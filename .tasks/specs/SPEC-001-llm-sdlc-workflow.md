@@ -3,7 +3,6 @@ id: SPEC-001
 title: LLM-driven SDLC workflow — "kanban in markdown" with epics
 status: draft            # draft | approved | superseded
 created: 2026-09-09
-epics: []                # derived by sync
 ---
 
 # SPEC-001: LLM-driven SDLC workflow
@@ -127,9 +126,12 @@ id: SPEC-001
 title: LLM-driven SDLC workflow — "kanban in markdown" with epics
 status: draft           # draft | approved | superseded
 created: 2026-09-09
-epics: []               # derived by sync
 ---
 ```
+
+The spec's epic list is not a frontmatter field — it is the generated `epics` region in the body
+(see Generated regions). Frontmatter holds source-of-truth values only; anything `sync` derives
+lives in a region.
 
 ---
 
@@ -191,6 +193,16 @@ Marker rules:
 - Hand-editing inside a region is a guardrail violation (see Guardrails); the edit is lost on the
   next `sync`.
 
+Rendering details (so output is byte-stable and `sync check` is meaningful):
+
+- Between the marker lines, `sync` emits exactly: the content lines, then a single trailing
+  newline before `<!-- END -->`. No leading blank line after `BEGIN`.
+- An **empty** region — a table with no rows — renders as the single line `_(none)_`.
+- Column tables (`in-progress`, `in-review`, `blocked`, `done`) use the header
+  `| Task | Title | Epic | Ref |`. `Ref` is the branch name while `in-progress`, the PR URL once
+  `in-review` or `done`. A task with no epic shows `—` in the Epic cell.
+- Table rows are ordered by task ID ascending. The `children` and `epics` panels likewise.
+
 Regions in use:
 
 | File | Region | Contents |
@@ -198,7 +210,7 @@ Regions in use:
 | `EPIC-*.md` | `children` | table of child tasks + `Progress: n/m done` |
 | `SPEC-*.md` | `epics` | table of epics spawned from this spec + their derived status |
 | `BOARD.md` | `epics` | roll-up panel (see below) |
-| `BOARD.md` | `in-progress`, `blocked`, `done` | one region per non-TODO column |
+| `BOARD.md` | `in-progress`, `in-review`, `blocked`, `done` | one region per non-TODO column |
 
 ---
 
@@ -239,10 +251,14 @@ The developer orders TODO by priority. `sync` must **preserve that order** and m
 A task with no epic simply omits the tag. A `blocked` task stays visible here with the marker
 rather than moving to its own column, so the priority list stays complete.
 
-### In Progress / Blocked / Done — fully generated
+### In Progress / In Review / Blocked / Done — fully generated
 
-Each is a `BEGIN:`/`END:` region holding a table of `ID | Title | Epic | Branch/PR`. Done is
-capped (e.g. last 20) with older entries removed by archiving.
+Each is a `BEGIN:`/`END:` region holding a table of `ID | Title | Epic | Branch/PR`. `in-review`
+is its own column (it maps to a real workflow state — a PR open, awaiting merge). Done is capped
+(e.g. last 20) with older entries removed by archiving.
+
+There is no "Won't do" column. `sync archive` moves `wont-do` task files to `.tasks/archive/`,
+leaving only a one-line reference behind — the board shows active work, not a graveyard.
 
 ### Idempotency
 
@@ -386,13 +402,15 @@ Stated explicitly for the LLM, from the analysis doc plus epic/marker additions:
 
 ---
 
+## Resolved during planning
+
+- **Archiving cadence** → runs at the end of every `sync` when `archive_done: true`. The
+  sync-subcommand table already specifies this; `implement-task` phase 4 simply calls `sync`.
+- **`in-review` on the board** → its own column. It maps to a real workflow state and the diff
+  noise of a dedicated column is negligible.
+
 ## Open questions
 
-- **Archiving cadence.** Immediately when a task hits `done` (inside `implement-task` phase 4), or
-  only in a periodic `sync archive` pass? Leaning immediate, but a burst of merges then produces
-  noisy board diffs.
-- **`in-review` on the board.** Its own column, or folded into In Progress with a marker (as
-  `blocked` is folded into TODO)? Leaning own column since it maps to a real Jira state.
 - **Multiple epics per task.** Jira allows only one Epic Link; this spec follows that. Revisit if
   a task legitimately spans two bodies of work (usually a sign it should be split).
 
