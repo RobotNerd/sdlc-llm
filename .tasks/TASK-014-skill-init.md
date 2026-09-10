@@ -22,7 +22,9 @@ A checklist skill that scaffolds the workflow into a fresh repo: empty `BOARD.md
 
 - [ ] Skill is a numbered checklist with explicit STOP markers and 'if X ambiguous, ASK' rules — not prose.
 - [ ] Produces: `BOARD.md` (with `epics` + four column regions, empty → `_(none)_`), `config.md`, `guidelines.md`, `.tasks/templates/{spec,epic,task}.md`, `.github/pull_request_template.md`.
-- [ ] Interviews the user for every `config.md` value rather than guessing; writes `workflow_version: 1`.
+- [ ] Interviews the user for every `config.md` value rather than guessing, including the git settings (`remote`, `rebase_before_pr`, `merge_strategy`, `delete_branch_after_merge`) with sensible defaults offered; writes `workflow_version: 1`.
+- [ ] Generated `guidelines.md` includes the git-workflow section and the never-merge / `--force-with-lease`-only guardrails (SPEC-001 §Guardrails).
+- [ ] Detects whether `gh` is installed and authenticated (`gh auth status`) and warns if not, since `implement-task` needs it.
 - [ ] Refuses to run if `.tasks/` already exists (points at an `upgrade` path instead).
 - [ ] Ends by running `sync` and showing the clean board.
 

@@ -79,13 +79,14 @@ refine-backlog→  periodic: reprioritise, recompute blocked, flag stale / under
 
 | Phase | Does | Ends |
 |---|---|---|
-| 1. Start | pick top unblocked TODO task, branch, `status: in-progress`, restate plan | **before any code** |
-| 2. Implement + test | code, unit tests, run the Testing strategy, record results in Worklog | after tests |
-| 3. Wrap up | docs, commit, push, **open** PR, `status: in-review` | **PR open, not merged** |
-| 4. Merge | separate go-ahead, CI green, merge, `status: done`, archive | done |
+| 1. Start | dirty-tree check, pick top unblocked TODO task, `git fetch` + branch from `origin/main`, `status: in-progress`, restate plan | **before any code** |
+| 2. Implement + test | code, unit tests, run the Testing strategy, record results in Worklog, stay in scope | after tests |
+| 3. Wrap up | docs, conventional commit, rebase onto `origin/main`, push (`--force-with-lease` after rebase), `gh pr create`, `status: in-review` | **PR open, not merged** |
+| 4. Merge — observed | a human reviews and **squash-merges** on GitHub; the skill polls `gh pr view`, then records `merge_commit`, `status: done`, archives, deletes the branch, ff-s local `main` | done |
 
 The STOPs exist because the original design did all of this in one uninterrupted run *including
-auto-merge* — which defeats the purpose of opening a PR at all.
+auto-merge* — which defeats the purpose of opening a PR at all. **The skill never merges** — it
+opens the PR and stops; phase 4 only observes the human's merge and records it.
 
 Two more behaviours worth knowing: **resumability** (on invocation it infers the current phase
 from branch existence + frontmatter + PR state, rather than restarting) and the **bail-out path**
@@ -114,29 +115,29 @@ But the workflow splits in two, and only one half is missing:
 | Decision | Choice |
 |---|---|
 | Branching | Per-task branches off `main`, PR into `main` — SPEC-001's flow verbatim |
+| Git driver | Automated via `git` + `gh` (installed, authed). Rebase-before-PR, `--force-with-lease` only after a rebase. **Human reviews every PR and does the squash & merge on GitHub**; the skill never merges |
 | `sync` home | `.tasks/bin/sync` — single stdlib file beside the data it manages |
-| Test setup | `pyproject.toml`, pytest as the only dev dependency, `test_command: pytest` |
+| Test setup | `pyproject.toml`, pytest as the only dev dependency, `test_command: pytest`. No conda/uv |
 | Sequencing | Front-load `sync`; drop the soft `TASK-004 ← TASK-002` edge |
 
-## Step 0 — prerequisite (you, manually)
+## Step 0 — prerequisite (done)
 
-`mvp` is 3 commits ahead of `main` and holds all the spec and task work. Land it first, or every
-task branch forks from a `main` that has no tasks in it:
+`mvp` was merged to `main` (the spec + tasks are on `main`). Refinements now go through
+`feat/initial-workflow` → PR → squash-merge before TASK-001 starts.
 
-```sh
-git checkout main && git merge mvp && git push origin main
-```
+## Changes made before TASK-001 (done — on `feat/initial-workflow`)
 
-## Changes to make before TASK-001 starts
-
-1. **`.tasks/TASK-004-sync-frontmatter-parser.md`** — remove `TASK-002` from `blocked_by`. The
-   parser targets SPEC-001's schema, which already exists; it does not need the templates. Remove
-   the mirrored `TASK-004` from `TASK-002`'s `blocks`, and note the reason in TASK-004's Notes.
-2. **`.tasks/TASK-004-...md`** — add an acceptance criterion: creates `pyproject.toml` (pytest as
-   sole dev dep) and the `tests/` directory, since it is the first task to ship Python.
-3. **`.tasks/BOARD.md`** — rewrite the TODO list in the new order below.
-4. **`.tasks/specs/SPEC-001-llm-sdlc-workflow.md`** — record the script's home (`.tasks/bin/sync`)
-   in §"The `sync` script"; it currently says "single-file Python 3 script" with no path.
+1. ✅ **TASK-004** — dropped `TASK-002` from `blocked_by`; removed the mirror from `TASK-002`'s
+   `blocks`; reason noted in both files' Notes.
+2. ✅ **TASK-004** — added acceptance criteria: `.tasks/bin/sync` path, root `pyproject.toml` with
+   `pytest` as the sole dev dep, `tests/` directory.
+3. ✅ **`.tasks/BOARD.md`** — TODO list rewritten in the new order below; `TASK-004` loses its ⛔.
+4. ✅ **SPEC-001** — script home fixed at `.tasks/bin/sync`; `config.md` schema gained the git
+   keys (`remote`, `rebase_before_pr`, `merge_strategy`, `delete_branch_after_merge`); Guardrails
+   gained the never-merge and `--force-with-lease`-only rules; `implement-task` phases 1/3/4
+   rewritten for `git`+`gh` automation.
+5. ✅ **TASK-001 / TASK-014 / TASK-016** — acceptance criteria updated for the git keys and the
+   `gh`-driven phases.
 
 ### New TODO order
 
@@ -153,52 +154,53 @@ git checkout main && git merge mvp && git push origin main
 
 ## The per-task loop (bootstrap mode)
 
-I follow SPEC-001's four-phase checklist by hand. **You run every git command.**
+I follow SPEC-001's four-phase checklist. **I run `git` and `gh`.** You review and squash-merge
+each PR on GitHub — that is the only step that is yours.
 
-**Phase 1 — Start.** I name the top unblocked TODO task and hand you the branch command
-(`git checkout main && git pull && git checkout -b task-NNN-slug`). You run it. I set
-`status: in-progress` and `branch:` in the task frontmatter, update the board, then restate the
-plan and acceptance criteria. → *you approve* → **STOP**
+**Phase 1 — Start.** I check the tree is clean, name the top unblocked TODO task, run
+`git fetch origin && git switch -c task-NNN-slug origin/main`, set `status: in-progress` and
+`branch:`, update the board, then restate the plan and acceptance criteria. → *you approve* →
+**STOP**
 
 **Phase 2 — Implement + test.** I write the files and unit tests, run `test_command` /
 `lint_command` once they exist, then walk the task's Testing strategy. Anything not automatable I
-hand to you to run, and record your result in the task's **Worklog**. I touch nothing outside the
-task's scope. → **STOP**
+hand to you to run, and record your result in the task's **Worklog**. I stay strictly in scope
+(`git diff --name-only`). → **STOP**
 
-**Phase 3 — Wrap up.** I update docs and draft the conventional commit message
-(`feat(TASK-001): …`) plus the PR title and body with acceptance criteria as a checklist. You run
-`git add` / `commit` / `push` and open the PR in the web UI. I record `pr:` and set
-`status: in-review`. → **STOP, no merge**
+**Phase 3 — Wrap up.** I update docs, make the conventional commit (`feat(TASK-001): …`), rebase
+onto `origin/main` (surfacing any conflict), push (`--force-with-lease` if the rebase rewrote
+pushed history), and run `gh pr create` with the acceptance criteria as a checklist. I record
+`pr:` and set `status: in-review`. → **STOP** — over to you
 
-**Phase 4 — Merge.** Separate go-ahead from you, gated on tests passing (on CI once TASK-020
-lands). You merge and `git checkout main && git pull`. I record `merge_commit:`, set
-`status: done`, and update the board — via `sync` once it exists.
+**Phase 4 — Merge (yours, then I observe).** You review the PR on GitHub and **squash & merge**.
+On my next turn I poll `gh pr view --json state,mergeCommit`; once merged I record `merge_commit:`,
+set `status: done`, update the board (via `sync` once it exists), delete the task branch, and
+fast-forward local `main`. I never run `gh pr merge`.
 
 ## Gaps
 
 | Gap | Effect now | Closes at |
 |---|---|---|
-| **Git is manual** — your call, by design | I draft every command and message; you execute. Nothing is committed or pushed without you | whenever you delegate |
-| **`gh` CLI not installed** | PRs opened via web UI. TASK-016's resumability detects state via `gh pr view` — it must degrade gracefully when `gh` is absent. Worth adding to its acceptance criteria | install `gh`, or design around it |
+| **Merge is manual** — by design | I open every PR and stop. You review and squash-merge on GitHub; I observe the result next turn | stays yours unless you delegate it |
+| **Git driver is checklist prose, not code** | I run `git`/`gh` by following SPEC-001's steps; no shared helper, so I re-derive the sequence each task | extract a helper if it proves unreliable (noted in TASK-016) |
 | **No skills exist** | I hand-follow SPEC-001's phase checklists. Risk: I drift from them — call it out if I skip a STOP | TASK-016 |
 | **No `sync`** | I hand-maintain task frontmatter + the TODO list; the `epics` panel, status columns and EPIC-001 `children` region go deliberately stale | TASK-008/009, verified by TASK-012 |
 | **Epic status won't roll up** | EPIC-001 reads `todo` on paper even once work starts | TASK-006 |
-| **No CI** | "merge gated on green CI" is "tests pass locally" | TASK-020 |
+| **No CI** | "merge gated on green CI" is "tests pass locally" + your eyeball on `gh pr checks` | TASK-020 |
 | **No `.tasks/archive/`** | Done tasks accumulate on the board | TASK-011 |
-| **`CLAUDE.md` is stale** | Still says "design-stage, no application code" — wrong the moment TASK-004 lands | TASK-019, or opportunistically |
-| **`prompts.md`** | Untracked, contents just `# prompts`, not referenced by any task | your call |
-| **`.tmp/` is not gitignored** | `.gitignore` has `tmp/`, which does not match `.tmp/` — this file would be committed | add `.tmp/` to `.gitignore` if unintended |
+| **`gh` degradation path untested** | If `gh` breaks mid-flow I fall back to printing commands for you; not yet exercised | TASK-016 testing strategy |
 
 ## Verification
 
-1. **Step 0 worked:** `git log --oneline main..mvp` is empty and `main` contains `.tasks/`.
-2. **Graph still sound:** re-run the dependency checks after the TASK-004 edit — `blocks` is still
-   the exact mirror of `blocked_by`, the graph is acyclic, the new TODO order is a valid
-   topological sort, all 20 tasks listed exactly once.
-3. **Board annotations match:** TASK-004's TODO line no longer carries a ⛔ marker.
-4. **First loop end-to-end:** run TASK-001 through all four phases. Success = a merged PR titled
-   for `TASK-001`, its frontmatter reading `status: done` with `pr:` and `merge_commit:` filled,
-   and `.tasks/config.md` + `.tasks/guidelines.md` present on `main`.
+1. **Refinements land:** `feat/initial-workflow` opens a PR, you squash-merge it, `main` carries
+   the git-automation changes.
+2. **Graph still sound:** the dependency checks pass after the TASK-004 edit — `blocks` mirrors
+   `blocked_by`, the graph is acyclic, the new TODO order is a valid topological sort, all 20
+   tasks listed exactly once. (Confirmed this pass.)
+3. **Board annotations match:** TASK-004's TODO line no longer carries a ⛔ marker. (Confirmed.)
+4. **First loop end-to-end:** run TASK-001 through all four phases. Success = a squash-merged PR
+   titled for `TASK-001`, its frontmatter reading `status: done` with `pr:` and `merge_commit:`
+   filled, and `.tasks/config.md` + `.tasks/guidelines.md` present on `main`.
 5. **The real proof, later:** at TASK-019 the first full `sync` run produces **no diff** against
    the hand-written generated regions. A mismatch means the spec was underspecified — file it as a
    defect rather than editing the regions to match.
