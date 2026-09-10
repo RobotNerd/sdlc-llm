@@ -17,7 +17,7 @@ Each .tasks/TASK-*.md file contains the following components:
 - Description: Details about the purpose of the ticket and relevant context needed to implement it.
 - Acceptance criteria: List of features/requirements that must be met for the ticket to be complete.
 - Testing strategy: High-level steps to test and verify the functionality. Note that these test steps differ from unit tests, becaue they are intended to verify the full behavior (e.g. making actual API calls, verifying that the feature works within the context of the larger application, etc).
-- Additional notess: Any additional information that provide useful context, e.g. related tickets, libraries that might be helpful, references to relevant documentation, etc.
+- Additional notes: Any additional information that provide useful context, e.g. related tickets, libraries that might be helpful, references to relevant documentation, etc.
 
 Example:
 
