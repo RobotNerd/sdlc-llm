@@ -2,7 +2,7 @@
 id: TASK-007
 title: "sync: epic children and spec epics region renderers"
 type: feature
-status: todo
+status: in-progress
 epic: EPIC-001
 created: 2026-09-10
 branch: task-007-sync-epic-spec-renderers
@@ -34,7 +34,19 @@ Render the two non-board regions: the `children` table + `Progress: n/m done` li
 
 ## Worklog
 
-_(empty — appended during implementation)_
+- 2026-09-11: Testing strategy step 2 (render SPEC-001's `epics` region, diff against hand-written)
+  surfaced a real defect in TASK-005's `find_region`: it has no concept of markdown fenced code
+  blocks, so SPEC-001's own illustrative examples of the marker syntax (§'Generated regions',
+  §'Epics panel') were misread as live regions. Fixed `_find_marker`/`find_region` to skip matches
+  inside ` ``` ` fences, with regression tests added to `test_region_engine.py` (TASK-005's test
+  file — the right home for tests of that code, even though the fix ships in this task's commit).
+  Chose to fix rather than work around: the bug would have corrupted SPEC-001 the first time
+  `sync` actually processed it, and it was found executing this task's own mandated testing step,
+  not an unrelated drive-by change.
+- Also added the real `epics` region to SPEC-001 (replacing the stale "Proposed epic breakdown"
+  six-epic table, superseded when the epic decomposition became a single `EPIC-001: MVP`) — this
+  was needed to have something real to diff against for step 2, and completes SPEC-001's own
+  Data model promise that spec files carry an `epics` region.
 
 ## Notes
 
