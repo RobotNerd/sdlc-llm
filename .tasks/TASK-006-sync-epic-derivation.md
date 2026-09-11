@@ -2,7 +2,7 @@
 id: TASK-006
 title: "sync: epic-status derivation and blocked_by/blocks reconciliation"
 type: feature
-status: todo
+status: in-progress
 epic: EPIC-001
 created: 2026-09-10
 branch: task-006-sync-epic-derivation
