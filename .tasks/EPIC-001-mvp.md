@@ -44,7 +44,7 @@ by this repo managing its own `.tasks/` end to end.
 | TASK-003 | todo | Add .github/pull_request_template.md mirroring acceptance criteria |
 | TASK-004 | done | sync: stdlib frontmatter parser and artifact loader |
 | TASK-005 | done | sync: generated-region find / replace / append engine |
-| TASK-006 | in-progress | sync: epic-status derivation and blocked_by/blocks reconciliation |
+| TASK-006 | in-review | sync: epic-status derivation and blocked_by/blocks reconciliation |
 | TASK-007 | todo | sync: epic children and spec epics region renderers |
 | TASK-008 | todo | sync: BOARD.md epics panel and status columns |
 | TASK-009 | todo | sync: BOARD.md TODO merge (preserve order, drop, append, annotate) |
