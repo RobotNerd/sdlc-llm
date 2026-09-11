@@ -42,7 +42,7 @@ by this repo managing its own `.tasks/` end to end.
 | TASK-001 | done | Author guidelines.md and config.md for this repo |
 | TASK-002 | todo | Create spec / epic / task templates in .tasks/templates/ |
 | TASK-003 | todo | Add .github/pull_request_template.md mirroring acceptance criteria |
-| TASK-004 | todo | sync: stdlib frontmatter parser and artifact loader |
+| TASK-004 | in-review | sync: stdlib frontmatter parser and artifact loader |
 | TASK-005 | todo | sync: generated-region find / replace / append engine |
 | TASK-006 | todo | sync: epic-status derivation and blocked_by/blocks reconciliation |
 | TASK-007 | todo | sync: epic children and spec epics region renderers |

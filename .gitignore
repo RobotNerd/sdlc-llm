@@ -1,2 +1,10 @@
 .DS_Store
 *.swp
+
+# Python (TASK-004 onward: .tasks/bin/sync + its pytest suite)
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+.venv/
+venv/
