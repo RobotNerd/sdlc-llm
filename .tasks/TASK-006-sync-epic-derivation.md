@@ -2,11 +2,11 @@
 id: TASK-006
 title: "sync: epic-status derivation and blocked_by/blocks reconciliation"
 type: feature
-status: todo
+status: in-review
 epic: EPIC-001
 created: 2026-09-10
 branch: task-006-sync-epic-derivation
-pr: null
+pr: https://github.com/RobotNerd/sdlc-llm/pull/6
 merge_commit: null
 blocked_by: [TASK-004]
 blocks: [TASK-007, TASK-008]
