@@ -2,12 +2,12 @@
 id: TASK-004
 title: "sync: stdlib frontmatter parser and artifact loader"
 type: feature
-status: in-review
+status: done
 epic: EPIC-001
 created: 2026-09-10
 branch: task-004-sync-frontmatter-parser
 pr: https://github.com/RobotNerd/sdlc-llm/pull/4
-merge_commit: null
+merge_commit: 7de06ef68a359d7da7d1eaee9c7b3328d2d41d99
 blocked_by: []
 blocks: [TASK-006, TASK-010, TASK-011]
 ---
