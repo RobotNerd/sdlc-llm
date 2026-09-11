@@ -1,0 +1,263 @@
+#!/usr/bin/env python3
+"""sync — the deterministic engine for this repo's markdown kanban workflow.
+
+TASK-004 lays the foundation only: a hand-rolled frontmatter parser/renderer
+and a loader that discovers SPEC/EPIC/TASK artifacts under `.tasks/`. It
+imports nothing outside the Python standard library — see
+`.tasks/specs/SPEC-001-llm-sdlc-workflow.md` §"The sync script" for why.
+
+Later tasks add the actual subcommands (`next-id`, region rendering, epic
+derivation, `check`, `archive` — TASK-006 through TASK-012). Running this
+file directly today just discovers and summarizes the current artifacts, as
+a smoke test that the parser/loader work end to end.
+"""
+
+from __future__ import annotations
+
+import re
+import sys
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+
+
+class FrontmatterError(ValueError):
+    """Raised when frontmatter falls outside the supported subset.
+
+    The supported subset (SPEC-001 §"The sync script"): bare and quoted
+    string scalars, `null`, `true`/`false`, integers, and single-level
+    inline `[a, b, c]` lists of those scalars. Trailing `# comment` text is
+    ignored on parse (and therefore not reproduced on render). Anything
+    else — nested maps, block scalars (`|`/`>`), YAML anchors/aliases,
+    multi-line values, tabs — is rejected with a specific error rather than
+    silently misparsed.
+    """
+
+
+_KEY_LINE_RE = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*):[ \t]*(.*)$")
+_INT_RE = re.compile(r"^-?\d+$")
+_BLOCK_SCALAR_PREFIXES = ("|", ">", "&", "*", "{", "}")
+
+
+def _strip_comment(raw: str) -> str:
+    """Drop a trailing ' # ...' comment, ignoring '#' inside a quoted string."""
+    in_quotes = False
+    for i, ch in enumerate(raw):
+        if ch == '"':
+            in_quotes = not in_quotes
+        elif ch == "#" and not in_quotes and (i == 0 or raw[i - 1] in " \t"):
+            return raw[:i].rstrip()
+    return raw.rstrip()
+
+
+def _parse_scalar(token: str) -> Any:
+    token = token.strip()
+    if token == "":
+        raise FrontmatterError("empty scalar value")
+    if token == "null":
+        return None
+    if token == "true":
+        return True
+    if token == "false":
+        return False
+    if token.startswith('"'):
+        if not (token.endswith('"') and len(token) >= 2):
+            raise FrontmatterError(f"unterminated quoted scalar: {token!r}")
+        inner = token[1:-1]
+        if '"' in inner:
+            raise FrontmatterError(f"unsupported escaped quote in: {token!r}")
+        return inner
+    if token.startswith("'"):
+        raise FrontmatterError(f"single-quoted scalars are not supported: {token!r}")
+    if _INT_RE.match(token):
+        return int(token)
+    if any(token.startswith(p) for p in _BLOCK_SCALAR_PREFIXES):
+        raise FrontmatterError(f"unsupported YAML feature: {token!r}")
+    return token  # bare string, taken verbatim
+
+
+def _parse_list(token: str) -> list[Any]:
+    if not (token.startswith("[") and token.endswith("]")):
+        raise FrontmatterError(f"unterminated list: {token!r}")
+    inner = token[1:-1].strip()
+    if inner == "":
+        return []
+    if "[" in inner or "]" in inner:
+        raise FrontmatterError(f"nested lists are not supported: {token!r}")
+    return [_parse_scalar(item) for item in inner.split(",")]
+
+
+def _parse_value(raw: str) -> Any:
+    raw = raw.strip()
+    if raw == "":
+        raise FrontmatterError("missing value")
+    if raw.startswith("["):
+        return _parse_list(raw)
+    return _parse_scalar(raw)
+
+
+def parse_frontmatter(text: str) -> tuple[dict[str, Any], str, list[str]]:
+    """Split a file into (fields, body, key_order).
+
+    `fields` is keyed by frontmatter key; `order` preserves the order keys
+    appeared in, so `render_frontmatter` can round-trip a file byte-for-byte
+    when it uses only the supported subset (SPEC-001's real task/epic/spec
+    files and config.md do). Raises `FrontmatterError` — naming the exact
+    line — for anything outside that subset.
+    """
+    if not text.startswith("---\n"):
+        raise FrontmatterError("file does not start with a '---' frontmatter block")
+    end = text.find("\n---\n", 4)
+    if end == -1:
+        raise FrontmatterError("frontmatter block is not closed with a '---' line")
+    block = text[4:end]
+    body = text[end + len("\n---\n"):]
+
+    fields: dict[str, Any] = {}
+    order: list[str] = []
+    for lineno, line in enumerate(block.split("\n"), start=1):
+        if line.strip() == "":
+            continue
+        if line[0] in " \t":
+            raise FrontmatterError(
+                f"line {lineno}: indentation / nested maps are not supported: {line!r}"
+            )
+        match = _KEY_LINE_RE.match(line)
+        if not match:
+            raise FrontmatterError(f"line {lineno}: not a 'key: value' line: {line!r}")
+        key, rest = match.group(1), _strip_comment(match.group(2))
+        try:
+            value = _parse_value(rest)
+        except FrontmatterError as exc:
+            raise FrontmatterError(f"line {lineno} ({key}): {exc}") from exc
+        if key in fields:
+            raise FrontmatterError(f"line {lineno}: duplicate key {key!r}")
+        fields[key] = value
+        order.append(key)
+    return fields, body, order
+
+
+def _needs_quoting(s: str) -> bool:
+    if s in ("null", "true", "false"):
+        return True
+    if _INT_RE.match(s):
+        return True
+    if s == "" or s[0] in " \t":
+        return True
+    if any(s.startswith(p) for p in ("[", *_BLOCK_SCALAR_PREFIXES, "'", '"')):
+        return True
+    return ":" in s or "#" in s
+
+
+def render_value(value: Any) -> str:
+    if value is None:
+        return "null"
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, int):
+        return str(value)
+    if isinstance(value, list):
+        return "[" + ", ".join(render_value(v) for v in value) + "]"
+    if isinstance(value, str):
+        if '"' in value:
+            raise FrontmatterError(f"cannot render a string containing '\"': {value!r}")
+        return f'"{value}"' if _needs_quoting(value) else value
+    raise FrontmatterError(f"cannot render value of type {type(value).__name__}: {value!r}")
+
+
+def render_frontmatter(fields: dict[str, Any], order: list[str] | None = None) -> str:
+    """Inverse of `parse_frontmatter`'s field extraction: dict -> '---' block.
+
+    `order` should normally be the `order` a prior `parse_frontmatter` call
+    returned, so edited files keep their original key order.
+    """
+    keys = order if order is not None else list(fields.keys())
+    if set(keys) != set(fields.keys()):
+        raise FrontmatterError("`order` does not match the keys in `fields`")
+    lines = ["---"]
+    lines.extend(f"{key}: {render_value(fields[key])}" for key in keys)
+    lines.append("---")
+    return "\n".join(lines) + "\n"
+
+
+_KIND_PATTERNS = {
+    "spec": re.compile(r"^SPEC-\d+.*\.md$"),
+    "epic": re.compile(r"^EPIC-\d+.*\.md$"),
+    "task": re.compile(r"^TASK-\d+.*\.md$"),
+}
+
+
+def _kind_of(filename: str) -> str | None:
+    for kind, pattern in _KIND_PATTERNS.items():
+        if pattern.match(filename):
+            return kind
+    return None
+
+
+@dataclass
+class Artifact:
+    """A loaded SPEC/EPIC/TASK file: its frontmatter, body, and location."""
+
+    id: str
+    kind: str  # "spec" | "epic" | "task"
+    path: Path
+    fields: dict[str, Any]
+    order: list[str]
+    body: str
+
+    def write(self) -> None:
+        """Write this artifact's current fields/body back to `self.path`."""
+        self.path.write_text(render_frontmatter(self.fields, self.order) + self.body)
+
+
+def discover(tasks_root: Path) -> dict[str, Artifact]:
+    """Scan `.tasks/`, `.tasks/specs/`, and `.tasks/archive/` for artifacts.
+
+    Returns a dict keyed by artifact id (e.g. "TASK-004"). Raises
+    `FrontmatterError` on a malformed file, a file missing/misplaced its
+    `id` field, or two files claiming the same id.
+    """
+    search_dirs = [tasks_root, tasks_root / "specs", tasks_root / "archive"]
+    artifacts: dict[str, Artifact] = {}
+    for directory in search_dirs:
+        if not directory.is_dir():
+            continue
+        for path in sorted(directory.glob("*.md")):
+            kind = _kind_of(path.name)
+            if kind is None:
+                continue
+            text = path.read_text()
+            try:
+                fields, body, order = parse_frontmatter(text)
+            except FrontmatterError as exc:
+                raise FrontmatterError(f"{path}: {exc}") from exc
+            art_id = fields.get("id")
+            if not isinstance(art_id, str) or not art_id:
+                raise FrontmatterError(f"{path}: missing or invalid 'id' field")
+            if art_id in artifacts:
+                raise FrontmatterError(
+                    f"duplicate id {art_id!r}: {artifacts[art_id].path} and {path}"
+                )
+            artifacts[art_id] = Artifact(
+                id=art_id, kind=kind, path=path, fields=fields, order=order, body=body
+            )
+    return artifacts
+
+
+def main(argv: list[str]) -> int:
+    if argv:
+        print(f"sync: no subcommands yet (got {argv!r}) — TASK-006 onward add them", file=sys.stderr)
+        return 2
+    tasks_root = Path(__file__).resolve().parent.parent
+    artifacts = discover(tasks_root)
+    by_kind: dict[str, int] = {}
+    for art in artifacts.values():
+        by_kind[art.kind] = by_kind.get(art.kind, 0) + 1
+    print(f"Discovered {len(artifacts)} artifact(s) under {tasks_root}:")
+    for kind in ("spec", "epic", "task"):
+        print(f"  {kind}: {by_kind.get(kind, 0)}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main(sys.argv[1:]))

@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sdlc-llm"
+version = "0.1.0"
+description = "LLM-driven SDLC workflow toolkit (kanban in markdown)."
+requires-python = ">=3.9"
+dependencies = []
+
+# pytest is the sole dev dependency (SPEC-001 §"The sync script"). `.tasks/bin/sync`
+# itself imports nothing outside the standard library — this extra exists only to
+# run its test suite.
+[project.optional-dependencies]
+dev = ["pytest"]
+
+# No installable package lives at the repo root — `.tasks/bin/sync` is a standalone
+# script, imported by tests via file path, not as a package. Tell setuptools not to
+# go looking for one, so `pip install -e '.[dev]'` succeeds with plain pip.
+[tool.setuptools]
+packages = []
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

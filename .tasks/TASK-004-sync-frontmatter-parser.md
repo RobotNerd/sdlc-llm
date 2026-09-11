@@ -2,7 +2,7 @@
 id: TASK-004
 title: "sync: stdlib frontmatter parser and artifact loader"
 type: feature
-status: todo
+status: in-progress
 epic: EPIC-001
 created: 2026-09-10
 branch: task-004-sync-frontmatter-parser
@@ -37,7 +37,12 @@ The foundation of `sync`: a single-file Python 3 module at `.tasks/bin/sync`, st
 
 ## Worklog
 
-_(empty — appended during implementation)_
+- 2026-09-11: Picked out of TODO order (TASK-005 is listed first but has no `blocked_by`; both
+  are unblocked). TASK-005's AC requires pytest-run unit tests, and the pytest scaffold
+  (`pyproject.toml`, `tests/`) is this task's scope. Doing TASK-004 first avoids TASK-005 either
+  bootstrapping that scaffold itself (scope creep across task boundaries) or shipping without
+  real tests. TODO list order is unchanged — this is a one-off pick of the top *practically*
+  unblocked task, confirmed with the user.
 
 ## Notes
 
