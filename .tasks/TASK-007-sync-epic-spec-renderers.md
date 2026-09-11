@@ -2,11 +2,11 @@
 id: TASK-007
 title: "sync: epic children and spec epics region renderers"
 type: feature
-status: in-progress
+status: in-review
 epic: EPIC-001
 created: 2026-09-10
 branch: task-007-sync-epic-spec-renderers
-pr: null
+pr: https://github.com/RobotNerd/sdlc-llm/pull/7
 merge_commit: null
 blocked_by: [TASK-005, TASK-006]
 blocks: [TASK-012]
