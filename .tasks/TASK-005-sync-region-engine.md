@@ -2,7 +2,7 @@
 id: TASK-005
 title: "sync: generated-region find / replace / append engine"
 type: feature
-status: todo
+status: in-progress
 epic: EPIC-001
 created: 2026-09-10
 branch: task-005-sync-region-engine
