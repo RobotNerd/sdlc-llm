@@ -2,7 +2,7 @@
 id: TASK-001
 title: "Author guidelines.md and config.md for this repo"
 type: chore
-status: todo
+status: in-progress
 epic: EPIC-001
 created: 2026-09-10
 branch: task-001-guidelines-and-config
