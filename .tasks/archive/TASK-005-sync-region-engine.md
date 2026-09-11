@@ -2,12 +2,12 @@
 id: TASK-005
 title: "sync: generated-region find / replace / append engine"
 type: feature
-status: in-review
+status: done
 epic: EPIC-001
 created: 2026-09-10
 branch: task-005-sync-region-engine
 pr: https://github.com/RobotNerd/sdlc-llm/pull/5
-merge_commit: null
+merge_commit: e4986616a7ff48c5da6f98a58df839d056899c3e
 blocked_by: []
 blocks: [TASK-007, TASK-008]
 ---
