@@ -9,7 +9,7 @@ created: 2026-09-09
 
 ## Problem
 
-`project-management-plan.md` critiques the workflow sketched in `README.md` and reaches firm
+`.tmp/project-management-plan.md` critiques the workflow sketched in `README.md` and reaches firm
 conclusions, but it is written as feedback on a design, not as something buildable: there are no
 schemas to code against, no derivation rules, no scope line. Separately, the workflow has no
 concept of an **epic** — a grouping layer above the task — which the user relies on in Jira
@@ -281,6 +281,10 @@ lint_command: ruff check .
 docs_paths: [README.md, docs/]
 default_branch: main
 branch_prefix: task-
+remote: origin
+rebase_before_pr: true
+merge_strategy: squash          # performed by a human; the skill never merges
+delete_branch_after_merge: true
 allow_auto_merge: false
 ci_checks: [build, test]
 archive_done: true
@@ -293,10 +297,13 @@ archive_done: true
 
 ## The `sync` script
 
-A single-file **Python 3 script, standard library only** — no pip dependencies, no YAML library
-(it hand-parses the small frontmatter subset the model produces: scalars, `null`, and simple
-`[a, b]` lists). Rationale: Python is present on macOS and virtually all Linux, so the script
-drops into any project regardless of that project's own language.
+Lives at **`.tasks/bin/sync`** — a single-file **Python 3 script, standard library only** — no pip
+dependencies, no YAML library (it hand-parses the small frontmatter subset the model produces:
+scalars, `null`, and simple `[a, b]` lists). Rationale: Python is present on macOS and virtually
+all Linux, so the script drops into any project regardless of that project's own language, and
+keeping it under `.tasks/` means the whole workflow travels as one directory when it is later
+extracted into a standalone repo. Its tests need `pytest` (declared as the only dev dependency in
+`pyproject.toml`); the script itself imports nothing outside the standard library.
 
 Subcommands:
 
@@ -319,9 +326,10 @@ not prose descriptions of intent. Each calls `sync` rather than hand-editing gen
 ### `init`
 
 Scaffolds `.tasks/` in a new repo: empty `BOARD.md` with its regions, `config.md` (interviews the
-user for `test_command` etc.), `guidelines.md` (carrying `workflow_version`), templates under
-`.tasks/templates/` for spec/epic/task, and `.github/pull_request_template.md` mirroring the
-acceptance-criteria checklist.
+user for `test_command`, the git settings — `remote`, `rebase_before_pr`, `merge_strategy`,
+`delete_branch_after_merge` — etc.), `guidelines.md` (carrying `workflow_version`, and stating the
+never-merge / `--force-with-lease`-only guardrails), templates under `.tasks/templates/` for
+spec/epic/task, and `.github/pull_request_template.md` mirroring the acceptance-criteria checklist.
 
 ### `add-task`
 
@@ -340,22 +348,31 @@ and a testing strategy, it asks follow-ups. Then:
 Four phases, each a natural stopping point with a **STOP** between them. Carries over the analysis
 doc's design.
 
-1. **Start.** Pick the top unblocked TODO task (announce any blocked ones skipped). Create the
-   branch from latest `default_branch`. Set `status: in-progress`, run `sync`. **Restate the plan
-   and the acceptance criteria for human approval before writing any code.** — STOP —
+1. **Start.** Refuse to begin if the working tree is dirty. Pick the top unblocked TODO task
+   (announce any blocked ones skipped). `git fetch <remote>`, then branch from
+   `<remote>/<default_branch>`. Set `status: in-progress` and `branch:`, run `sync`. **Restate the
+   plan and the acceptance criteria for human approval before writing any code.** — STOP —
 2. **Implement + test.** Write code and unit tests. Run `test_command` and `lint_command`. Then
    walk the task's Testing strategy; for steps that cannot be automated (real API calls, cost
    money, need credentials) **present them to the human to run and record the result** in the
-   Worklog — do not silently skip. Explicit rule: **do not fix unrelated things on this branch.**
-   — STOP —
-3. **Wrap up.** Update `docs_paths`. Conventional-commit referencing `TASK-011`. Push. Open the PR
-   with acceptance criteria as a checklist and test results filled in. Record `pr:` in
-   frontmatter, set `status: in-review`, run `sync`. **STOP here** — do not merge.
-4. **Merge.** Separate invocation, separate go-ahead, gated on CI green. Merge, record
-   `merge_commit:`, set `status: done`, run `sync` (which archives the task).
+   Worklog — do not silently skip. Explicit rule: **do not fix unrelated things on this branch** —
+   verify with `git diff --name-only` before committing. — STOP —
+3. **Wrap up.** Update `docs_paths`. Commit (conventional, referencing the task ID). If
+   `rebase_before_pr`, `git fetch <remote>` and rebase onto `<remote>/<default_branch>` — on
+   conflict, stop and surface it rather than guessing. Push (`--force-with-lease` if the rebase
+   rewrote already-pushed history). Open the PR with `gh pr create`, acceptance criteria as a
+   checklist and test results filled in. Record the returned URL in `pr:`, set
+   `status: in-review`, run `sync`. **STOP here** — the human reviews and merges.
+4. **Merge — observed, never performed.** A human reviews the PR on GitHub and **squash-merges**
+   it. On the next invocation the skill polls `gh pr view --json state,mergeCommit`; once `MERGED`
+   it records `merge_commit:` (the squash commit), sets `status: done`, runs `sync` (which
+   archives the task), then deletes the task branch locally and on the remote if
+   `delete_branch_after_merge`, and fast-forwards local `default_branch`. **The skill never runs
+   `gh pr merge`.**
 
-**Resumability:** on invocation the skill detects current phase from repo state — branch exists?
-frontmatter `status` / `pr`? `gh pr view`? — and continues from there rather than restarting.
+**Resumability:** on invocation the skill detects current phase from repo state — working tree
+clean? branch exists (`git branch --list`)? frontmatter `status` / `pr`? `gh pr view --json
+state,mergeCommit`? — and continues from there rather than restarting.
 
 **Bail-out:** if mid-implementation the task proves wrong or underspecified, stop, write findings
 into the task file, set `status` back to `todo` or `blocked`, run `sync`, surface to the user.
@@ -380,9 +397,13 @@ spec-kit, Amazon Kiro).
 
 Stated explicitly for the LLM, from the analysis doc plus epic/marker additions:
 
-- Never push to `default_branch`; never force-push; always branch from latest `default_branch`.
-- Never merge with red CI. Never merge in phase 3 of `implement-task`.
-- Never touch files outside the current task's scope.
+- Never push to `default_branch`. Always branch from the freshly-fetched `<remote>/<default_branch>`.
+- **Never merge.** The skill opens the PR and stops; a human reviews and squash-merges on GitHub.
+  Phase 4 only observes that merge and records it. Never run `gh pr merge`.
+- Force-pushing is allowed **only** as `git push --force-with-lease` on the current task's own
+  branch, immediately after a rebase onto `default_branch` — never plain `--force`, never on
+  `default_branch`, never on a branch anyone else uses.
+- Never touch files outside the current task's scope (`git diff --name-only` is the check).
 - Never hand-edit text inside a `BEGIN:`/`END:` generated region — change the source task/epic
   file and run `sync`.
 - Never hand-edit an epic's `status` except to set `wont-do`.

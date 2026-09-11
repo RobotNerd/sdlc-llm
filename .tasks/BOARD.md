@@ -14,19 +14,19 @@ between `<!-- BEGIN -->` / `<!-- END -->` markers — change the task/epic file 
 
 ## TODO
 
-- TASK-002 — Create spec / epic / task templates in .tasks/templates/  `EPIC-001`
 - TASK-001 — Author guidelines.md and config.md for this repo  `EPIC-001`
-- TASK-003 — Add .github/pull_request_template.md mirroring acceptance criteria  `EPIC-001`
 - TASK-005 — sync: generated-region find / replace / append engine  `EPIC-001`
-- TASK-004 — sync: stdlib frontmatter parser and artifact loader  `EPIC-001` ⛔ blocked_by TASK-002
+- TASK-004 — sync: stdlib frontmatter parser and artifact loader  `EPIC-001`
 - TASK-006 — sync: epic-status derivation and blocked_by/blocks reconciliation  `EPIC-001` ⛔ blocked_by TASK-004
 - TASK-007 — sync: epic children and spec epics region renderers  `EPIC-001` ⛔ blocked_by TASK-005, TASK-006
 - TASK-008 — sync: BOARD.md epics panel and status columns  `EPIC-001` ⛔ blocked_by TASK-005, TASK-006
 - TASK-009 — sync: BOARD.md TODO merge (preserve order, drop, append, annotate)  `EPIC-001` ⛔ blocked_by TASK-008
+- TASK-012 — sync check: compute, diff, exit non-zero, write nothing  `EPIC-001` ⛔ blocked_by TASK-007, TASK-008, TASK-009
 - TASK-010 — sync next-id: print the next free id for a type  `EPIC-001` ⛔ blocked_by TASK-004
 - TASK-011 — sync archive: move done/wont-do tasks to .tasks/archive/  `EPIC-001` ⛔ blocked_by TASK-004, TASK-008
-- TASK-012 — sync check: compute, diff, exit non-zero, write nothing  `EPIC-001` ⛔ blocked_by TASK-007, TASK-008, TASK-009
 - TASK-013 — End-to-end idempotency and derivation-matrix test suite  `EPIC-001` ⛔ blocked_by TASK-009, TASK-011, TASK-012
+- TASK-002 — Create spec / epic / task templates in .tasks/templates/  `EPIC-001`
+- TASK-003 — Add .github/pull_request_template.md mirroring acceptance criteria  `EPIC-001`
 - TASK-019 — Dogfood: bring this repo's .tasks/ fully under the toolkit  `EPIC-001` ⛔ blocked_by TASK-012, TASK-013
 - TASK-020 — CI workflow running sync check on every PR  `EPIC-001` ⛔ blocked_by TASK-012
 - TASK-014 — init skill: scaffold .tasks/ in a new repo  `EPIC-001` ⛔ blocked_by TASK-002, TASK-003, TASK-010

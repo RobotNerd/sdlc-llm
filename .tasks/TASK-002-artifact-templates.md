@@ -9,7 +9,7 @@ branch: task-002-artifact-templates
 pr: null
 merge_commit: null
 blocked_by: []
-blocks: [TASK-004, TASK-014, TASK-015, TASK-016]
+blocks: [TASK-014, TASK-015, TASK-016]
 ---
 
 # TASK-002: Create spec / epic / task templates in .tasks/templates/
@@ -38,4 +38,5 @@ _(empty — appended during implementation)_
 ## Notes
 
 - No dependencies.
-- Blocks TASK-004, TASK-014, TASK-015, TASK-016 — they all consume these templates or the schema they encode.
+- Blocks TASK-014, TASK-015, TASK-016 — the skills consume these templates. (TASK-004's parser
+  targets the schema in SPEC-001 directly, not the templates, so that edge was dropped.)
