@@ -397,7 +397,11 @@ spec-kit, Amazon Kiro).
 
 Stated explicitly for the LLM, from the analysis doc plus epic/marker additions:
 
-- Never push to `default_branch`. Always branch from the freshly-fetched `<remote>/<default_branch>`.
+- Never push *task work* to `default_branch`. Always branch from the freshly-fetched
+  `<remote>/<default_branch>`. The one exception: phase 4's own bookkeeping (`merge_commit`,
+  `status: done`, archiving, board/epic regeneration) may commit straight to `default_branch` —
+  it records a fact about a merge a human already reviewed, not new work, and requiring a PR to
+  document a PR's own merge is unbounded regress.
 - **Never merge.** The skill opens the PR and stops; a human reviews and squash-merges on GitHub.
   Phase 4 only observes that merge and records it. Never run `gh pr merge`.
 - Force-pushing is allowed **only** as `git push --force-with-lease` on the current task's own

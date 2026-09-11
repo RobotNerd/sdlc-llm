@@ -2,12 +2,12 @@
 id: TASK-001
 title: "Author guidelines.md and config.md for this repo"
 type: chore
-status: in-review
+status: done
 epic: EPIC-001
 created: 2026-09-10
 branch: task-001-guidelines-and-config
 pr: https://github.com/RobotNerd/sdlc-llm/pull/3
-merge_commit: null
+merge_commit: fdae0e08c463666f5d42a7c01fd035ce583971d0
 blocked_by: []
 blocks: []
 ---
