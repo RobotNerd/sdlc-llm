@@ -2,11 +2,11 @@
 id: TASK-008
 title: "sync: BOARD.md epics panel and status columns"
 type: feature
-status: in-progress
+status: in-review
 epic: EPIC-001
 created: 2026-09-10
 branch: task-008-sync-board-columns
-pr: null
+pr: https://github.com/RobotNerd/sdlc-llm/pull/8
 merge_commit: null
 blocked_by: [TASK-005, TASK-006]
 blocks: [TASK-009, TASK-011, TASK-012]

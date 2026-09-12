@@ -46,7 +46,7 @@ by this repo managing its own `.tasks/` end to end.
 | TASK-005 | done | sync: generated-region find / replace / append engine |
 | TASK-006 | done | sync: epic-status derivation and blocked_by/blocks reconciliation |
 | TASK-007 | done | sync: epic children and spec epics region renderers |
-| TASK-008 | in-progress | sync: BOARD.md epics panel and status columns |
+| TASK-008 | in-review | sync: BOARD.md epics panel and status columns |
 | TASK-009 | todo | sync: BOARD.md TODO merge (preserve order, drop, append, annotate) |
 | TASK-010 | todo | sync next-id: print the next free id for a type |
 | TASK-011 | todo | sync archive: move done/wont-do tasks to .tasks/archive/ |
