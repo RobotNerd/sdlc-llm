@@ -2,7 +2,7 @@
 id: TASK-008
 title: "sync: BOARD.md epics panel and status columns"
 type: feature
-status: todo
+status: in-progress
 epic: EPIC-001
 created: 2026-09-10
 branch: task-008-sync-board-columns
@@ -35,7 +35,16 @@ Regenerate the fully-derived parts of `BOARD.md`: the `epics` roll-up panel (one
 
 ## Worklog
 
-_(empty — appended during implementation)_
+- 2026-09-12: Testing strategy step 1 was written when this epic was still all-`todo` ("epics
+  panel must come back as `| EPIC-001 | todo | 0/20 done |`, all four columns `_(none)_`"). Real
+  progress has moved on since (5 tasks done by the time this started). Ran the equivalent check
+  against current reality instead: all five real board regions (epics panel + 4 columns) came back
+  as true no-ops against the hand-written `BOARD.md` — same intent, current data.
+- Clarified a genuine ambiguity in SPEC-001 while implementing the `blocked` column: "a blocked
+  task stays in TODO" (§TODO) and "Blocked" being one of the four generated columns (§BOARD.md
+  contract) sound contradictory. Resolved: a `todo` task with unmet `blocked_by` stays in TODO
+  with the ⛔ marker (status is still `todo`); a task whose `status` field is literally `blocked`
+  has left `todo` and gets the column. Added one disambiguating sentence to SPEC-001.
 
 ## Notes
 

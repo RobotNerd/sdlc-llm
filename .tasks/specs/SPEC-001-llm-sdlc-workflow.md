@@ -248,8 +248,10 @@ The developer orders TODO by priority. `sync` must **preserve that order** and m
 - TASK-019 — Rotate API keys  `EPIC-002` ⛔ blocked_by TASK-008
 ```
 
-A task with no epic simply omits the tag. A `blocked` task stays visible here with the marker
-rather than moving to its own column, so the priority list stays complete.
+A task with no epic simply omits the tag. Two distinct things share the word "blocked" here — a
+`todo` task with a non-empty `blocked_by` (colloquially blocked, but its `status` field is still
+`todo`) stays visible in TODO with the ⛔ marker, so the priority list stays complete; a task whose
+`status` field is literally `blocked` (see below) has left `todo` and moves to its own column.
 
 ### In Progress / In Review / Blocked / Done — fully generated
 
