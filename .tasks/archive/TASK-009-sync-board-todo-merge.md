@@ -2,12 +2,12 @@
 id: TASK-009
 title: "sync: BOARD.md TODO merge (preserve order, drop, append, annotate)"
 type: feature
-status: in-review
+status: done
 epic: EPIC-001
 created: 2026-09-10
 branch: task-009-sync-board-todo-merge
 pr: https://github.com/RobotNerd/sdlc-llm/pull/9
-merge_commit: null
+merge_commit: d0df4ac1f41ea0f17da363633df5f77fcb79527a
 blocked_by: [TASK-008]
 blocks: [TASK-012, TASK-013, TASK-017]
 ---
