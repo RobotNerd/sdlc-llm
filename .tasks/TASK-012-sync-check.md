@@ -2,11 +2,11 @@
 id: TASK-012
 title: "sync check: compute, diff, exit non-zero, write nothing"
 type: feature
-status: in-progress
+status: in-review
 epic: EPIC-001
 created: 2026-09-10
 branch: task-012-sync-check
-pr: null
+pr: https://github.com/RobotNerd/sdlc-llm/pull/10
 merge_commit: null
 blocked_by: [TASK-007, TASK-008, TASK-009]
 blocks: [TASK-013, TASK-016, TASK-019, TASK-020]

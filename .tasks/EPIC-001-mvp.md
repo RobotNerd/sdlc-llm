@@ -50,7 +50,7 @@ by this repo managing its own `.tasks/` end to end.
 | TASK-009 | done | sync: BOARD.md TODO merge (preserve order, drop, append, annotate) |
 | TASK-010 | todo | sync next-id: print the next free id for a type |
 | TASK-011 | todo | sync archive: move done/wont-do tasks to .tasks/archive/ |
-| TASK-012 | in-progress | sync check: compute, diff, exit non-zero, write nothing |
+| TASK-012 | in-review | sync check: compute, diff, exit non-zero, write nothing |
 | TASK-013 | todo | End-to-end idempotency and derivation-matrix test suite |
 | TASK-014 | todo | init skill: scaffold .tasks/ in a new repo |
 | TASK-015 | todo | add-task skill: interview, epic prompt, size check, priority placement |
