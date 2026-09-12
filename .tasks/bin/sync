@@ -14,12 +14,14 @@ So far this lays the foundation only, not the real subcommands:
 - TASK-007: `render_epic_children` / `render_spec_epics` — the two
   non-board region bodies, meant to be handed to TASK-005's
   `replace_region`/`ensure_region`.
+- TASK-008: `render_board_epics_panel` / `render_board_column` — BOARD.md's
+  roll-up panel and its four fully-generated status columns.
 
 It imports nothing outside the Python standard library — see
 `.tasks/specs/SPEC-001-llm-sdlc-workflow.md` §"The sync script" for why.
 
-Later tasks add the actual subcommands (`next-id`, board rendering,
-`check`, `archive` — TASK-008 through TASK-012). Running this file
+Later tasks add the actual subcommands (`next-id`, the TODO merge,
+`check`, `archive` — TASK-009 through TASK-012). Running this file
 directly today just discovers and summarizes the current artifacts, as a
 smoke test that the parser/loader work end to end.
 """
@@ -562,6 +564,61 @@ def render_spec_epics(epics_with_children: list[tuple[Artifact, list[Artifact]]]
         done, total = _epic_progress(children)
         rows.append(f"| {epic.id} | {epic.fields.get('status')} | {done}/{total} done |")
     return "| Epic | Status | Progress |\n|---|---|---|\n" + "\n".join(rows)
+
+
+# ---------------------------------------------------------------------------
+# BOARD.md: epics roll-up panel and fully-generated status columns
+# ---------------------------------------------------------------------------
+
+
+def render_board_epics_panel(epics_with_children: list[tuple[Artifact, list[Artifact]]]) -> str:
+    """Render BOARD.md's `epics` roll-up panel (SPEC-001 §'BOARD.md
+    contract'): the same shape as `render_spec_epics`, restricted to
+    epics whose *current* status is not `done` and not `wont-do` — the
+    panel shows open work, not a history. Each `epic` is expected to
+    already carry its derived status, same contract as `render_spec_epics`.
+    """
+    active = [
+        (epic, children)
+        for epic, children in epics_with_children
+        if epic.fields.get("status") not in ("done", "wont-do")
+    ]
+    return render_spec_epics(active)
+
+
+def render_board_column(tasks: list[Artifact], status: str, cap: int | None = None) -> str:
+    """Render one of BOARD.md's fully-generated status columns (SPEC-001
+    §'BOARD.md contract' / §'Rendering details'): a `| Task | Title | Epic
+    | Ref |` table of every task in `tasks` whose `status` equals `status`,
+    ordered by id.
+
+    `Ref` is the task's `branch` while `in-progress`; its `pr` URL for
+    every other status (falling back to `branch` if `pr` isn't set yet,
+    e.g. a task bailed out back to `blocked` before ever opening a PR). A
+    task with no epic or no ref value shows `—`. If `cap` is given, only
+    the highest-id (most recently created) `cap` rows are kept — this is
+    how the `done` column stays bounded once `sync archive` starts moving
+    old entries out of `.tasks/` (still-discoverable in `.tasks/archive/`,
+    but the board shows recent work, not the full history).
+
+    Returns `""` when no task matches; the region engine renders that as
+    `_(none)_`.
+    """
+    matching = sorted((t for t in tasks if t.fields.get("status") == status), key=lambda t: t.id)
+    if not matching:
+        return ""
+    if cap is not None and len(matching) > cap:
+        matching = matching[-cap:]
+    rows = []
+    for task in matching:
+        _reject_pipe(task.fields.get("title"), f"{task.id} title")
+        epic = task.fields.get("epic") or "—"
+        if status == "in-progress":
+            ref = task.fields.get("branch") or "—"
+        else:
+            ref = task.fields.get("pr") or task.fields.get("branch") or "—"
+        rows.append(f"| {task.id} | {task.fields.get('title')} | {epic} | {ref} |")
+    return "| Task | Title | Epic | Ref |\n|---|---|---|---|\n" + "\n".join(rows)
 
 
 def main(argv: list[str]) -> int:
