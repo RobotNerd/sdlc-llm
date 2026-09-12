@@ -2,7 +2,7 @@
 id: TASK-009
 title: "sync: BOARD.md TODO merge (preserve order, drop, append, annotate)"
 type: feature
-status: todo
+status: in-progress
 epic: EPIC-001
 created: 2026-09-10
 branch: task-009-sync-board-todo-merge
@@ -36,7 +36,17 @@ The one place `sync` merges instead of regenerating. Reconcile the hand-ordered 
 
 ## Worklog
 
-_(empty — appended during implementation)_
+- 2026-09-12: Testing strategy step 1 (no-op against the hand-written `BOARD.md`) failed on first
+  run against the real repo — `render_todo_line` rendered `blocked_by` verbatim, but that field is
+  a static historical list (nothing prunes it as blockers complete; only `blocks` is derived from
+  it). TASK-012/010/011's `blocked_by` still list already-done blockers from when they were
+  created, so the raw field disagreed with the hand-maintained board, which has always shown only
+  outstanding blockers. Fixed: `render_todo_line` now takes the full task map and filters to
+  blockers whose status isn't `done`/`wont-do` at render time. Added a clarifying sentence to
+  SPEC-001 §'Relationships' since this was genuinely ambiguous before. No task files needed
+  correcting — the bug was in the new code, not in any prior hand-maintenance.
+- Also found a smaller idempotency edge case (TODO as the very last section, no next heading):
+  fixed the trailing-blank-line logic to not force one when there's nothing after to separate from.
 
 ## Notes
 
