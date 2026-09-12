@@ -2,11 +2,11 @@
 id: TASK-010
 title: "sync next-id: print the next free id for a type"
 type: feature
-status: in-progress
+status: in-review
 epic: EPIC-001
 created: 2026-09-10
 branch: task-010-sync-next-id
-pr: null
+pr: https://github.com/RobotNerd/sdlc-llm/pull/11
 merge_commit: null
 blocked_by: [TASK-004]
 blocks: [TASK-014, TASK-015]
