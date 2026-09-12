@@ -19,18 +19,22 @@ So far this lays the foundation only, not the real subcommands:
 - TASK-009: `merge_todo` / `apply_todo_merge` — the one place `sync`
   merges instead of regenerating: reconciles the hand-ordered TODO list
   with reality without ever reordering it.
+- TASK-012: `sync check` — runs every derivation/renderer above in
+  memory and diffs the result against disk, writing nothing. The real
+  subcommand: `.tasks/bin/sync check`.
 
 It imports nothing outside the Python standard library — see
 `.tasks/specs/SPEC-001-llm-sdlc-workflow.md` §"The sync script" for why.
 
-Later tasks add the actual subcommands (`next-id`, `check`, `archive` —
-TASK-010 through TASK-012). Running this file directly today just
-discovers and summarizes the current artifacts, as a
-smoke test that the parser/loader work end to end.
+Later tasks add `next-id` and `archive` (TASK-010, TASK-011), and a bare
+write mode for `sync` itself -- not yet built; see TASK-012's Worklog.
+Running this file with no arguments just discovers and summarizes the
+current artifacts, as a smoke test that the loader works end to end.
 """
 
 from __future__ import annotations
 
+import difflib
 import re
 import sys
 from dataclasses import dataclass, replace
@@ -720,19 +724,174 @@ def apply_todo_merge(board_text: str, tasks: dict[str, Artifact]) -> str:
     return board_text[:start] + body + trailer + board_text[end:]
 
 
-def main(argv: list[str]) -> int:
-    if argv:
-        print(f"sync: no subcommands yet (got {argv!r}) — TASK-006 onward add them", file=sys.stderr)
-        return 2
-    tasks_root = Path(__file__).resolve().parent.parent
+# ---------------------------------------------------------------------------
+# sync check: compute everything in memory, diff against disk, write nothing
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class Mismatch:
+    """One place a file on disk disagrees with what `sync` would produce.
+
+    `current`/`expected` are the *whole* file content (not just the
+    changed region) so `diff()` reads naturally in a unified diff; most
+    mismatches differ in only one region, since each is computed via
+    `replace_region`/`ensure_region`, which touch nothing else.
+    """
+
+    path: Path
+    region: str
+    current: str
+    expected: str
+
+    def diff(self) -> str:
+        return "".join(
+            difflib.unified_diff(
+                self.current.splitlines(keepends=True),
+                self.expected.splitlines(keepends=True),
+                fromfile=f"{self.path} [{self.region}]",
+                tofile=f"{self.path} [{self.region}] (expected)",
+            )
+        )
+
+
+def _diff_region(path: Path, text: str, name: str, expected_body: str) -> Mismatch | None:
+    """Compare `text`'s `name` region against `expected_body`, appending
+    the region at end-of-file if it doesn't exist yet. `None` if they
+    already agree.
+    """
+    try:
+        replaced = replace_region(text, name, expected_body)
+    except RegionError:
+        replaced = ensure_region(text, name, expected_body)
+    if replaced == text:
+        return None
+    return Mismatch(path=path, region=name, current=text, expected=replaced)
+
+
+_DONE_COLUMN_CAP = 20
+
+
+def compute_mismatches(tasks_root: Path) -> list[Mismatch]:
+    """Run every derivation and renderer TASK-004 through TASK-009 built,
+    in memory, and report everywhere the result disagrees with what's on
+    disk. Never writes anything -- this is the shared core `sync check`
+    (this task) is built on; a future write mode would apply these same
+    `Mismatch.expected` values instead of only reporting them.
+
+    Covers (SPEC-001 §'The sync script'): epic `children` regions, spec
+    `epics` regions, the board `epics` panel, the four board columns, the
+    TODO merge, and epic `status` frontmatter. Also checks task `blocks`
+    against `reconcile_blocks` -- not itemized in TASK-012's acceptance
+    criteria, but "every derivation" (its own Description) includes it,
+    and skipping it would leave a real class of drift undetected.
+    """
     artifacts = discover(tasks_root)
-    by_kind: dict[str, int] = {}
-    for art in artifacts.values():
-        by_kind[art.kind] = by_kind.get(art.kind, 0) + 1
-    print(f"Discovered {len(artifacts)} artifact(s) under {tasks_root}:")
-    for kind in ("spec", "epic", "task"):
-        print(f"  {kind}: {by_kind.get(kind, 0)}")
-    return 0
+    tasks = {a.id: a for a in artifacts.values() if a.kind == "task"}
+    epics = {a.id: a for a in artifacts.values() if a.kind == "epic"}
+    specs = {a.id: a for a in artifacts.values() if a.kind == "spec"}
+
+    mismatches: list[Mismatch] = []
+
+    # blocks reconciliation (frontmatter, not a region)
+    reconciled = reconcile_blocks(tasks)
+    for task_id, art in tasks.items():
+        want = reconciled[task_id].fields["blocks"]
+        if (art.fields.get("blocks") or []) != want:
+            mismatches.append(
+                Mismatch(
+                    path=art.path,
+                    region="blocks (frontmatter)",
+                    current=render_frontmatter(art.fields, art.order),
+                    expected=render_frontmatter(reconciled[task_id].fields, reconciled[task_id].order),
+                )
+            )
+
+    # epic status (frontmatter) + children region, per epic
+    children_of: dict[str, list[Artifact]] = {epic_id: [] for epic_id in epics}
+    for task in tasks.values():
+        epic_id = task.fields.get("epic")
+        if epic_id in children_of:
+            children_of[epic_id].append(task)
+
+    derived_epics: dict[str, Artifact] = {}
+    for epic_id, epic in epics.items():
+        children = children_of[epic_id]
+        derived = derive_epic_status(epic, children)
+        derived_epics[epic_id] = derived
+        if derived.fields.get("status") != epic.fields.get("status"):
+            mismatches.append(
+                Mismatch(
+                    path=epic.path,
+                    region="status (frontmatter)",
+                    current=render_frontmatter(epic.fields, epic.order),
+                    expected=render_frontmatter(derived.fields, derived.order),
+                )
+            )
+        epic_text = epic.path.read_text()
+        mismatch = _diff_region(epic.path, epic_text, "children", render_epic_children(derived, children))
+        if mismatch:
+            mismatches.append(mismatch)
+
+    # spec epics region, per spec (using each epic's *derived* status)
+    for spec_id, spec in specs.items():
+        linked = [
+            (derived_epics[epic_id], children_of[epic_id])
+            for epic_id, epic in epics.items()
+            if epic.fields.get("spec") == spec_id
+        ]
+        spec_text = spec.path.read_text()
+        mismatch = _diff_region(spec.path, spec_text, "epics", render_spec_epics(linked))
+        if mismatch:
+            mismatches.append(mismatch)
+
+    # BOARD.md: epics panel, four columns, TODO merge
+    board_path = tasks_root / "BOARD.md"
+    board_text = board_path.read_text()
+    all_pairs = [(derived_epics[epic_id], children_of[epic_id]) for epic_id in epics]
+
+    mismatch = _diff_region(board_path, board_text, "epics", render_board_epics_panel(all_pairs))
+    if mismatch:
+        mismatches.append(mismatch)
+
+    for status, cap in (("in-progress", None), ("in-review", None), ("blocked", None), ("done", _DONE_COLUMN_CAP)):
+        mismatch = _diff_region(board_path, board_text, status, render_board_column(list(tasks.values()), status, cap=cap))
+        if mismatch:
+            mismatches.append(mismatch)
+
+    merged_board = apply_todo_merge(board_text, tasks)
+    if merged_board != board_text:
+        mismatches.append(Mismatch(path=board_path, region="TODO", current=board_text, expected=merged_board))
+
+    return mismatches
+
+
+def run_check(tasks_root: Path) -> int:
+    """`sync check`: print a unified diff per mismatch, write nothing.
+    Returns the process exit code -- 0 when clean, 1 when drift is found.
+    """
+    mismatches = compute_mismatches(tasks_root)
+    for mismatch in mismatches:
+        print(mismatch.diff(), end="")
+    return 1 if mismatches else 0
+
+
+def main(argv: list[str]) -> int:
+    tasks_root = Path(__file__).resolve().parent.parent
+    if not argv:
+        artifacts = discover(tasks_root)
+        by_kind: dict[str, int] = {}
+        for art in artifacts.values():
+            by_kind[art.kind] = by_kind.get(art.kind, 0) + 1
+        print(f"Discovered {len(artifacts)} artifact(s) under {tasks_root}:")
+        for kind in ("spec", "epic", "task"):
+            print(f"  {kind}: {by_kind.get(kind, 0)}")
+        print("(no write mode yet -- see TASK-012's Worklog; run 'check' to see what would change)")
+        return 0
+    if argv == ["check"]:
+        return run_check(tasks_root)
+    print(f"sync: unknown arguments {argv!r} — supported: (none), check", file=sys.stderr)
+    return 2
 
 
 if __name__ == "__main__":

@@ -2,11 +2,11 @@
 id: TASK-012
 title: "sync check: compute, diff, exit non-zero, write nothing"
 type: feature
-status: todo
+status: in-review
 epic: EPIC-001
 created: 2026-09-10
 branch: task-012-sync-check
-pr: null
+pr: https://github.com/RobotNerd/sdlc-llm/pull/10
 merge_commit: null
 blocked_by: [TASK-007, TASK-008, TASK-009]
 blocks: [TASK-013, TASK-016, TASK-019, TASK-020]
@@ -34,7 +34,23 @@ A read-only `sync`: run every derivation and renderer in memory, diff the result
 
 ## Worklog
 
-_(empty — appended during implementation)_
+- 2026-09-12: `python3 .tasks/bin/sync check` against this actual repo exits **0, no output** —
+  every generated region, every epic status field, and the TODO section already match what `sync`
+  would produce. This is the payoff of the bootstrap approach: eight tasks of hand-writing regions
+  to match a tool that didn't exist yet, and the tool agrees with all of it on the first real run.
+  Confirmed the other two testing-strategy steps too: a hand-broken character in `BOARD.md` is
+  caught with a diff naming the exact file and region (exit 1), and no file mtimes change across a
+  check run.
+- Scope note: AC explicitly scopes this task to the read-only `check` path ("writes no files under
+  any circumstance"). Nothing in the 20-task breakdown explicitly owns wiring bare `sync` (no args)
+  to actually *write* the computed regions — but TASK-019 (dogfood) needs that to exist to migrate
+  this repo off manual bookkeeping. Deliberately not building it here to keep this PR scoped to its
+  own AC; `compute_mismatches()` already returns everything a write mode needs (each `Mismatch`
+  carries the full expected file content), so adding one is a small follow-up, not a redesign.
+  Flagging for the user rather than deciding unilaterally which task should own it.
+- Also checks task `blocks` frontmatter against `reconcile_blocks` — not itemized in the AC's
+  region list, but the Description says "every derivation," and skipping it would leave a real
+  class of drift (blocked_by edited without updating the mirror) undetected.
 
 ## Notes
 
