@@ -80,7 +80,11 @@ child list is always *derived* by `sync` into a generated region.
 - **Epic → Spec:** the epic carries `spec: SPEC-001` (nullable). One spec may spawn several epics.
 - **Task → Task:** `blocked_by` / `blocks` lists, as in the analysis doc. `blocks` is a
   convenience mirror that `sync` keeps consistent with the `blocked_by` edges; if the two
-  disagree, `blocked_by` wins.
+  disagree, `blocked_by` wins. `blocked_by` is a **static, declared dependency list** — nothing
+  prunes it as a blocker completes; it stays the true historical graph. "Is this task still
+  blocked" is answered at render time by checking each listed blocker's current `status`
+  (`done`/`wont-do` = satisfied), not by mutating the list. The TODO ⛔ marker shows only
+  currently-outstanding blockers for exactly this reason.
 
 ### Task frontmatter
 

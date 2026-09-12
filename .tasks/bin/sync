@@ -16,13 +16,16 @@ So far this lays the foundation only, not the real subcommands:
   `replace_region`/`ensure_region`.
 - TASK-008: `render_board_epics_panel` / `render_board_column` — BOARD.md's
   roll-up panel and its four fully-generated status columns.
+- TASK-009: `merge_todo` / `apply_todo_merge` — the one place `sync`
+  merges instead of regenerating: reconciles the hand-ordered TODO list
+  with reality without ever reordering it.
 
 It imports nothing outside the Python standard library — see
 `.tasks/specs/SPEC-001-llm-sdlc-workflow.md` §"The sync script" for why.
 
-Later tasks add the actual subcommands (`next-id`, the TODO merge,
-`check`, `archive` — TASK-009 through TASK-012). Running this file
-directly today just discovers and summarizes the current artifacts, as a
+Later tasks add the actual subcommands (`next-id`, `check`, `archive` —
+TASK-010 through TASK-012). Running this file directly today just
+discovers and summarizes the current artifacts, as a
 smoke test that the parser/loader work end to end.
 """
 
@@ -619,6 +622,102 @@ def render_board_column(tasks: list[Artifact], status: str, cap: int | None = No
             ref = task.fields.get("pr") or task.fields.get("branch") or "—"
         rows.append(f"| {task.id} | {task.fields.get('title')} | {epic} | {ref} |")
     return "| Task | Title | Epic | Ref |\n|---|---|---|---|\n" + "\n".join(rows)
+
+
+# ---------------------------------------------------------------------------
+# BOARD.md's TODO section: the one place sync merges instead of regenerating
+# ---------------------------------------------------------------------------
+
+
+_TODO_HEADING = "## TODO\n\n"
+_TODO_LINE_RE = re.compile(r"^- (TASK-\d+) — ")
+
+
+def _outstanding_blockers(task: Artifact, tasks: dict[str, Artifact]) -> list[str]:
+    """The subset of `task`'s `blocked_by` that isn't satisfied yet.
+
+    `blocked_by` itself is a static, declared dependency list -- nothing
+    prunes it as blockers complete (`reconcile_blocks` only ever derives
+    `blocks` *from* it, never the reverse). "Is this task still blocked"
+    is a display-time question, answered here: a blocker counts as
+    satisfied once its `status` is `done` or `wont-do`. A blocker id with
+    no matching task (shouldn't happen -- `reconcile_blocks` raises on
+    that) is conservatively treated as still outstanding.
+    """
+    outstanding = []
+    for blocker_id in task.fields.get("blocked_by") or []:
+        blocker = tasks.get(blocker_id)
+        if blocker is None or blocker.fields.get("status") not in ("done", "wont-do"):
+            outstanding.append(blocker_id)
+    return outstanding
+
+
+def render_todo_line(task: Artifact, tasks: dict[str, Artifact]) -> str:
+    """Render one TODO line (SPEC-001 §'TODO — hand-maintained'): dash,
+    id, em-dash, title, two spaces, the epic tag in backticks (omitted
+    when the task has no epic), then ' ⛔ blocked_by TASK-A, TASK-B' (ids
+    ascending) listing *outstanding* blockers only (see
+    `_outstanding_blockers`) when there are any. No trailing newline.
+
+    `tasks` is every loaded task, keyed by id -- needed to look up each
+    blocker's current status.
+    """
+    _reject_pipe(task.fields.get("title"), f"{task.id} title")
+    line = f"- {task.id} — {task.fields.get('title')}"
+    epic = task.fields.get("epic")
+    if epic:
+        line += f"  `{epic}`"
+    outstanding = _outstanding_blockers(task, tasks)
+    if outstanding:
+        line += " ⛔ blocked_by " + ", ".join(sorted(outstanding))
+    return line
+
+
+def merge_todo(existing_lines: list[str], tasks: dict[str, Artifact]) -> list[str]:
+    """Reconcile the hand-ordered TODO list with reality.
+
+    - existing order is preserved exactly -- never sorted, never reordered
+    - a line whose task is no longer `todo` (or no longer exists) is dropped
+    - a `todo` task not already listed is appended at the end, in id order
+      among the newly-added (not merged into the existing sequence)
+    - every kept/appended line is re-rendered fresh via `render_todo_line`,
+      so annotations (epic tag, blocked marker) always reflect current data
+
+    `existing_lines` is the TODO section's current lines, in file order;
+    anything not matching a `- TASK-NNN — ...` line (blank lines, stray
+    prose) is ignored. `tasks` is every loaded task, keyed by id -- both
+    to check "is this id still todo" and to find newly-appeared ones.
+    Returns the new list of rendered lines (no trailing newlines).
+    """
+    existing_ids = [m.group(1) for line in existing_lines if (m := _TODO_LINE_RE.match(line))]
+    kept = [tid for tid in existing_ids if tid in tasks and tasks[tid].fields.get("status") == "todo"]
+    already_listed = set(kept)
+    newly_added = sorted(
+        tid for tid, task in tasks.items()
+        if task.fields.get("status") == "todo" and tid not in already_listed
+    )
+    return [render_todo_line(tasks[tid], tasks) for tid in kept + newly_added]
+
+
+def apply_todo_merge(board_text: str, tasks: dict[str, Artifact]) -> str:
+    """Reconcile BOARD.md's TODO section in place via `merge_todo`.
+
+    Only the lines between `## TODO\\n\\n` and the next `## ` heading
+    change; the heading itself and the rest of the file are untouched.
+    Raises `RegionError` if the `## TODO` heading isn't present.
+    """
+    if _TODO_HEADING not in board_text:
+        raise RegionError("no '## TODO' heading found")
+    start = board_text.index(_TODO_HEADING) + len(_TODO_HEADING)
+    next_heading = board_text.find("\n## ", start)
+    end = len(board_text) if next_heading == -1 else next_heading + 1
+    existing_lines = board_text[start:end].splitlines()
+    merged = merge_todo(existing_lines, tasks)
+    body = "".join(line + "\n" for line in merged)
+    # A blank line separates the section from the next heading; if TODO is
+    # the last section (no next heading), there is nothing to separate.
+    trailer = "\n" if next_heading != -1 else ""
+    return board_text[:start] + body + trailer + board_text[end:]
 
 
 def main(argv: list[str]) -> int:
