@@ -22,14 +22,17 @@ So far this lays the foundation only, not the real subcommands:
 - TASK-012: `sync check` — runs every derivation/renderer above in
   memory and diffs the result against disk, writing nothing. The real
   subcommand: `.tasks/bin/sync check`.
+- TASK-010: `sync next-id <spec|epic|task>` — the next free id of a type,
+  scanning `.tasks/`, `.tasks/specs/`, and `.tasks/archive/` so an id is
+  never reused after archiving.
 
 It imports nothing outside the Python standard library — see
 `.tasks/specs/SPEC-001-llm-sdlc-workflow.md` §"The sync script" for why.
 
-Later tasks add `next-id` and `archive` (TASK-010, TASK-011), and a bare
-write mode for `sync` itself -- not yet built; see TASK-012's Worklog.
-Running this file with no arguments just discovers and summarizes the
-current artifacts, as a smoke test that the loader works end to end.
+TASK-011 still needs to add `archive`, and a bare write mode for `sync`
+itself is not yet built — see TASK-012's Worklog. Running this file with
+no arguments just discovers and summarizes the current artifacts, as a
+smoke test that the loader works end to end.
 """
 
 from __future__ import annotations
@@ -263,6 +266,25 @@ def discover(tasks_root: Path) -> dict[str, Artifact]:
                 id=art_id, kind=kind, path=path, fields=fields, order=order, body=body
             )
     return artifacts
+
+
+_ID_KIND_PREFIXES = {"spec": "SPEC", "epic": "EPIC", "task": "TASK"}
+
+
+def next_id(tasks_root: Path, kind: str) -> str:
+    """The next free id for `kind` ('spec' | 'epic' | 'task'): the max
+    existing id of that kind across `.tasks/`, `.tasks/specs/`, and
+    `.tasks/archive/`, plus 1, zero-padded to three digits (SPEC-001
+    §'ID allocation'). Archived files count too -- an id is never reused.
+
+    Raises `ValueError` for a `kind` outside `spec`/`epic`/`task`.
+    """
+    if kind not in _ID_KIND_PREFIXES:
+        raise ValueError(f"unknown id type {kind!r} — expected one of: {', '.join(sorted(_ID_KIND_PREFIXES))}")
+    prefix = _ID_KIND_PREFIXES[kind]
+    artifacts = discover(tasks_root)
+    existing = [int(art.id.split("-", 1)[1]) for art in artifacts.values() if art.kind == kind]
+    return f"{prefix}-{max(existing, default=0) + 1:03d}"
 
 
 # ---------------------------------------------------------------------------
@@ -890,7 +912,14 @@ def main(argv: list[str]) -> int:
         return 0
     if argv == ["check"]:
         return run_check(tasks_root)
-    print(f"sync: unknown arguments {argv!r} — supported: (none), check", file=sys.stderr)
+    if len(argv) == 2 and argv[0] == "next-id":
+        try:
+            print(next_id(tasks_root, argv[1]))
+        except ValueError as exc:
+            print(f"sync next-id: {exc}", file=sys.stderr)
+            return 2
+        return 0
+    print(f"sync: unknown arguments {argv!r} — supported: (none), check, next-id <spec|epic|task>", file=sys.stderr)
     return 2
 
 
