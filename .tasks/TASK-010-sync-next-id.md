@@ -2,7 +2,7 @@
 id: TASK-010
 title: "sync next-id: print the next free id for a type"
 type: feature
-status: todo
+status: in-progress
 epic: EPIC-001
 created: 2026-09-10
 branch: task-010-sync-next-id
