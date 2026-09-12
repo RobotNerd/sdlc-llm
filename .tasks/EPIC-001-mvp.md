@@ -45,7 +45,7 @@ by this repo managing its own `.tasks/` end to end.
 | TASK-004 | done | sync: stdlib frontmatter parser and artifact loader |
 | TASK-005 | done | sync: generated-region find / replace / append engine |
 | TASK-006 | done | sync: epic-status derivation and blocked_by/blocks reconciliation |
-| TASK-007 | in-review | sync: epic children and spec epics region renderers |
+| TASK-007 | done | sync: epic children and spec epics region renderers |
 | TASK-008 | todo | sync: BOARD.md epics panel and status columns |
 | TASK-009 | todo | sync: BOARD.md TODO merge (preserve order, drop, append, annotate) |
 | TASK-010 | todo | sync next-id: print the next free id for a type |
@@ -60,5 +60,5 @@ by this repo managing its own `.tasks/` end to end.
 | TASK-019 | todo | Dogfood: bring this repo's .tasks/ fully under the toolkit |
 | TASK-020 | todo | CI workflow running sync check on every PR |
 
-Progress: 4/20 done
+Progress: 5/20 done
 <!-- END:children -->
