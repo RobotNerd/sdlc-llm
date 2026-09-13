@@ -1,0 +1,40 @@
+name: CI
+
+# SPEC-001 §"Success criteria": `sync check` runs in CI and fails on drift. Both
+# jobs are named to match `.tasks/config.md`'s `ci_checks`, which `implement-task`
+# phase 4 reads to know which checks to gate merge on.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  sync-check:
+    name: sync-check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+      # .tasks/bin/sync is standard-library only (CLAUDE.md / SPEC-001) — no pip
+      # install step for it. Read-only: exits non-zero and prints a diff per
+      # mismatch if any generated region or derived status has drifted from what
+      # `sync` would produce, without writing anything.
+      - name: sync check
+        run: python3 .tasks/bin/sync check
+
+  test:
+    name: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+      # pytest is sync's sole dev dependency (pyproject.toml) — needed to run its
+      # test suite, not by sync itself.
+      - name: Install dev dependencies
+        run: pip install -e '.[dev]'
+      - name: Run test suite
+        run: pytest

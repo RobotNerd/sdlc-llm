@@ -58,7 +58,7 @@ by this repo managing its own `.tasks/` end to end.
 | TASK-017 | todo | refine-backlog skill: periodic lightweight backlog pass |
 | TASK-018 | todo | plan-feature skill: spec -> epics -> vertical-slice tasks |
 | TASK-019 | done | Dogfood: bring this repo's .tasks/ fully under the toolkit |
-| TASK-020 | todo | CI workflow running sync check on every PR |
+| TASK-020 | in-progress | CI workflow running sync check on every PR |
 
 Progress: 14/20 done
 <!-- END:children -->

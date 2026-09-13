@@ -2,7 +2,7 @@
 id: TASK-020
 title: "CI workflow running sync check on every PR"
 type: chore
-status: todo
+status: in-progress
 epic: EPIC-001
 created: 2026-09-10
 branch: task-020-ci-sync-check
@@ -20,11 +20,11 @@ A GitHub Actions workflow that runs `sync check` (and the TASK-013 suite) on eve
 
 ## Acceptance criteria
 
-- [ ] `.github/workflows/` job runs `sync check` on `pull_request` and fails the check on non-zero exit.
-- [ ] Same job (or a sibling) runs the repo's `test_command`, including the TASK-013 suite.
-- [ ] Job uses only the Python standard library — no pip install step for `sync` itself.
+- [x] `.github/workflows/` job runs `sync check` on `pull_request` and fails the check on non-zero exit.
+- [x] Same job (or a sibling) runs the repo's `test_command`, including the TASK-013 suite.
+- [x] Job uses only the Python standard library — no pip install step for `sync` itself.
 - [ ] A PR that hand-edits a generated region without running `sync` gets a red check with a diff in the log.
-- [ ] `ci_checks` in `config.md` lists the job names so `implement-task` phase 4 can gate merge on them.
+- [x] `ci_checks` in `config.md` lists the job names so `implement-task` phase 4 can gate merge on them.
 
 ## Testing strategy
 
@@ -34,7 +34,15 @@ A GitHub Actions workflow that runs `sync check` (and the TASK-013 suite) on eve
 
 ## Worklog
 
-_(empty — appended during implementation)_
+- 2026-09-12: `.github/workflows/ci.yml` added — two jobs, `sync-check` (checkout + setup-python
+  + `python3 .tasks/bin/sync check`, no install step) and `test` (checkout + setup-python +
+  `pip install -e '.[dev]'` + `pytest`), both on `pull_request` and `push` to `main` (the latter
+  to also cover phase-4's direct-to-main bookkeeping commits). `config.md`'s `ci_checks` updated
+  to `[sync-check, test]` to match the job names. `sync check` stayed clean throughout.
+- Steps 2/3 (clean PR passes; no external deps for the `sync-check` job) can only be proven by a
+  real GitHub Actions run — verifying against this task's own PR once opened, recorded below.
+  Step 1 (a PR that hand-edits a region goes red with the diff in the log) needs a second,
+  throwaway PR carrying a deliberate violation — same approach as TASK-003's throwaway-PR check.
 
 ## Notes
 
