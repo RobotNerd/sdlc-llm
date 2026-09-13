@@ -24,7 +24,7 @@ This spec turns the analysis into a PRD for a v1 toolkit, and adds epic tracking
 - Frontmatter is the single machine-readable source of truth; `BOARD.md` is mostly a rendered view.
 - A deterministic `sync` script does everything that does not require judgement (board
   regeneration, epic roll-up, ID allocation, blocked computation, archiving).
-- Five skills drive the lifecycle: `init`, `add-task`, `implement-task`, `refine-backlog`,
+- Five skills drive the lifecycle: `init-project`, `add-task`, `implement-task`, `refine-backlog`,
   `plan-feature`.
 - An **epic** layer that groups tasks and rolls their status up to a board panel.
 - Generic skill logic is separated from per-project config so the same skills work in any repo.
@@ -276,7 +276,7 @@ merges rather than regenerates.
 
 ## `.tasks/config.md`
 
-Written by `init`, read by every skill and by `sync`. It is the seam that keeps skill logic
+Written by `init-project`, read by every skill and by `sync`. It is the seam that keeps skill logic
 identical across projects — only this file changes per repo.
 
 ```yaml
@@ -329,9 +329,10 @@ Subcommands:
 All five are checklist-style with explicit **STOP** markers and "if X is ambiguous, ASK" rules —
 not prose descriptions of intent. Each calls `sync` rather than hand-editing generated files.
 
-### `init`
+### `init-project`
 
-Scaffolds `.tasks/` in a new repo: empty `BOARD.md` with its regions, `config.md` (interviews the
+Named to avoid colliding with a generic `init` skill (e.g. one that scaffolds a `CLAUDE.md`) —
+see TASK-014's Description. Scaffolds `.tasks/` in a new repo: empty `BOARD.md` with its regions, `config.md` (interviews the
 user for `test_command`, the git settings — `remote`, `rebase_before_pr`, `merge_strategy`,
 `delete_branch_after_merge` — etc.), `guidelines.md` (carrying `workflow_version`, and stating the
 never-merge / `--force-with-lease`-only guardrails), templates under `.tasks/templates/` for
