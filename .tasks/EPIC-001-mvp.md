@@ -51,7 +51,7 @@ by this repo managing its own `.tasks/` end to end.
 | TASK-010 | done | sync next-id: print the next free id for a type |
 | TASK-011 | done | sync archive: move done/wont-do tasks to .tasks/archive/ |
 | TASK-012 | done | sync check: compute, diff, exit non-zero, write nothing |
-| TASK-013 | todo | End-to-end idempotency and derivation-matrix test suite |
+| TASK-013 | in-progress | End-to-end idempotency and derivation-matrix test suite |
 | TASK-014 | todo | init skill: scaffold .tasks/ in a new repo |
 | TASK-015 | todo | add-task skill: interview, epic prompt, size check, priority placement |
 | TASK-016 | todo | implement-task skill: four phases, STOP markers, resumable, bail-out |
