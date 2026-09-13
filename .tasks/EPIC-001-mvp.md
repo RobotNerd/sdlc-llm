@@ -51,7 +51,7 @@ by this repo managing its own `.tasks/` end to end.
 | TASK-010 | done | sync next-id: print the next free id for a type |
 | TASK-011 | done | sync archive: move done/wont-do tasks to .tasks/archive/ |
 | TASK-012 | done | sync check: compute, diff, exit non-zero, write nothing |
-| TASK-013 | in-review | End-to-end idempotency and derivation-matrix test suite |
+| TASK-013 | done | End-to-end idempotency and derivation-matrix test suite |
 | TASK-014 | todo | init skill: scaffold .tasks/ in a new repo |
 | TASK-015 | todo | add-task skill: interview, epic prompt, size check, priority placement |
 | TASK-016 | todo | implement-task skill: four phases, STOP markers, resumable, bail-out |
@@ -60,5 +60,5 @@ by this repo managing its own `.tasks/` end to end.
 | TASK-019 | todo | Dogfood: bring this repo's .tasks/ fully under the toolkit |
 | TASK-020 | todo | CI workflow running sync check on every PR |
 
-Progress: 10/20 done
+Progress: 11/20 done
 <!-- END:children -->
