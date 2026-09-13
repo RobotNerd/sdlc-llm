@@ -2,12 +2,12 @@
 id: TASK-011
 title: "sync archive: move done/wont-do tasks to .tasks/archive/"
 type: feature
-status: in-review
+status: done
 epic: EPIC-001
 created: 2026-09-10
 branch: task-011-sync-archive
 pr: https://github.com/RobotNerd/sdlc-llm/pull/12
-merge_commit: null
+merge_commit: efa3b35180e3a55a8b7acbda082366f954d5112a
 blocked_by: [TASK-004, TASK-008]
 blocks: [TASK-013]
 ---
