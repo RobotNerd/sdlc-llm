@@ -10,7 +10,7 @@ rebase_before_pr: true
 merge_strategy: squash
 delete_branch_after_merge: true
 allow_auto_merge: false
-ci_checks: [test]
+ci_checks: [sync-check, test]
 archive_done: true
 ---
 
@@ -34,9 +34,10 @@ describes: the skills' logic stays identical across projects, only this file cha
 - **`remote` / `rebase_before_pr` / `merge_strategy` / `delete_branch_after_merge`** — the git
   automation settings from SPEC-001's `implement-task` phases 1/3/4. `merge_strategy: squash`
   documents how the *human* merges; the skill itself never merges (see `guidelines.md`).
-- **`ci_checks: [test]`** — placeholder naming the pytest suite as the one check that matters
-  today. TASK-020 (CI workflow) will make this a real GitHub Actions job name that `gh pr checks`
-  can query by.
+- **`ci_checks: [sync-check, test]`** — the two `.github/workflows/ci.yml` job names (TASK-020):
+  `sync-check` runs `.tasks/bin/sync check` (drift detection, stdlib only), `test` runs the
+  `test_command` suite. `implement-task` phase 4 (and a human eyeballing `gh pr checks`) gates
+  merge on both being green.
 - **`allow_auto_merge: false`** — reinforces the never-merge guardrail; not currently read by
   anything since the skill never attempts to merge regardless, but kept for parity with
   SPEC-001's schema and as a documented intent if that ever changes.
