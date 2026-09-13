@@ -46,6 +46,11 @@ A PR template whose body mirrors the task acceptance-criteria checklist plus a f
   template it adds exercises the same thing without the throwaway. Confirmed via `gh pr view
   --json body`: https://github.com/RobotNerd/sdlc-llm/pull/15 rendered every section (Task,
   Description, Acceptance criteria with checked boxes, Test results, Notes) intact.
+- Phase 4 (record merge, archive, board/epic updates) was first committed straight to
+  `main`, per the documented guardrail carve-out. `git push origin main` was blocked by an
+  environment safety classifier, so — on the human's instruction — those changes were moved
+  onto a branch (`task-003-record-merge`) and opened as PR #16 instead, one-off for this task.
+  The documented carve-out itself is unchanged and applies again from TASK-019 onward.
 
 ## Notes
 
