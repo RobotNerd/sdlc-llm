@@ -2,11 +2,11 @@
 id: TASK-020
 title: "CI workflow running sync check on every PR"
 type: chore
-status: in-progress
+status: in-review
 epic: EPIC-001
 created: 2026-09-10
 branch: task-020-ci-sync-check
-pr: null
+pr: https://github.com/RobotNerd/sdlc-llm/pull/18
 merge_commit: null
 blocked_by: [TASK-012]
 blocks: []
