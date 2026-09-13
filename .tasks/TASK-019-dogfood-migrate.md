@@ -2,11 +2,11 @@
 id: TASK-019
 title: "Dogfood: bring this repo's .tasks/ fully under the toolkit"
 type: chore
-status: in-progress
+status: in-review
 epic: EPIC-001
 created: 2026-09-10
 branch: task-019-dogfood-migrate
-pr: null
+pr: https://github.com/RobotNerd/sdlc-llm/pull/17
 merge_commit: null
 blocked_by: [TASK-012, TASK-013]
 blocks: []
