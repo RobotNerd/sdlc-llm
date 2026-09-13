@@ -2,12 +2,12 @@
 id: TASK-003
 title: "Add .github/pull_request_template.md mirroring acceptance criteria"
 type: chore
-status: in-review
+status: done
 epic: EPIC-001
 created: 2026-09-10
 branch: task-003-pr-template
 pr: https://github.com/RobotNerd/sdlc-llm/pull/15
-merge_commit: null
+merge_commit: c26452b610b7a71e3a844a32fe79107d5438c689
 blocked_by: []
 blocks: [TASK-014]
 ---
