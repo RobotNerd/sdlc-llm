@@ -48,7 +48,7 @@ by this repo managing its own `.tasks/` end to end.
 | TASK-007 | done | sync: epic children and spec epics region renderers |
 | TASK-008 | done | sync: BOARD.md epics panel and status columns |
 | TASK-009 | done | sync: BOARD.md TODO merge (preserve order, drop, append, annotate) |
-| TASK-010 | in-review | sync next-id: print the next free id for a type |
+| TASK-010 | done | sync next-id: print the next free id for a type |
 | TASK-011 | todo | sync archive: move done/wont-do tasks to .tasks/archive/ |
 | TASK-012 | done | sync check: compute, diff, exit non-zero, write nothing |
 | TASK-013 | todo | End-to-end idempotency and derivation-matrix test suite |
@@ -60,5 +60,5 @@ by this repo managing its own `.tasks/` end to end.
 | TASK-019 | todo | Dogfood: bring this repo's .tasks/ fully under the toolkit |
 | TASK-020 | todo | CI workflow running sync check on every PR |
 
-Progress: 8/20 done
+Progress: 9/20 done
 <!-- END:children -->
