@@ -25,14 +25,16 @@ So far this lays the foundation only, not the real subcommands:
 - TASK-010: `sync next-id <spec|epic|task>` — the next free id of a type,
   scanning `.tasks/`, `.tasks/specs/`, and `.tasks/archive/` so an id is
   never reused after archiving.
+- TASK-011: `sync archive` — moves `done`/`wont-do` task files into
+  `.tasks/archive/`, preserving filename and frontmatter untouched.
 
 It imports nothing outside the Python standard library — see
 `.tasks/specs/SPEC-001-llm-sdlc-workflow.md` §"The sync script" for why.
 
-TASK-011 still needs to add `archive`, and a bare write mode for `sync`
-itself is not yet built — see TASK-012's Worklog. Running this file with
-no arguments just discovers and summarizes the current artifacts, as a
-smoke test that the loader works end to end.
+A bare write mode for `sync` itself (regenerating and writing every
+region, then archiving) is not yet built — see TASK-012's Worklog.
+Running this file with no arguments just discovers and summarizes the
+current artifacts, as a smoke test that the loader works end to end.
 """
 
 from __future__ import annotations
@@ -285,6 +287,67 @@ def next_id(tasks_root: Path, kind: str) -> str:
     artifacts = discover(tasks_root)
     existing = [int(art.id.split("-", 1)[1]) for art in artifacts.values() if art.kind == kind]
     return f"{prefix}-{max(existing, default=0) + 1:03d}"
+
+
+# ---------------------------------------------------------------------------
+# Archiving done/wont-do tasks
+# ---------------------------------------------------------------------------
+
+
+_ARCHIVABLE_STATUSES = ("done", "wont-do")
+
+
+def find_archivable(tasks_root: Path) -> dict[str, Artifact]:
+    """Tasks whose status is `done` or `wont-do` and aren't already under
+    `.tasks/archive/`. What `archive()` would move, without moving it.
+    """
+    archive_dir = (tasks_root / "archive").resolve()
+    return {
+        task_id: art
+        for task_id, art in discover(tasks_root).items()
+        if art.kind == "task"
+        and art.fields.get("status") in _ARCHIVABLE_STATUSES
+        and archive_dir not in art.path.resolve().parents
+    }
+
+
+def archive(tasks_root: Path) -> list[Path]:
+    """Move every `done`/`wont-do` task file into `.tasks/archive/`,
+    preserving its filename and frontmatter untouched. Idempotent --
+    already-archived files are skipped, so a second run moves nothing.
+    Returns the destination paths of files actually moved.
+
+    Task frontmatter (title, `pr`) is left exactly as it was: the moved
+    file itself is the durable "one-line reference" SPEC-001 asks for
+    once a task ages out of BOARD.md's capped `done` column -- while
+    still within the cap, `render_board_column` already surfaces title
+    and `pr` for every done task regardless of file location, since
+    `discover()` scans `.tasks/archive/` too. No separate archive index
+    is created.
+
+    Does not update BOARD.md or any other file -- that's the (not yet
+    built) write mode's job, once it exists; see the module docstring.
+    """
+    archive_dir = tasks_root / "archive"
+    moved = []
+    for art in find_archivable(tasks_root).values():
+        archive_dir.mkdir(parents=True, exist_ok=True)
+        dest = archive_dir / art.path.name
+        art.path.rename(dest)
+        moved.append(dest)
+    return moved
+
+
+def should_auto_archive(config: dict[str, Any]) -> bool:
+    """Whether a bare `sync` write mode should call `archive()`
+    automatically, per `config.md`'s `archive_done` key (default `True`
+    if unset). `sync archive`, invoked directly, always archives
+    regardless of this -- it exists precisely so archiving still works
+    when auto-archiving is turned off. Exposed as its own function so
+    it's already implemented and tested for whenever bare `sync` gains a
+    write mode (not yet built; see the module docstring).
+    """
+    return bool(config.get("archive_done", True))
 
 
 # ---------------------------------------------------------------------------
@@ -919,7 +982,19 @@ def main(argv: list[str]) -> int:
             print(f"sync next-id: {exc}", file=sys.stderr)
             return 2
         return 0
-    print(f"sync: unknown arguments {argv!r} — supported: (none), check, next-id <spec|epic|task>", file=sys.stderr)
+    if argv == ["archive"]:
+        moved = archive(tasks_root)
+        if moved:
+            print(f"Archived {len(moved)} task(s):")
+            for path in moved:
+                print(f"  {path.relative_to(tasks_root)}")
+        else:
+            print("Nothing to archive.")
+        return 0
+    print(
+        f"sync: unknown arguments {argv!r} — supported: (none), check, next-id <spec|epic|task>, archive",
+        file=sys.stderr,
+    )
     return 2
 
 

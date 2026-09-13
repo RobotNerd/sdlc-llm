@@ -2,11 +2,11 @@
 id: TASK-011
 title: "sync archive: move done/wont-do tasks to .tasks/archive/"
 type: feature
-status: todo
+status: in-review
 epic: EPIC-001
 created: 2026-09-10
 branch: task-011-sync-archive
-pr: null
+pr: https://github.com/RobotNerd/sdlc-llm/pull/12
 merge_commit: null
 blocked_by: [TASK-004, TASK-008]
 blocks: [TASK-013]
@@ -35,7 +35,20 @@ Move every `done` and `wont-do` `TASK-*.md` into `.tasks/archive/`, leaving a on
 
 ## Worklog
 
-_(empty — appended during implementation)_
+- 2026-09-13: `python3 .tasks/bin/sync archive` against this real repo reports "Nothing to
+  archive" — all 9 done tasks so far were already hand-moved into `.tasks/archive/` during each
+  task's phase-4 bookkeeping. Real confirmation that the manual archiving matches what the real
+  code now does, and that the idempotency check holds on real history, not just fixtures.
+- Design decision on AC #2 ("a one-line reference remains discoverable... in an archive region or
+  index"): didn't build a separate index. `archive()` only moves the file — frontmatter (title,
+  `pr`) is untouched, and `discover()` already scans `.tasks/archive/`, so TASK-008's
+  `render_board_column` keeps surfacing a done task's title + PR on the board regardless of file
+  location, up to its 20-row cap. Once a task ages past that cap, the archived file itself (full
+  content, not just one line) is the durable record. A second index would duplicate that.
+- `should_auto_archive(config)` is implemented and tested even though nothing calls it yet — the
+  bare `sync` write mode that would (per AC #4, "with archive_done: false, sync skips archiving")
+  doesn't exist (see TASK-012's Worklog). `sync archive`, invoked directly, always archives
+  regardless of config, which is what "sync archive still works when called directly" asks for.
 
 ## Notes
 
