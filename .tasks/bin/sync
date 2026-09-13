@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """sync — the deterministic engine for this repo's markdown kanban workflow.
 
-So far this lays the foundation only, not the real subcommands:
+Built up task by task:
 
 - TASK-004: a hand-rolled frontmatter parser/renderer and a loader that
   discovers SPEC/EPIC/TASK artifacts under `.tasks/`.
@@ -19,22 +19,22 @@ So far this lays the foundation only, not the real subcommands:
 - TASK-009: `merge_todo` / `apply_todo_merge` — the one place `sync`
   merges instead of regenerating: reconciles the hand-ordered TODO list
   with reality without ever reordering it.
-- TASK-012: `sync check` — runs every derivation/renderer above in
-  memory and diffs the result against disk, writing nothing. The real
-  subcommand: `.tasks/bin/sync check`.
 - TASK-010: `sync next-id <spec|epic|task>` — the next free id of a type,
   scanning `.tasks/`, `.tasks/specs/`, and `.tasks/archive/` so an id is
   never reused after archiving.
 - TASK-011: `sync archive` — moves `done`/`wont-do` task files into
   `.tasks/archive/`, preserving filename and frontmatter untouched.
+- TASK-012: `compute_mismatches` / `sync check` — runs every derivation
+  and renderer above in memory and diffs the result against disk,
+  writing nothing.
+- TASK-013: `apply_all` / `run_sync` — the write mode: applies every
+  mismatch `compute_mismatches` would report (chaining a file's updates
+  where more than one applies, e.g. BOARD.md's several regions), then
+  archives if configured. Bare `.tasks/bin/sync` (no arguments) runs
+  this now.
 
 It imports nothing outside the Python standard library — see
 `.tasks/specs/SPEC-001-llm-sdlc-workflow.md` §"The sync script" for why.
-
-A bare write mode for `sync` itself (regenerating and writing every
-region, then archiving) is not yet built — see TASK-012's Worklog.
-Running this file with no arguments just discovers and summarizes the
-current artifacts, as a smoke test that the loader works end to end.
 """
 
 from __future__ import annotations
@@ -840,15 +840,21 @@ class Mismatch:
         )
 
 
-def _diff_region(path: Path, text: str, name: str, expected_body: str) -> Mismatch | None:
-    """Compare `text`'s `name` region against `expected_body`, appending
-    the region at end-of-file if it doesn't exist yet. `None` if they
-    already agree.
+def _apply_region(text: str, name: str, expected_body: str) -> str:
+    """Return `text` with region `name` set to `expected_body`, appending
+    it at end-of-file if it doesn't exist yet.
     """
     try:
-        replaced = replace_region(text, name, expected_body)
+        return replace_region(text, name, expected_body)
     except RegionError:
-        replaced = ensure_region(text, name, expected_body)
+        return ensure_region(text, name, expected_body)
+
+
+def _diff_region(path: Path, text: str, name: str, expected_body: str) -> Mismatch | None:
+    """Compare `text`'s `name` region against `expected_body` (see
+    `_apply_region`). `None` if they already agree.
+    """
+    replaced = _apply_region(text, name, expected_body)
     if replaced == text:
         return None
     return Mismatch(path=path, region=name, current=text, expected=replaced)
@@ -961,17 +967,130 @@ def run_check(tasks_root: Path) -> int:
     return 1 if mismatches else 0
 
 
+# ---------------------------------------------------------------------------
+# Bare `sync`: the write mode
+# ---------------------------------------------------------------------------
+#
+# Deliberately deferred out of TASK-012 and TASK-011 (see their Worklogs) --
+# `compute_mismatches` covered read-only diagnosis, which was all their own
+# acceptance criteria needed. Built here because TASK-013's own idempotency
+# test ("run sync, then sync again, confirm the second run is a no-op") has
+# no way to exist without something that actually writes.
+
+
+def load_config(tasks_root: Path) -> dict[str, Any]:
+    """Load `.tasks/config.md`'s frontmatter fields, or `{}` if the file
+    doesn't exist yet (a repo mid-bootstrap, or a test fixture that
+    doesn't need one -- `should_auto_archive({})` still defaults `True`).
+    """
+    config_path = tasks_root / "config.md"
+    if not config_path.is_file():
+        return {}
+    fields, _body, _order = parse_frontmatter(config_path.read_text())
+    return fields
+
+
+def apply_all(tasks_root: Path) -> list[Path]:
+    """Write every region/frontmatter update `compute_mismatches` would
+    otherwise only report, and return the paths actually changed.
+
+    Unlike `compute_mismatches` -- which diffs each region independently
+    against the pristine on-disk text, so a per-region diff always names
+    exactly what changed -- this function must *chain* a file's updates
+    when more than one applies to it (BOARD.md can need all of: the epics
+    panel, all four columns, and the TODO merge). Applying each against
+    the original text independently and writing them in sequence would
+    let a later write silently undo an earlier one; chaining through a
+    running `text` per file avoids that. Does not archive -- see
+    `run_sync`.
+    """
+    artifacts = discover(tasks_root)
+    tasks = {a.id: a for a in artifacts.values() if a.kind == "task"}
+    epics = {a.id: a for a in artifacts.values() if a.kind == "epic"}
+    specs = {a.id: a for a in artifacts.values() if a.kind == "spec"}
+    changed: list[Path] = []
+
+    # blocks reconciliation (frontmatter)
+    reconciled = reconcile_blocks(tasks)
+    for task_id, art in tasks.items():
+        new_blocks = reconciled[task_id].fields["blocks"]
+        if new_blocks != (art.fields.get("blocks") or []):
+            new_fields = {**art.fields, "blocks": new_blocks}
+            art.path.write_text(render_frontmatter(new_fields, art.order) + art.body)
+            changed.append(art.path)
+
+    # epic status (frontmatter) + children region, chained per epic
+    children_of: dict[str, list[Artifact]] = {epic_id: [] for epic_id in epics}
+    for task in tasks.values():
+        epic_id = task.fields.get("epic")
+        if epic_id in children_of:
+            children_of[epic_id].append(task)
+
+    derived_epics: dict[str, Artifact] = {}
+    for epic_id, epic in epics.items():
+        children = children_of[epic_id]
+        derived = derive_epic_status(epic, children)
+        derived_epics[epic_id] = derived
+        original_text = epic.path.read_text()
+        text = original_text
+        if derived.fields.get("status") != epic.fields.get("status"):
+            text = render_frontmatter(derived.fields, derived.order) + epic.body
+        text = _apply_region(text, "children", render_epic_children(derived, children))
+        if text != original_text:
+            epic.path.write_text(text)
+            changed.append(epic.path)
+
+    # spec epics region, per spec
+    for spec_id, spec in specs.items():
+        linked = [
+            (derived_epics[epic_id], children_of[epic_id])
+            for epic_id, epic in epics.items()
+            if epic.fields.get("spec") == spec_id
+        ]
+        original_text = spec.path.read_text()
+        text = _apply_region(original_text, "epics", render_spec_epics(linked))
+        if text != original_text:
+            spec.path.write_text(text)
+            changed.append(spec.path)
+
+    # BOARD.md: chain the epics panel, all four columns, and the TODO merge
+    board_path = tasks_root / "BOARD.md"
+    original_board_text = board_path.read_text()
+    board_text = original_board_text
+    all_pairs = [(derived_epics[epic_id], children_of[epic_id]) for epic_id in epics]
+    board_text = _apply_region(board_text, "epics", render_board_epics_panel(all_pairs))
+    for status, cap in (("in-progress", None), ("in-review", None), ("blocked", None), ("done", _DONE_COLUMN_CAP)):
+        board_text = _apply_region(board_text, status, render_board_column(list(tasks.values()), status, cap=cap))
+    board_text = apply_todo_merge(board_text, tasks)
+    if board_text != original_board_text:
+        board_path.write_text(board_text)
+        changed.append(board_path)
+
+    return changed
+
+
+def run_sync(tasks_root: Path) -> list[Path]:
+    """Bare `sync`: write every derived region and frontmatter field via
+    `apply_all`, then archive `done`/`wont-do` tasks if `config.md`'s
+    `archive_done` allows it (default: yes). Returns every path changed
+    or moved.
+    """
+    changed = apply_all(tasks_root)
+    if should_auto_archive(load_config(tasks_root)):
+        changed += archive(tasks_root)
+    return changed
+
+
 def main(argv: list[str]) -> int:
     tasks_root = Path(__file__).resolve().parent.parent
     if not argv:
-        artifacts = discover(tasks_root)
-        by_kind: dict[str, int] = {}
-        for art in artifacts.values():
-            by_kind[art.kind] = by_kind.get(art.kind, 0) + 1
-        print(f"Discovered {len(artifacts)} artifact(s) under {tasks_root}:")
-        for kind in ("spec", "epic", "task"):
-            print(f"  {kind}: {by_kind.get(kind, 0)}")
-        print("(no write mode yet -- see TASK-012's Worklog; run 'check' to see what would change)")
+        changed = run_sync(tasks_root)
+        if changed:
+            print(f"Updated {len(changed)} file(s):")
+            for path in changed:
+                print(f"  {path.relative_to(tasks_root)}")
+        else:
+            print("Already up to date.")
         return 0
     if argv == ["check"]:
         return run_check(tasks_root)
