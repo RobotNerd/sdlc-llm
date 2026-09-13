@@ -2,11 +2,11 @@
 id: TASK-013
 title: "End-to-end idempotency and derivation-matrix test suite"
 type: chore
-status: in-progress
+status: in-review
 epic: EPIC-001
 created: 2026-09-10
 branch: task-013-sync-test-suite
-pr: null
+pr: https://github.com/RobotNerd/sdlc-llm/pull/13
 merge_commit: null
 blocked_by: [TASK-009, TASK-011, TASK-012]
 blocks: [TASK-019]
