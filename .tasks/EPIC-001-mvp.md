@@ -40,7 +40,7 @@ by this repo managing its own `.tasks/` end to end.
 | Task | Status | Title |
 |---|---|---|
 | TASK-001 | done | Author guidelines.md and config.md for this repo |
-| TASK-002 | todo | Create spec / epic / task templates in .tasks/templates/ |
+| TASK-002 | in-progress | Create spec / epic / task templates in .tasks/templates/ |
 | TASK-003 | todo | Add .github/pull_request_template.md mirroring acceptance criteria |
 | TASK-004 | done | sync: stdlib frontmatter parser and artifact loader |
 | TASK-005 | done | sync: generated-region find / replace / append engine |

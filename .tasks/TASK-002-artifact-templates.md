@@ -2,7 +2,7 @@
 id: TASK-002
 title: "Create spec / epic / task templates in .tasks/templates/"
 type: feature
-status: todo
+status: in-progress
 epic: EPIC-001
 created: 2026-09-10
 branch: task-002-artifact-templates
