@@ -2,11 +2,11 @@
 id: TASK-015
 title: "add-task skill: interview, epic prompt, size check, priority placement"
 type: feature
-status: todo
+status: in-review
 epic: EPIC-001
 created: 2026-09-10
 branch: task-015-skill-add-task
-pr: null
+pr: https://github.com/RobotNerd/sdlc-llm/pull/21
 merge_commit: null
 blocked_by: [TASK-002, TASK-010]
 blocks: [TASK-018]
@@ -20,12 +20,12 @@ A skill that turns a rough description into a well-formed `TASK-*.md`: interview
 
 ## Acceptance criteria
 
-- [ ] Skill is a checklist with STOP markers; if the description yields no concrete acceptance criteria or testing strategy, it asks follow-ups before writing anything.
-- [ ] Allocates the ID with `sync next-id task` — never by counting files itself.
-- [ ] Epic prompt offers: attach to an existing open epic (lists them), create a new epic now, or leave unassigned.
-- [ ] Size check: if the work looks larger than one PR / one sitting, it proposes a split and stops.
-- [ ] Asks for TODO rank rather than always appending; inserts the line at that position.
-- [ ] Writes the file from `.tasks/templates/task.md`, then runs `sync`.
+- [x] Skill is a checklist with STOP markers; if the description yields no concrete acceptance criteria or testing strategy, it asks follow-ups before writing anything.
+- [x] Allocates the ID with `sync next-id task` — never by counting files itself.
+- [x] Epic prompt offers: attach to an existing open epic (lists them), create a new epic now, or leave unassigned.
+- [x] Size check: if the work looks larger than one PR / one sitting, it proposes a split and stops.
+- [x] Asks for TODO rank rather than always appending; inserts the line at that position.
+- [x] Writes the file from `.tasks/templates/task.md`, then runs `sync`.
 
 ## Testing strategy
 
@@ -35,7 +35,34 @@ A skill that turns a rough description into a well-formed `TASK-*.md`: interview
 
 ## Worklog
 
-_(empty — appended during implementation)_
+- 2026-09-13: Built `.claude/skills/add-task/SKILL.md` — no naming collision to resolve this time
+  (unlike TASK-014's `init` → `init-project`), so it's named `add-task` directly per SPEC-001.
+  Checklist order deliberately puts the write step (6) strictly after the interview gate (1) and
+  the size-check gate (2), so a vague or oversized description structurally cannot reach a file
+  write — there's no separate "don't write yet" flag to forget to check.
+- **Priority placement design:** `sync`'s bare run only ever *appends* a newly-`todo` task at the
+  end of TODO (by design — TODO order is entirely hand-maintained). To honor a requested rank
+  other than "at the end," the skill runs `sync` first to get the new line in its exact canonical
+  rendered form (dash, id, em-dash, title, epic tag, blocked marker), then relocates that literal
+  line within `BOARD.md` — never hand-composes the line itself. Confirmed in testing that moving
+  an already-correct line leaves `sync check` clean (TODO order isn't a generated region).
+- All three testing-strategy scenarios run against a scratch copy of this real repo's `.tasks/`
+  (not the real one — this creates real files):
+  1. (Vague one-liner → no file until criteria exist.) Verified by construction, not a runtime
+     probe: the write step is gated behind steps 1 and 2, so nothing downstream of an unanswered
+     interview or an unresolved size check can execute.
+  2. Well-specified task ("`sync`: add a `--dry-run` flag", `EPIC-001`, requested rank "before
+     TASK-017"): `sync next-id task` → `TASK-021`; wrote the file from the template — **caught a
+     real gap while filling it in**: the template's title placeholder appears *twice*
+     (`title: "{{title}}"` in frontmatter and `# {{id}}: {{title}}` in the heading right below
+     it) and it's easy to fill only the quoted one and miss the heading's. Fixed by calling this
+     out explicitly in `SKILL.md` step 6.2. After fixing, ran bare `sync` (appended the TODO line
+     + `EPIC-001`'s `children` region, both correct), moved the literal appended line to before
+     `TASK-017`, then `sync check` exited `0`.
+  3. (Oversized task → split proposal, not a write.) Same structural argument as scenario 1 — the
+     size-check gate (step 2) precedes the write step (step 6).
+- `pytest` (211 passed) and `python3 .tasks/bin/sync check` (exit 0) on the real repo — this task
+  didn't touch any Python, both are reconfirmations, not new coverage.
 
 ## Notes
 
