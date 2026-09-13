@@ -53,7 +53,7 @@ by this repo managing its own `.tasks/` end to end.
 | TASK-012 | done | sync check: compute, diff, exit non-zero, write nothing |
 | TASK-013 | done | End-to-end idempotency and derivation-matrix test suite |
 | TASK-014 | done | init-project skill: scaffold .tasks/ in a new repo |
-| TASK-015 | todo | add-task skill: interview, epic prompt, size check, priority placement |
+| TASK-015 | in-progress | add-task skill: interview, epic prompt, size check, priority placement |
 | TASK-016 | todo | implement-task skill: four phases, STOP markers, resumable, bail-out |
 | TASK-017 | todo | refine-backlog skill: periodic lightweight backlog pass |
 | TASK-018 | todo | plan-feature skill: spec -> epics -> vertical-slice tasks |
