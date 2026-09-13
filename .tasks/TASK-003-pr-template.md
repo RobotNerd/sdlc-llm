@@ -2,11 +2,11 @@
 id: TASK-003
 title: "Add .github/pull_request_template.md mirroring acceptance criteria"
 type: chore
-status: in-progress
+status: in-review
 epic: EPIC-001
 created: 2026-09-10
 branch: task-003-pr-template
-pr: null
+pr: https://github.com/RobotNerd/sdlc-llm/pull/15
 merge_commit: null
 blocked_by: []
 blocks: [TASK-014]
@@ -43,8 +43,9 @@ A PR template whose body mirrors the task acceptance-criteria checklist plus a f
   what a reviewer needs, not a full transcript.
 - Testing strategy step 1 (throwaway draft PR): deferred to this task's own phase-3 `gh pr
   create` rather than a separate scratch branch — opening TASK-003's real PR against the
-  template it adds exercises the same thing without the throwaway. Will confirm GitHub renders
-  it correctly and note the result here before wrap-up.
+  template it adds exercises the same thing without the throwaway. Confirmed via `gh pr view
+  --json body`: https://github.com/RobotNerd/sdlc-llm/pull/15 rendered every section (Task,
+  Description, Acceptance criteria with checked boxes, Test results, Notes) intact.
 
 ## Notes
 
