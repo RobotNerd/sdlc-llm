@@ -179,28 +179,23 @@ fast-forward local `main`. I never run `gh pr merge`.
 
 ## Gaps
 
-| Gap | Effect now | Closes at |
-|---|---|---|
-| **Merge is manual** — by design | I open every PR and stop. You review and squash-merge on GitHub; I observe the result next turn | stays yours unless you delegate it |
-| **Git driver is checklist prose, not code** | I run `git`/`gh` by following SPEC-001's steps; no shared helper, so I re-derive the sequence each task | extract a helper if it proves unreliable (noted in TASK-016) |
-| **No skills exist** | I hand-follow SPEC-001's phase checklists. Risk: I drift from them — call it out if I skip a STOP | TASK-016 |
-| **No `sync`** | I hand-maintain task frontmatter + the TODO list; the `epics` panel, status columns and EPIC-001 `children` region go deliberately stale | TASK-008/009, verified by TASK-012 |
-| **Epic status won't roll up** | EPIC-001 reads `todo` on paper even once work starts | TASK-006 |
-| **No CI** | "merge gated on green CI" is "tests pass locally" + your eyeball on `gh pr checks` | TASK-020 |
-| **No `.tasks/archive/`** | Done tasks accumulate on the board | TASK-011 |
-| **`gh` degradation path untested** | If `gh` breaks mid-flow I fall back to printing commands for you; not yet exercised | TASK-016 testing strategy |
+Updated 2026-09-13, 12/20 tasks done. See `.tmp/session-handoff.md` for exactly where things
+stand and how to resume.
+
+| Gap | Status |
+|---|---|
+| **No `sync`** | ✅ Closed — TASK-004 through TASK-013. `.tasks/bin/sync check` (read-only) and `.tasks/bin/sync` (write mode, TASK-013) both exist and are fully tested. |
+| **Epic status won't roll up** | ✅ Closed — TASK-006 (`derive_epic_status`, 7 rules). |
+| **No `.tasks/archive/`** | ✅ Closed — TASK-011 (`sync archive`). |
+| **Merge is manual** — by design | Unchanged, and staying this way: I open every PR and stop; you review and squash-merge on GitHub; I observe the result next turn. |
+| **Git driver is checklist prose, not code** | Unchanged. I still run `git`/`gh` by following the phase checklist by hand each task (no skill exists yet to encode it — that's TASK-016). |
+| **No skills exist** | Unchanged — TASK-014 through TASK-018, not started. |
+| **No CI** | Unchanged — TASK-020, not started. "Merge gated on green CI" is still "tests pass locally" + your eyeball. |
+| **`gh` degradation path untested** | Unchanged — exercising it is part of TASK-016's own testing strategy. |
+| **`sync`'s write mode not yet run on this repo for real** | New, deliberate: TASK-013 built it, but phase-4 bookkeeping still hand-edits `BOARD.md`/`EPIC-001`/`SPEC-001` rather than running bare `sync`, on purpose — so TASK-019's "first real run" stays a meaningful proof rather than already-true-by-construction. |
 
 ## Verification
 
-1. **Refinements land:** `feat/initial-workflow` opens a PR, you squash-merge it, `main` carries
-   the git-automation changes.
-2. **Graph still sound:** the dependency checks pass after the TASK-004 edit — `blocks` mirrors
-   `blocked_by`, the graph is acyclic, the new TODO order is a valid topological sort, all 20
-   tasks listed exactly once. (Confirmed this pass.)
-3. **Board annotations match:** TASK-004's TODO line no longer carries a ⛔ marker. (Confirmed.)
-4. **First loop end-to-end:** run TASK-001 through all four phases. Success = a squash-merged PR
-   titled for `TASK-001`, its frontmatter reading `status: done` with `pr:` and `merge_commit:`
-   filled, and `.tasks/config.md` + `.tasks/guidelines.md` present on `main`.
-5. **The real proof, later:** at TASK-019 the first full `sync` run produces **no diff** against
-   the hand-written generated regions. A mismatch means the spec was underspecified — file it as a
-   defect rather than editing the regions to match.
+The original bootstrap-specific verification steps (TASK-001 through the graph/board checks) all
+passed and are now historical — see the archived task Worklogs under `.tasks/archive/` for what
+each one actually found. For current status and how to resume, see `.tmp/session-handoff.md`.
