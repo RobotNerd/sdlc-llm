@@ -238,3 +238,28 @@ def test_apply_todo_merge_handles_todo_as_the_last_section():
     tasks = {"TASK-001": make_task("TASK-001", title="a")}
     result = apply_todo_merge(text, tasks)
     assert result == text
+
+
+def test_apply_todo_merge_handles_an_empty_todo_immediately_followed_by_a_heading():
+    """Regression (found via TASK-014): a completely empty TODO section
+    butting straight up against the next heading, with no blank-line gap
+    to search through, used to make `next_heading` come back -1 -- as if
+    TODO were the file's last section -- which silently discarded that
+    heading and everything after it (data loss on a freshly-scaffolded
+    board with zero TODO items). Must not lose `## In Progress` or
+    anything after it, and must be idempotent.
+    """
+    text = "# Board\n\n## TODO\n\n## In Progress\n\n_(none)_\n"
+    once = apply_todo_merge(text, {})
+    assert "## In Progress" in once
+    assert "_(none)_" in once
+    assert apply_todo_merge(once, {}) == once  # idempotent
+
+
+def test_apply_todo_merge_empty_todo_can_still_gain_a_line_next_to_a_heading():
+    text = "# Board\n\n## TODO\n\n## In Progress\n\n_(none)_\n"
+    tasks = {"TASK-001": make_task("TASK-001", title="a")}
+    result = apply_todo_merge(text, tasks)
+    assert "- TASK-001 — a" in result
+    assert "## In Progress" in result
+    assert apply_todo_merge(result, tasks) == result  # idempotent

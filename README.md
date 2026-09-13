@@ -57,7 +57,8 @@ Five Claude Code skills drive the workflow end to end (still to be built — TAS
 TASK-018; until then, follow SPEC-001's `implement-task` phases by hand, per `CLAUDE.md` and
 `.tmp/workflow-plan.md`):
 
-- **`init`** — scaffold `.tasks/` in a new repo.
+- **`init-project`** — scaffold `.tasks/` in a new repo. (Named `init-project`, not `init`, so it
+  doesn't collide with a generic `init` skill.)
 - **`add-task`** — interview a request into real acceptance criteria, allocate an ID, place it in
   TODO.
 - **`implement-task`** — the four-phase loop (start → implement + test → wrap up → observed

@@ -20,7 +20,7 @@ by this repo managing its own `.tasks/` end to end.
 - `sync`: frontmatter parser, generated-region engine, epic-status derivation, board renderers,
   the TODO merge, `next-id`, `archive`, and `check`.
 - An end-to-end idempotency + derivation-matrix test suite.
-- Skills: `init`, `add-task`, `implement-task`, `refine-backlog`, `plan-feature`.
+- Skills: `init-project`, `add-task`, `implement-task`, `refine-backlog`, `plan-feature`.
 - Dogfooding this repo onto the toolkit and a CI job running `sync check`.
 
 ## Out of scope
@@ -52,7 +52,7 @@ by this repo managing its own `.tasks/` end to end.
 | TASK-011 | done | sync archive: move done/wont-do tasks to .tasks/archive/ |
 | TASK-012 | done | sync check: compute, diff, exit non-zero, write nothing |
 | TASK-013 | done | End-to-end idempotency and derivation-matrix test suite |
-| TASK-014 | todo | init skill: scaffold .tasks/ in a new repo |
+| TASK-014 | in-review | init-project skill: scaffold .tasks/ in a new repo |
 | TASK-015 | todo | add-task skill: interview, epic prompt, size check, priority placement |
 | TASK-016 | todo | implement-task skill: four phases, STOP markers, resumable, bail-out |
 | TASK-017 | todo | refine-backlog skill: periodic lightweight backlog pass |

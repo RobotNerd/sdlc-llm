@@ -11,7 +11,7 @@ the first real `sync` run on this repo was a no-op, proving the hand-written reg
 were spec-accurate).
 
 `.tasks/bin/sync` is built and live: it owns every generated region in `BOARD.md`, `EPIC-*.md`,
-and `SPEC-*.md` now — **run it, don't hand-edit**. The five skills (`init`, `add-task`,
+and `SPEC-*.md` now — **run it, don't hand-edit**. The five skills (`init-project`, `add-task`,
 `implement-task`, `refine-backlog`, `plan-feature` — TASK-014 through TASK-018) don't exist yet;
 until they land, work a task by hand following the phases below. The v1 build is tracked as
 EPIC-001 with 20 tasks — see `.tasks/BOARD.md` for current progress.
