@@ -40,7 +40,7 @@ by this repo managing its own `.tasks/` end to end.
 | Task | Status | Title |
 |---|---|---|
 | TASK-001 | done | Author guidelines.md and config.md for this repo |
-| TASK-002 | in-review | Create spec / epic / task templates in .tasks/templates/ |
+| TASK-002 | done | Create spec / epic / task templates in .tasks/templates/ |
 | TASK-003 | todo | Add .github/pull_request_template.md mirroring acceptance criteria |
 | TASK-004 | done | sync: stdlib frontmatter parser and artifact loader |
 | TASK-005 | done | sync: generated-region find / replace / append engine |
@@ -60,5 +60,5 @@ by this repo managing its own `.tasks/` end to end.
 | TASK-019 | todo | Dogfood: bring this repo's .tasks/ fully under the toolkit |
 | TASK-020 | todo | CI workflow running sync check on every PR |
 
-Progress: 11/20 done
+Progress: 12/20 done
 <!-- END:children -->

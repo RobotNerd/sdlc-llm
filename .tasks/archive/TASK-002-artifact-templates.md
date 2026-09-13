@@ -2,12 +2,12 @@
 id: TASK-002
 title: "Create spec / epic / task templates in .tasks/templates/"
 type: feature
-status: in-review
+status: done
 epic: EPIC-001
 created: 2026-09-10
 branch: task-002-artifact-templates
 pr: https://github.com/RobotNerd/sdlc-llm/pull/14
-merge_commit: null
+merge_commit: 43d0d17983e1b1eaffbafc212265ab93fcbf74ae
 blocked_by: []
 blocks: [TASK-014, TASK-015, TASK-016]
 ---
