@@ -57,7 +57,7 @@ by this repo managing its own `.tasks/` end to end.
 | TASK-016 | todo | implement-task skill: four phases, STOP markers, resumable, bail-out |
 | TASK-017 | todo | refine-backlog skill: periodic lightweight backlog pass |
 | TASK-018 | todo | plan-feature skill: spec -> epics -> vertical-slice tasks |
-| TASK-019 | todo | Dogfood: bring this repo's .tasks/ fully under the toolkit |
+| TASK-019 | in-progress | Dogfood: bring this repo's .tasks/ fully under the toolkit |
 | TASK-020 | todo | CI workflow running sync check on every PR |
 
 Progress: 13/20 done

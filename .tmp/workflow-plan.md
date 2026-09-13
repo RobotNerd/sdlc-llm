@@ -107,8 +107,10 @@ But the workflow splits in two, and only one half is missing:
 
 - **The git/PR half** — branch per task, conventional commit citing the task ID, PR carrying the
   acceptance criteria as its checklist, merge. **Needs no tooling.** We run it from task one.
-- **The board half** — `sync`. Doesn't exist. Until it does I keep frontmatter current by hand and
-  we let the derived views go stale on purpose.
+- **The board half** — `sync`. Built (TASK-004–013) and dogfooded onto this real repo (TASK-019):
+  it now does all board/epic/spec regeneration. Only the five skills remain unbuilt (TASK-014–018)
+  — until they land, follow the per-task loop below by hand, but let `sync` (not hand-editing) own
+  every generated region.
 
 ## Decisions
 
@@ -159,8 +161,8 @@ each PR on GitHub — that is the only step that is yours.
 
 **Phase 1 — Start.** I check the tree is clean, name the top unblocked TODO task, run
 `git fetch origin && git switch -c task-NNN-slug origin/main`, set `status: in-progress` and
-`branch:`, update the board, then restate the plan and acceptance criteria. → *you approve* →
-**STOP**
+`branch:`, run `sync` to update the board and epic, then restate the plan and acceptance
+criteria. → *you approve* → **STOP**
 
 **Phase 2 — Implement + test.** I write the files and unit tests, run `test_command` /
 `lint_command` once they exist, then walk the task's Testing strategy. Anything not automatable I
@@ -174,25 +176,26 @@ pushed history), and run `gh pr create` with the acceptance criteria as a checkl
 
 **Phase 4 — Merge (yours, then I observe).** You review the PR on GitHub and **squash & merge**.
 On my next turn I poll `gh pr view --json state,mergeCommit`; once merged I record `merge_commit:`,
-set `status: done`, update the board (via `sync` once it exists), delete the task branch, and
-fast-forward local `main`. I never run `gh pr merge`.
+set `status: done`, run `sync` (updates the board/epic, archives the task), delete the task
+branch, and fast-forward local `main`. I never run `gh pr merge`.
 
 ## Gaps
 
-Updated 2026-09-13, 12/20 tasks done. See `.tmp/session-handoff.md` for exactly where things
-stand and how to resume.
+Updated 2026-09-12, 14/20 tasks done (TASK-019 landed: `sync`'s first real run on this repo was
+a no-op, proving the hand-written regions were spec-accurate all along). See
+`.tmp/session-handoff.md` for exactly where things stand and how to resume.
 
 | Gap | Status |
 |---|---|
 | **No `sync`** | ✅ Closed — TASK-004 through TASK-013. `.tasks/bin/sync check` (read-only) and `.tasks/bin/sync` (write mode, TASK-013) both exist and are fully tested. |
 | **Epic status won't roll up** | ✅ Closed — TASK-006 (`derive_epic_status`, 7 rules). |
 | **No `.tasks/archive/`** | ✅ Closed — TASK-011 (`sync archive`). |
+| **`sync`'s write mode not yet run on this repo for real** | ✅ Closed — TASK-019. Bare `sync` now owns `BOARD.md`/`EPIC-001`/`SPEC-001`'s generated regions; the first real run was an empty diff. Phase 1/3/4 of the per-task loop run `sync` instead of hand-editing from here on. |
 | **Merge is manual** — by design | Unchanged, and staying this way: I open every PR and stop; you review and squash-merge on GitHub; I observe the result next turn. |
 | **Git driver is checklist prose, not code** | Unchanged. I still run `git`/`gh` by following the phase checklist by hand each task (no skill exists yet to encode it — that's TASK-016). |
 | **No skills exist** | Unchanged — TASK-014 through TASK-018, not started. |
 | **No CI** | Unchanged — TASK-020, not started. "Merge gated on green CI" is still "tests pass locally" + your eyeball. |
 | **`gh` degradation path untested** | Unchanged — exercising it is part of TASK-016's own testing strategy. |
-| **`sync`'s write mode not yet run on this repo for real** | New, deliberate: TASK-013 built it, but phase-4 bookkeeping still hand-edits `BOARD.md`/`EPIC-001`/`SPEC-001` rather than running bare `sync`, on purpose — so TASK-019's "first real run" stays a meaningful proof rather than already-true-by-construction. |
 
 ## Verification
 
