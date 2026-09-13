@@ -49,7 +49,7 @@ by this repo managing its own `.tasks/` end to end.
 | TASK-008 | done | sync: BOARD.md epics panel and status columns |
 | TASK-009 | done | sync: BOARD.md TODO merge (preserve order, drop, append, annotate) |
 | TASK-010 | done | sync next-id: print the next free id for a type |
-| TASK-011 | in-progress | sync archive: move done/wont-do tasks to .tasks/archive/ |
+| TASK-011 | in-review | sync archive: move done/wont-do tasks to .tasks/archive/ |
 | TASK-012 | done | sync check: compute, diff, exit non-zero, write nothing |
 | TASK-013 | todo | End-to-end idempotency and derivation-matrix test suite |
 | TASK-014 | todo | init skill: scaffold .tasks/ in a new repo |
