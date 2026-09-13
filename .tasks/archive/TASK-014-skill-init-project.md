@@ -2,12 +2,12 @@
 id: TASK-014
 title: "init-project skill: scaffold .tasks/ in a new repo"
 type: feature
-status: in-review
+status: done
 epic: EPIC-001
 created: 2026-09-10
 branch: task-014-skill-init-project
 pr: https://github.com/RobotNerd/sdlc-llm/pull/20
-merge_commit: null
+merge_commit: 977989af6f4b07402b358cfe6dc41ac7ff862f2a
 blocked_by: [TASK-002, TASK-003, TASK-010]
 blocks: []
 ---
