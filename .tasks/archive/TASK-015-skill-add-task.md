@@ -2,12 +2,12 @@
 id: TASK-015
 title: "add-task skill: interview, epic prompt, size check, priority placement"
 type: feature
-status: in-review
+status: done
 epic: EPIC-001
 created: 2026-09-10
 branch: task-015-skill-add-task
 pr: https://github.com/RobotNerd/sdlc-llm/pull/21
-merge_commit: null
+merge_commit: 0884e1fd37dcfb4221dafab2f3c291babf3235de
 blocked_by: [TASK-002, TASK-010]
 blocks: [TASK-018]
 ---
