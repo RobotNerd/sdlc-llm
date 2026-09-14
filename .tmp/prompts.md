@@ -46,3 +46,40 @@ Use the add-task skill to create a new refactoring task in EPIC-001 that makes t
 - @CLAUDE.md
 - Determine if anything in @.tmp/workflow-plan.md and @.tmp/project-management-plan.md is important information that needs to be kept. If so, find a better location for these details outside of .tmp.
 - Add a `Example Usage` section to @README.md with an example step-by-step workflow that uses the skills defined in this repo. -->
+
+<!-- I agree with your plan.
+
+- Format: We'll do this as pure prose for now. After the implementation is done, I'll review and determine if I want a followup ticket to extract the deterministic behavior to a script.
+- STOP semantics: You've been working more autonomously than I originally planned, and it's been going well. So let's keep that workflow.
+- Good on the rest.
+
+Go ahead with the implementation. -->
+
+---
+
+TODO: Use the add-task skill to create a new refactoring task in EPIC-001 that makes these changes to the `implement-task` skill:
+- move deterministic portions of the `implement-task` skill to python script:
+  - step 0 and step 1 - most of these actions seem eligible for code
+  - in general, most of the git actions seem like good candidates to be run in code
+  - look for other deterministic steps that can be moved to the script
+
+--
+
+TODO: EPIC: Use the plan-feature skill to create a new epic to convert as much as possible to hooks.
+
+---
+
+TODO: EPIC: Refactor implement-task skill to be more automated:
+- user provides an epic, a task range, task list, or a stopping task and LLM works through all tasks autonomously
+  - epic provided: LLM attempts to implement all tasks in the epic
+  - task range: implement all tasks from start to end in range
+  - task list: a list of individual tasks to work, which might not be in the same order as the board
+  - stopping task: LLM starts with the first task at the top of the TODO section on the board and works all tasks in order from the TODO list until completing the stopping task
+- before working, LLM must verify that the set of tasks provided by the user is valid
+- determine conditions when LLM should interrupt work and notify the user
+  - running into an issue the requires clarification from the user
+  - running out of context; need strategies to avoid this
+  - running into an unexpected blocker
+  - using too many tokens; need strategies to keep token usage low, especially if spawning additional worker agents
+- creating follow up tasks: user can choose if they want the LLM to create additional tasks automatically or if the user needs to be notified; e.g. the LLM determines that a task is too big and needs to be split up
+- switch to TDD: LLM should write test cases first, verify they fail, then implement and re-test until test cases pass
