@@ -55,13 +55,17 @@ Use the add-task skill to create a new refactoring task in EPIC-001 that makes t
 
 Go ahead with the implementation. -->
 
----
+<!-- ---
 
 TODO: Use the add-task skill to create a new refactoring task in EPIC-001 that makes these changes to the `implement-task` skill:
 - move deterministic portions of the `implement-task` skill to python script:
   - step 0 and step 1 - most of these actions seem eligible for code
   - in general, most of the git actions seem like good candidates to be run in code
-  - look for other deterministic steps that can be moved to the script
+  - look for other deterministic steps that can be moved to the script -->
+
+<!-- I merged it. Just like in previous steps, do the git clean up steps. Once you're done with the cleanup, use the add-task skill to create another task in EPIC-001 to automate the mechanical parts of the `refine-backlog` skill. Place the new task at the bottom of the TODO list on the board.
+
+Include one additional work item as part of the new task. For step 3 with the stale-todo scan, I want a more sophisticated check then simply a created date > 30 days old. I'm designing this for use on my own personal projects, which I'll often have to drop and return to much later. One option is to account for the date of the last activity of the git repository, e.g. > 30 days older than the last commit date. I don't have a strong idea on the best way to do this, so part of the planning stage when implementing the task is to provide your analysis and suggestions on how best to adjust the stale-todo range. -->
 
 --
 
