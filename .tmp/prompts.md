@@ -73,9 +73,7 @@ Include one additional work item as part of the new task. For step 3 with the st
 
 <!-- /add-task New task in EPIC-001 at bottom of the TODO list. Modify the `init-project` skill so that it can be used to do an idempotent upgrade to an existing project where init-project has already been run. Like the current script implementation, behaviors should be implemented in the scaffold script where possible. Ensure that no existing spec/epic/task data is lost. The goal is to upgrade the skills and related process docs to keep them up-to-date with the latest changes in this repo. -->
 
-/add-task Add a new optional feature that includes an automatic code formatting tool if supported. Add an entry for it in @.tasks/config.md with null as the default value; it should be part of the interview questions to populate the value during the init-project skill. Update the implement-task to use the code formatter. Add a hook that ensure that the code formatter is run before creating a PR.
-
----
+<!-- /add-task Create a new task in EPIC-001 at the bottom of the TODO list. Add a new optional feature that includes an automatic code formatting tool if supported. Add an entry for it in @.tasks/config.md with null as the default value; it should be part of the interview questions to populate the value during the init-project skill. Update the implement-task to use the code formatter. Add a hook that ensure that the code formatter is run before creating a PR. -->
 
 /plan-feature Create a new epic to move behavior to hooks. I want you to identify what behaviors from the existing skills make sense to be turned into hooks. The goal is to ensure that the hook behaviors always occur and aren't left to probabilistic decisions. In addition to the existing skills, are there any new behaviors you would recommend adding as hooks?
 
