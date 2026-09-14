@@ -2,11 +2,11 @@
 id: TASK-024
 title: "Scratch: implement-task dry-run (throwaway, not real backlog)"
 type: chore
-status: in-progress
+status: in-review
 epic: EPIC-001
 created: 2026-09-13
 branch: task-024-scratch-dryrun
-pr: null
+pr: https://github.com/RobotNerd/sdlc-llm/pull/22
 merge_commit: null
 blocked_by: []
 blocks: []
