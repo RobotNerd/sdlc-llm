@@ -63,6 +63,7 @@ by this repo managing its own `.tasks/` end to end.
 | TASK-022 | todo | add-task: move deterministic portions to a stdlib script, define its parameters |
 | TASK-023 | todo | Docs cleanup: remove redundant/deprecated info, relocate .tmp/ content, add README usage example |
 | TASK-024 | todo | implement-task: move deterministic git/gh actions to a stdlib script |
+| TASK-025 | todo | refine-backlog: move mechanical steps to a stdlib script; activity-aware stale detection |
 
-Progress: 19/24 done
+Progress: 19/25 done
 <!-- END:children -->
