@@ -6,27 +6,29 @@ description: Scaffold the "kanban in markdown" workflow (SPEC-001) into this rep
 # init-project
 
 A numbered checklist, not prose. Each step says exactly what to do; **STOP** means pause for the
-human before continuing; **ASK** means don't guess — ask a follow-up question instead. Files this
-skill reads (never modifies) live under `templates/` next to this `SKILL.md`, plus a vendored copy
-of `.tasks/bin/sync` at `vendored-sync` next to it.
+human before continuing; **ASK** means don't guess — ask a follow-up question instead.
+
+Everything mechanical — creating directories, writing/copying files, vendoring `sync`, running
+`sync`/`sync check` — lives in `scaffold.py` next to this `SKILL.md` (TASK-021), not in this
+prose. This skill's own job is the interview and the two STOPs; the script writes only what's
+already been confirmed.
 
 ## 0. Refuse if already initialized
 
-Check whether `.tasks/` already exists at the repo root.
-
-- If it does: **STOP**. Tell the human this repo is already using the workflow, and that
-  `init-project` doesn't support migrating or re-initializing an existing `.tasks/` — that's a
-  future `upgrade` skill's job. Change nothing and end here.
-- If it doesn't: continue.
+Quick check: does `.tasks/` already exist at the repo root? If so, **STOP** before running any
+interview — tell the human this repo is already using the workflow, and that `init-project`
+doesn't support migrating or re-initializing an existing `.tasks/` (a future `upgrade` skill's
+job). Change nothing and end here. (`scaffold.py` also refuses on its own if this is somehow
+skipped — this step exists so the interview below isn't wasted on a doomed run.)
 
 ## 1. Preflight
 
-1. Confirm the current directory is inside a git repository (`git rev-parse --show-toplevel`). If
-   not, **STOP** and tell the human `init-project` needs to run inside a git repo.
+1. Quick check: is the current directory inside a git repository (`git rev-parse
+   --show-toplevel`)? If not, **STOP** and tell the human `init-project` needs to run inside a
+   git repo. (Same reasoning as step 0 — `scaffold.py` verifies this independently too.)
 2. Run `gh auth status`. If `gh` isn't installed, or isn't authenticated, **warn** the human that
-   `implement-task` (the task-execution skill) needs `gh` for PR automation and won't work until
-   it's set up — but this is a warning, not a blocker. **ASK** whether to continue anyway or stop
-   to install/authenticate `gh` first.
+   `implement-task` needs `gh` for PR automation and won't work until it's set up — a warning,
+   not a blocker. **ASK** whether to continue anyway or stop to install/authenticate `gh` first.
 
 ## 2. Interview for `.tasks/config.md`
 
@@ -40,7 +42,7 @@ saying what that is), **ASK** a follow-up rather than picking for them.
 |---|---|---|
 | `test_command` | How are tests run? | none — leave `null` if the human doesn't have one yet |
 | `lint_command` | How is linting run, if at all? | `null` |
-| `docs_paths` | Which files should `implement-task` phase 3 consider "the docs" to keep current? | `[README.md]` |
+| `docs_paths` | Which files should `implement-task` phase 3 consider "the docs" to keep current? | `["README.md"]` |
 | `default_branch` | Default branch name? | `main` |
 | `branch_prefix` | Prefix for task branches? | `task-` |
 | `remote` | Git remote name? | `origin` |
@@ -56,30 +58,20 @@ either; they're fixed by the template.
 Once every value is answered, **restate the full `config.md` you're about to write and STOP** for
 the human's go-ahead before creating any files.
 
-## 3. Scaffold
+## 3. Scaffold and finish
 
-Once confirmed:
+Once confirmed: write the answers as a JSON object to a scratch file (your scratchpad directory,
+or any temp path — object keys are exactly the table above's, JSON `true`/`false`/`null`/lists as
+appropriate), then run:
 
-1. Create `.tasks/`, `.tasks/bin/`, and `.tasks/templates/`.
-2. Write `.tasks/config.md`: take `templates/config.md`, drop its leading `<!-- ... -->` comment
-   block, and substitute the interview answers for its `{{placeholder}}`s.
-3. Write `.tasks/guidelines.md` as a verbatim copy of `templates/guidelines.md` — it's already
-   generic, no substitution needed.
-4. Write `.tasks/BOARD.md` as a verbatim copy of `templates/board.md`.
-5. Copy `templates/spec.md`, `templates/epic.md`, and `templates/task.md` into
-   `.tasks/templates/` verbatim — these are the project's own task/epic/spec authoring templates
-   (for `add-task`/`plan-feature`), a different thing from this skill's own `templates/`.
-6. Write `.github/pull_request_template.md` (create `.github/` if it doesn't exist) as a verbatim
-   copy of `templates/pull_request_template.md`.
-7. Copy `vendored-sync` (next to this `SKILL.md`) to `.tasks/bin/sync` and make it executable
-   (`chmod +x`). This isn't in SPEC-001's `init` file list, but nothing after this step works
-   without it — see TASK-014's Worklog for why it's vendored here rather than referenced.
+```
+python3 .claude/skills/init-project/scaffold.py run <path-to-answers.json>
+```
 
-## 4. Finish
+This performs every mechanical step (directory creation, `config.md` rendering, the verbatim
+file copies, vendoring `sync`, running `sync` then `sync check`) and exits non-zero with a clear
+message if `.tasks/` already exists, this isn't a git repo, or an answer is missing.
 
-1. Run `python3 .tasks/bin/sync` (bare — it writes).
-2. Run `python3 .tasks/bin/sync check` and confirm it exits `0`.
-3. Show the human the resulting `.tasks/BOARD.md`.
-
-If `sync check` is *not* clean at this point, that's a bug in this skill or in the vendored
-`sync` — **STOP**, show the diff, and don't paper over it by hand-editing a generated region.
+If it exits non-zero for any other reason: **STOP**, show the human the error — that's a bug in
+this script or in the vendored `sync`, not something to paper over by hand-editing a generated
+region. If it exits `0`, show the human the resulting `.tasks/BOARD.md`.
