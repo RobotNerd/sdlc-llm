@@ -65,6 +65,8 @@ by this repo managing its own `.tasks/` end to end.
 | TASK-024 | todo | implement-task: move deterministic git/gh actions to a stdlib script |
 | TASK-025 | todo | refine-backlog: move mechanical steps to a stdlib script; activity-aware stale detection |
 | TASK-026 | todo | plan-feature: move mechanical file-writing and cycle checking to a stdlib script |
+| TASK-027 | todo | Strip project-specific references from the portable surface |
+| TASK-028 | todo | Replace .tmp/prompts.md special-case with an ignored_paths config key |
 
-Progress: 21/26 done
+Progress: 21/28 done
 <!-- END:children -->

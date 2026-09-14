@@ -9,7 +9,7 @@ branch: task-022-add-task-script-split
 pr: null
 merge_commit: null
 blocked_by: []
-blocks: []
+blocks: [TASK-027]
 ---
 
 # TASK-022: add-task: move deterministic portions to a stdlib script, define its parameters

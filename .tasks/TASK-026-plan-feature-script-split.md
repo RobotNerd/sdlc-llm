@@ -9,7 +9,7 @@ branch: task-026-plan-feature-script-split
 pr: null
 merge_commit: null
 blocked_by: []
-blocks: []
+blocks: [TASK-027]
 ---
 
 # TASK-026: plan-feature: move mechanical file-writing and cycle checking to a stdlib script

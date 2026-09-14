@@ -69,29 +69,34 @@ Include one additional work item as part of the new task. For step 3 with the st
 
 <!-- I merged it. Just like in previous steps, do the git clean up steps. Once you're done with the cleanup, use the add-task skill to create another task in EPIC-001 to automate the mechanical parts of the `plan-feature` skill. Place the new task at the bottom of the TODO list on the board. -->
 
----
-
-/add-task Remove references to details that are relevant only to this project, which can be found throughout many of the files in this project. One example: in the init-project skill, there is a reference to a task `(TASK-021)` included in the skill definition as well as comments in the associated scaffold script. This will be confusing to the agent when the skill is used in a different project, since it should have no reference to the inner workings of this repo, leading to a likely collision on task names. Focus only on the content that will be used in other projects, which is copied to the new project by the init-project skill @.claude/skills/init-project/. This goes at the bottom of the TODO list on the board.
+<!-- /add-task Remove references to details that are relevant only to this project, which can be found throughout many of the files in this project. One example: in the init-project skill, there is a reference to a task `(TASK-021)` included in the skill definition as well as comments in the associated scaffold script. This will be confusing to the agent when the skill is used in a different project, since it should have no reference to the inner workings of this repo, leading to a likely collision on task names. Focus only on the content that will be used in other projects, which is copied to the new project by the init-project skill @.claude/skills/init-project/. This goes at the bottom of the TODO list on the board. -->
 
 ---
 
-TODO: EPIC: Use the plan-feature skill to create a new epic to convert as much as possible to hooks.
+/add-task New task in EPIC-001 at bottom of the TODO list. Modify the `init-project` skill so that it can be used to upgrade an existing project where init-project has already been run. Like the current script implementation, decisions should be implemented in the scaffold script where possible. Ensure that no existing spec/epic/task data is lost. The goal is to upgrade the skills and related process docs to keep them up-to-date with the latest changes in this repo.
 
 ---
 
-TODO: EPIC: Refactor implement-task skill to be more automated:
+/plan-feature Create a new epic to move behavior to hooks. I want you to identify what behaviors from the existing skills make sense to be turned into hooks. The goal is to ensure that the hook behaviors always occur and aren't left to probabilistic decisions. In addition to the existing skills, are there any new behaviors you would recommend adding as hooks?
+
+My current ideas for hooks:
+- A script that checks for references to SPEC-NNN and TASK-NNN in the artifacts that will be copied to other repositories using the init-project skill (see TASK-027). Causes the agent to clean up these references before a PR can be opened for a task. This hook would only exist in the current repository and would be excluded from the list of artifacts copied by the init-project skill.
+
+---
+
+/plan-feature Create a new epic to refactor the `implement-task` skill to be more automated:
 - user provides an epic, a task range, task list, or a stopping task and LLM works through all tasks autonomously
   - epic provided: LLM attempts to implement all tasks in the epic
-  - task range: implement all tasks from start to end in range
-  - task list: a list of individual tasks to work, which might not be in the same order as the board
+  - task range: implement all tasks from start to end in the range
+  - task list: a list of individual tasks to work, which might not be in the same order as the TODO list on the board
   - stopping task: LLM starts with the first task at the top of the TODO section on the board and works all tasks in order from the TODO list until completing the stopping task
-- before working, LLM must verify that the set of tasks provided by the user is valid
-- determine conditions when LLM should interrupt work and notify the user
+- before working, LLM must verify that the set of tasks provided by the user is valid; implement this as a script to offload the decision making from the LLM
+- determine conditions when LLM should interrupt work and notify the user; these are my rough ideas, and I need suggestions/best practices from you
   - running into an issue the requires clarification from the user
   - running out of context; need strategies to avoid this
   - running into an unexpected blocker
   - using too many tokens; need strategies to keep token usage low, especially if spawning additional worker agents
-- creating follow up tasks: user can choose if they want the LLM to create additional tasks automatically or if the user needs to be notified; e.g. the LLM determines that a task is too big and needs to be split up
+- creating follow up tasks: user can choose if they want the LLM to create additional tasks automatically or if the user needs to be notified; e.g. the LLM determines that a task is too big and needs to be split up; default to allowing new task creation, but add a limiter to prevent task explosion
 - switch to TDD: LLM should write test cases first, verify they fail, then implement and re-test until test cases pass
 
 ---
