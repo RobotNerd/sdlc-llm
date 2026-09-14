@@ -2,7 +2,7 @@
 id: TASK-024
 title: "Scratch: implement-task dry-run (throwaway, not real backlog)"
 type: chore
-status: todo
+status: in-progress
 epic: EPIC-001
 created: 2026-09-13
 branch: task-024-scratch-dryrun
