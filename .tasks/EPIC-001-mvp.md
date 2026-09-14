@@ -64,6 +64,7 @@ by this repo managing its own `.tasks/` end to end.
 | TASK-023 | todo | Docs cleanup: remove redundant/deprecated info, relocate .tmp/ content, add README usage example |
 | TASK-024 | todo | implement-task: move deterministic git/gh actions to a stdlib script |
 | TASK-025 | todo | refine-backlog: move mechanical steps to a stdlib script; activity-aware stale detection |
+| TASK-026 | todo | plan-feature: move mechanical file-writing and cycle checking to a stdlib script |
 
-Progress: 20/25 done
+Progress: 20/26 done
 <!-- END:children -->
