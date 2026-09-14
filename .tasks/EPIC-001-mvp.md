@@ -56,7 +56,7 @@ by this repo managing its own `.tasks/` end to end.
 | TASK-015 | done | add-task skill: interview, epic prompt, size check, priority placement |
 | TASK-016 | done | implement-task skill: four phases, STOP markers, resumable, bail-out |
 | TASK-017 | done | refine-backlog skill: periodic lightweight backlog pass |
-| TASK-018 | in-review | plan-feature skill: spec -> epics -> vertical-slice tasks |
+| TASK-018 | done | plan-feature skill: spec -> epics -> vertical-slice tasks |
 | TASK-019 | done | Dogfood: bring this repo's .tasks/ fully under the toolkit |
 | TASK-020 | done | CI workflow running sync check on every PR |
 | TASK-021 | todo | init-project: move deterministic scaffolding to a stdlib Python script |
@@ -65,5 +65,5 @@ by this repo managing its own `.tasks/` end to end.
 | TASK-024 | todo | implement-task: move deterministic git/gh actions to a stdlib script |
 | TASK-025 | todo | refine-backlog: move mechanical steps to a stdlib script; activity-aware stale detection |
 
-Progress: 19/25 done
+Progress: 20/25 done
 <!-- END:children -->

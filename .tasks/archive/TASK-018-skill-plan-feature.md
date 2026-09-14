@@ -2,12 +2,12 @@
 id: TASK-018
 title: "plan-feature skill: spec -> epics -> vertical-slice tasks"
 type: feature
-status: in-review
+status: done
 epic: EPIC-001
 created: 2026-09-10
 branch: task-018-skill-plan-feature
 pr: https://github.com/RobotNerd/sdlc-llm/pull/28
-merge_commit: null
+merge_commit: 3fcbbfe114d36f86845e4948741bc7e13817dd0d
 blocked_by: [TASK-015]
 blocks: []
 ---
