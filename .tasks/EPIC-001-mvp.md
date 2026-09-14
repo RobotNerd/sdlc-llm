@@ -54,7 +54,7 @@ by this repo managing its own `.tasks/` end to end.
 | TASK-013 | done | End-to-end idempotency and derivation-matrix test suite |
 | TASK-014 | done | init-project skill: scaffold .tasks/ in a new repo |
 | TASK-015 | done | add-task skill: interview, epic prompt, size check, priority placement |
-| TASK-016 | in-progress | implement-task skill: four phases, STOP markers, resumable, bail-out |
+| TASK-016 | in-review | implement-task skill: four phases, STOP markers, resumable, bail-out |
 | TASK-017 | todo | refine-backlog skill: periodic lightweight backlog pass |
 | TASK-018 | todo | plan-feature skill: spec -> epics -> vertical-slice tasks |
 | TASK-019 | done | Dogfood: bring this repo's .tasks/ fully under the toolkit |

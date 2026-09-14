@@ -2,11 +2,11 @@
 id: TASK-016
 title: "implement-task skill: four phases, STOP markers, resumable, bail-out"
 type: feature
-status: in-progress
+status: in-review
 epic: EPIC-001
 created: 2026-09-10
 branch: task-016-skill-implement-task
-pr: null
+pr: https://github.com/RobotNerd/sdlc-llm/pull/23
 merge_commit: null
 blocked_by: [TASK-002, TASK-012]
 blocks: []
