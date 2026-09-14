@@ -67,6 +67,8 @@ TODO: Use the add-task skill to create a new refactoring task in EPIC-001 that m
 
 Include one additional work item as part of the new task. For step 3 with the stale-todo scan, I want a more sophisticated check then simply a created date > 30 days old. I'm designing this for use on my own personal projects, which I'll often have to drop and return to much later. One option is to account for the date of the last activity of the git repository, e.g. > 30 days older than the last commit date. I don't have a strong idea on the best way to do this, so part of the planning stage when implementing the task is to provide your analysis and suggestions on how best to adjust the stale-todo range. -->
 
+<!-- I merged it. Just like in previous steps, do the git clean up steps. Once you're done with the cleanup, use the add-task skill to create another task in EPIC-001 to automate the mechanical parts of the `plan-feature` skill. Place the new task at the bottom of the TODO list on the board. -->
+
 --
 
 TODO: EPIC: Use the plan-feature skill to create a new epic to convert as much as possible to hooks.
