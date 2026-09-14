@@ -59,6 +59,7 @@ by this repo managing its own `.tasks/` end to end.
 | TASK-018 | todo | plan-feature skill: spec -> epics -> vertical-slice tasks |
 | TASK-019 | done | Dogfood: bring this repo's .tasks/ fully under the toolkit |
 | TASK-020 | done | CI workflow running sync check on every PR |
+| TASK-021 | todo | init-project: move deterministic scaffolding to a stdlib Python script |
 
-Progress: 17/20 done
+Progress: 17/21 done
 <!-- END:children -->
