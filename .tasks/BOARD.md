@@ -15,10 +15,10 @@ between `<!-- BEGIN -->` / `<!-- END -->` markers — change the task/epic file 
 ## TODO
 
 - TASK-022 — add-task: move deterministic portions to a stdlib script, define its parameters  `EPIC-001`
-- TASK-023 — Docs cleanup: remove redundant/deprecated info, relocate .tmp/ content, add README usage example  `EPIC-001`
 - TASK-024 — implement-task: move deterministic git/gh actions to a stdlib script  `EPIC-001`
 - TASK-025 — refine-backlog: move mechanical steps to a stdlib script; activity-aware stale detection  `EPIC-001`
 - TASK-026 — plan-feature: move mechanical file-writing and cycle checking to a stdlib script  `EPIC-001`
+- TASK-023 — Docs cleanup: remove redundant/deprecated info, relocate .tmp/ content, add README usage example  `EPIC-001`
 
 ## In Progress
 

@@ -69,7 +69,11 @@ Include one additional work item as part of the new task. For step 3 with the st
 
 <!-- I merged it. Just like in previous steps, do the git clean up steps. Once you're done with the cleanup, use the add-task skill to create another task in EPIC-001 to automate the mechanical parts of the `plan-feature` skill. Place the new task at the bottom of the TODO list on the board. -->
 
---
+---
+
+/add-task Remove references to details that are relevant only to this project, which can be found throughout many of the files in this project. One example: in the init-project skill, there is a reference to a task `(TASK-021)` included in the skill definition as well as comments in the associated scaffold script. This will be confusing to the agent when the skill is used in a different project, since it should have no reference to the inner workings of this repo, leading to a likely collision on task names. Focus only on the content that will be used in other projects, which is copied to the new project by the init-project skill @.claude/skills/init-project/. This goes at the bottom of the TODO list on the board.
+
+---
 
 TODO: EPIC: Use the plan-feature skill to create a new epic to convert as much as possible to hooks.
 
@@ -89,3 +93,7 @@ TODO: EPIC: Refactor implement-task skill to be more automated:
   - using too many tokens; need strategies to keep token usage low, especially if spawning additional worker agents
 - creating follow up tasks: user can choose if they want the LLM to create additional tasks automatically or if the user needs to be notified; e.g. the LLM determines that a task is too big and needs to be split up
 - switch to TDD: LLM should write test cases first, verify they fail, then implement and re-test until test cases pass
+
+---
+
+TODO: /add-task use higher model (e.g. Opus) as the orchestrator and spin off lower models (e.g. Sonnet) to implement the tasks; each model and effort level is configurable; how to balance context and token usage to keep the process efficient?
