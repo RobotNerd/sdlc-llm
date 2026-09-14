@@ -60,6 +60,7 @@ by this repo managing its own `.tasks/` end to end.
 | TASK-019 | done | Dogfood: bring this repo's .tasks/ fully under the toolkit |
 | TASK-020 | done | CI workflow running sync check on every PR |
 | TASK-021 | todo | init-project: move deterministic scaffolding to a stdlib Python script |
+| TASK-022 | todo | add-task: move deterministic portions to a stdlib script, define its parameters |
 
-Progress: 17/21 done
+Progress: 17/22 done
 <!-- END:children -->
