@@ -55,15 +55,11 @@ Use the add-task skill to create a new refactoring task in EPIC-001 that makes t
 
 Go ahead with the implementation. -->
 
----
+<!-- ---
 
-TODO: Use the add-task skill to create a new refactoring task in EPIC-001 that makes these changes to the `implement-task` skill:
-- move deterministic portions of the `implement-task` skill to python script:
-  - step 0 and step 1 - most of these actions seem eligible for code
-  - in general, most of the git actions seem like good candidates to be run in code
-  - look for other deterministic steps that can be moved to the script
-
---
+Use the add-task skill to create a new refactoring task in EPIC-001 for the `implement-task` skill. The goal is to move deterministic portions of the `implement-task` skill to a python script:
+- in general, most/all of the git actions seem like good candidates to be run via code
+- identify other deterministic steps that can be moved to the script -->
 
 TODO: EPIC: Use the plan-feature skill to create a new epic to convert as much as possible to hooks.
 
