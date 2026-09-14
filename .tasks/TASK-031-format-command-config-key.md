@@ -1,6 +1,6 @@
 ---
 id: TASK-031
-title: "Add optional format_command config key; run it in implement-task before opening a PR"
+title: Add optional format_command config key; run it in implement-task before opening a PR
 type: feature
 status: todo
 epic: EPIC-001
@@ -9,7 +9,7 @@ branch: task-031-format-command-config-key
 pr: null
 merge_commit: null
 blocked_by: [TASK-024]
-blocks: []
+blocks: [TASK-035]
 ---
 
 # TASK-031: Add optional format_command config key; run it in implement-task before opening a PR

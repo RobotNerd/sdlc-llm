@@ -10,6 +10,7 @@ between `<!-- BEGIN -->` / `<!-- END -->` markers — change the task/epic file 
 | Epic | Status | Progress |
 |---|---|---|
 | EPIC-001 | in-progress | 21/31 done |
+| EPIC-002 | todo | 0/7 done |
 <!-- END:epics -->
 
 ## TODO
@@ -24,6 +25,13 @@ between `<!-- BEGIN -->` / `<!-- END -->` markers — change the task/epic file 
 - TASK-029 — init-project upgrade: refresh an initialized project from the toolkit repo  `EPIC-001` ⛔ blocked_by TASK-027, TASK-028
 - TASK-030 — Migrate config.md to the current schema during upgrade  `EPIC-001` ⛔ blocked_by TASK-029
 - TASK-031 — Add optional format_command config key; run it in implement-task before opening a PR  `EPIC-001` ⛔ blocked_by TASK-024
+- TASK-032 — Hooks infrastructure + shared guardrails module + core git/gh guardrail hooks  `EPIC-002`
+- TASK-033 — Structural edit guardrails hook: generated regions and epic status  `EPIC-002` ⛔ blocked_by TASK-032
+- TASK-034 — Branch-name + dirty-tree gate hook  `EPIC-002` ⛔ blocked_by TASK-028, TASK-032
+- TASK-035 — Pre-PR quality gate hook: sync check, test, lint, format  `EPIC-002` ⛔ blocked_by TASK-031, TASK-032
+- TASK-036 — SPEC/TASK-reference scan hook (repo-only, never copied)  `EPIC-002` ⛔ blocked_by TASK-027, TASK-032
+- TASK-037 — SessionStart board-context hook  `EPIC-002` ⛔ blocked_by TASK-032
+- TASK-038 — Wire hooks into upgrade and config migration  `EPIC-002` ⛔ blocked_by TASK-029, TASK-030, TASK-032
 
 ## In Progress
 

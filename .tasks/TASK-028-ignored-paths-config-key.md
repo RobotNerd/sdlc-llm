@@ -9,7 +9,7 @@ branch: task-028-ignored-paths-config-key
 pr: null
 merge_commit: null
 blocked_by: [TASK-024]
-blocks: [TASK-029]
+blocks: [TASK-029, TASK-034]
 ---
 
 # TASK-028: Replace .tmp/prompts.md special-case with an ignored_paths config key

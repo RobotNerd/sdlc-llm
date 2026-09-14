@@ -1,6 +1,6 @@
 ---
 id: TASK-030
-title: "Migrate config.md to the current schema during upgrade"
+title: Migrate config.md to the current schema during upgrade
 type: feature
 status: todo
 epic: EPIC-001
@@ -9,7 +9,7 @@ branch: task-030-config-schema-migration
 pr: null
 merge_commit: null
 blocked_by: [TASK-029]
-blocks: []
+blocks: [TASK-038]
 ---
 
 # TASK-030: Migrate config.md to the current schema during upgrade

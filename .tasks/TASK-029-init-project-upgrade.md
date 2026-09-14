@@ -9,7 +9,7 @@ branch: task-029-init-project-upgrade
 pr: null
 merge_commit: null
 blocked_by: [TASK-027, TASK-028]
-blocks: [TASK-030]
+blocks: [TASK-030, TASK-038]
 ---
 
 # TASK-029: init-project upgrade: refresh an initialized project from the toolkit repo

@@ -75,14 +75,15 @@ Include one additional work item as part of the new task. For step 3 with the st
 
 <!-- /add-task Create a new task in EPIC-001 at the bottom of the TODO list. Add a new optional feature that includes an automatic code formatting tool if supported. Add an entry for it in @.tasks/config.md with null as the default value; it should be part of the interview questions to populate the value during the init-project skill. Update the implement-task to use the code formatter. Add a hook that ensure that the code formatter is run before creating a PR. -->
 
-/plan-feature Create a new epic to move behavior to hooks. I want you to identify what behaviors from the existing skills make sense to be turned into hooks. The goal is to ensure that the hook behaviors always occur and aren't left to probabilistic decisions. In addition to the existing skills, are there any new behaviors you would recommend adding as hooks?
+<!-- /plan-feature Create a new epic to move behavior to hooks. These hooks are included at the per-project level, so they are copied to a new repo as part of the init-project skill. I want you to identify what behaviors from the existing skills make sense to be turned into hooks. The goal is to ensure that the hook behaviors always occur and aren't left to probabilistic decisions. In addition to the existing skills and items I mention below, are there any new behaviors you would recommend adding as hooks?
 
 My current ideas for hooks:
+- Everything described in the `Guardrails` section of @.tasks/specs/SPEC-001-llm-sdlc-workflow.md.
 - A script that checks for references to SPEC-NNN and TASK-NNN in the artifacts that will be copied to other repositories using the init-project skill (see TASK-027). Causes the agent to clean up these references before a PR can be opened for a task. This hook would only exist in the current repository and would be excluded from the list of artifacts copied by the init-project skill.
 - The test_command is run before creating a PR and must pass.
 - The lint_command is run before creating a PR and must pass.
-- The code formatting tool is run before creating a PR.
-- Ensure that re-running init-project to upgrade a project doesn't modify the excluded files.
+- The code formatting tool is run before creating a PR (see TASK-031).
+- Ensure that re-running init-project to upgrade a project doesn't modify the excluded files. -->
 
 ---
 
