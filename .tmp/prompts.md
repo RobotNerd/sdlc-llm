@@ -41,8 +41,8 @@ Use the add-task skill to create a new refactoring task in EPIC-001 that makes t
 - It looks like your plan only relies on pytest as a dependency at the moment and everything else is in stdlib. Should we use conda/uv for the sync script or is that overkill?
 - I removed `tmp/` from .gitignore. I've decided to which to the `.tmp/` pattern and keep these files checked into the repo, knowing that I may manually remove them in the future. -->
 
-Use the add-task skill to create a new refactoring task to clean up docs to remove redundant/deprecated information:
+<!-- Use the add-task skill to create a new refactoring task to clean up docs to remove redundant/deprecated information. This task should go at the bottom of the TODO list on the board. Some docs for cleanup that I've identified are:
 - @./tasks/guidelines.md and @.claude/skills/init-project/templates/guidelines.md: some of these instructions are redundant now that they have been implemented in @.tasks/bin/sync.py.
 - @CLAUDE.md
 - Determine if anything in @.tmp/workflow-plan.md and @.tmp/project-management-plan.md is important information that needs to be kept. If so, find a better location for these details outside of .tmp.
-- Add a `Example Usage` section to @README.md with an example step-by-step workflow that uses the skills defined in this repo.
+- Add a `Example Usage` section to @README.md with an example step-by-step workflow that uses the skills defined in this repo. -->

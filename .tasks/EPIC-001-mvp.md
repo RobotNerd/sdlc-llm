@@ -61,6 +61,7 @@ by this repo managing its own `.tasks/` end to end.
 | TASK-020 | done | CI workflow running sync check on every PR |
 | TASK-021 | todo | init-project: move deterministic scaffolding to a stdlib Python script |
 | TASK-022 | todo | add-task: move deterministic portions to a stdlib script, define its parameters |
+| TASK-023 | todo | Docs cleanup: remove redundant/deprecated info, relocate .tmp/ content, add README usage example |
 
-Progress: 17/22 done
+Progress: 17/23 done
 <!-- END:children -->
