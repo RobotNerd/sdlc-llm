@@ -59,12 +59,12 @@ by this repo managing its own `.tasks/` end to end.
 | TASK-018 | done | plan-feature skill: spec -> epics -> vertical-slice tasks |
 | TASK-019 | done | Dogfood: bring this repo's .tasks/ fully under the toolkit |
 | TASK-020 | done | CI workflow running sync check on every PR |
-| TASK-021 | in-review | init-project: move deterministic scaffolding to a stdlib Python script |
+| TASK-021 | done | init-project: move deterministic scaffolding to a stdlib Python script |
 | TASK-022 | todo | add-task: move deterministic portions to a stdlib script, define its parameters |
 | TASK-023 | todo | Docs cleanup: remove redundant/deprecated info, relocate .tmp/ content, add README usage example |
 | TASK-024 | todo | implement-task: move deterministic git/gh actions to a stdlib script |
 | TASK-025 | todo | refine-backlog: move mechanical steps to a stdlib script; activity-aware stale detection |
 | TASK-026 | todo | plan-feature: move mechanical file-writing and cycle checking to a stdlib script |
 
-Progress: 20/26 done
+Progress: 21/26 done
 <!-- END:children -->
