@@ -2,11 +2,11 @@
 id: TASK-021
 title: "init-project: move deterministic scaffolding to a stdlib Python script"
 type: refactor
-status: in-progress
+status: in-review
 epic: EPIC-001
 created: 2026-09-13
 branch: task-021-init-project-scaffold-script
-pr: null
+pr: https://github.com/RobotNerd/sdlc-llm/pull/30
 merge_commit: null
 blocked_by: []
 blocks: []
