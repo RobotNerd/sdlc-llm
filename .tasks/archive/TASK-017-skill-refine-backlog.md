@@ -2,12 +2,12 @@
 id: TASK-017
 title: "refine-backlog skill: periodic lightweight backlog pass"
 type: feature
-status: in-review
+status: done
 epic: EPIC-001
 created: 2026-09-10
 branch: task-017-skill-refine-backlog
 pr: https://github.com/RobotNerd/sdlc-llm/pull/26
-merge_commit: null
+merge_commit: d0f729c03c2d25e71237f0067bff06260761bbdf
 blocked_by: [TASK-009]
 blocks: []
 ---
