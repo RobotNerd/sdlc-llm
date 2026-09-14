@@ -71,9 +71,9 @@ Include one additional work item as part of the new task. For step 3 with the st
 
 <!-- /add-task Remove references to details that are relevant only to this project, which can be found throughout many of the files in this project. One example: in the init-project skill, there is a reference to a task `(TASK-021)` included in the skill definition as well as comments in the associated scaffold script. This will be confusing to the agent when the skill is used in a different project, since it should have no reference to the inner workings of this repo, leading to a likely collision on task names. Focus only on the content that will be used in other projects, which is copied to the new project by the init-project skill @.claude/skills/init-project/. This goes at the bottom of the TODO list on the board. -->
 
----
+<!-- /add-task New task in EPIC-001 at bottom of the TODO list. Modify the `init-project` skill so that it can be used to do an idempotent upgrade to an existing project where init-project has already been run. Like the current script implementation, behaviors should be implemented in the scaffold script where possible. Ensure that no existing spec/epic/task data is lost. The goal is to upgrade the skills and related process docs to keep them up-to-date with the latest changes in this repo. -->
 
-/add-task New task in EPIC-001 at bottom of the TODO list. Modify the `init-project` skill so that it can be used to upgrade an existing project where init-project has already been run. Like the current script implementation, decisions should be implemented in the scaffold script where possible. Ensure that no existing spec/epic/task data is lost. The goal is to upgrade the skills and related process docs to keep them up-to-date with the latest changes in this repo.
+/add-task Add a new optional feature that includes an automatic code formatting tool if supported. Add an entry for it in @.tasks/config.md with null as the default value; it should be part of the interview questions to populate the value during the init-project skill. Update the implement-task to use the code formatter. Add a hook that ensure that the code formatter is run before creating a PR.
 
 ---
 
@@ -81,6 +81,10 @@ Include one additional work item as part of the new task. For step 3 with the st
 
 My current ideas for hooks:
 - A script that checks for references to SPEC-NNN and TASK-NNN in the artifacts that will be copied to other repositories using the init-project skill (see TASK-027). Causes the agent to clean up these references before a PR can be opened for a task. This hook would only exist in the current repository and would be excluded from the list of artifacts copied by the init-project skill.
+- The test_command is run before creating a PR and must pass.
+- The lint_command is run before creating a PR and must pass.
+- The code formatting tool is run before creating a PR.
+- Ensure that re-running init-project to upgrade a project doesn't modify the excluded files.
 
 ---
 
@@ -101,4 +105,4 @@ My current ideas for hooks:
 
 ---
 
-TODO: /add-task use higher model (e.g. Opus) as the orchestrator and spin off lower models (e.g. Sonnet) to implement the tasks; each model and effort level is configurable; how to balance context and token usage to keep the process efficient?
+TODO: /add-task use higher model (e.g. Opus) as the orchestrator and spin off lower models (e.g. Sonnet) to implement the tasks; each model and its effort level is configurable; how to balance context and token usage to keep the process efficient?

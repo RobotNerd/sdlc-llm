@@ -1,6 +1,6 @@
 ---
 id: TASK-028
-title: "Replace .tmp/prompts.md special-case with an ignored_paths config key"
+title: Replace .tmp/prompts.md special-case with an ignored_paths config key
 type: refactor
 status: todo
 epic: EPIC-001
@@ -9,7 +9,7 @@ branch: task-028-ignored-paths-config-key
 pr: null
 merge_commit: null
 blocked_by: [TASK-024]
-blocks: []
+blocks: [TASK-029]
 ---
 
 # TASK-028: Replace .tmp/prompts.md special-case with an ignored_paths config key

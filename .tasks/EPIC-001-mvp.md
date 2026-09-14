@@ -67,6 +67,8 @@ by this repo managing its own `.tasks/` end to end.
 | TASK-026 | todo | plan-feature: move mechanical file-writing and cycle checking to a stdlib script |
 | TASK-027 | todo | Strip project-specific references from the portable surface |
 | TASK-028 | todo | Replace .tmp/prompts.md special-case with an ignored_paths config key |
+| TASK-029 | todo | init-project upgrade: refresh an initialized project from the toolkit repo |
+| TASK-030 | todo | Migrate config.md to the current schema during upgrade |
 
-Progress: 21/28 done
+Progress: 21/30 done
 <!-- END:children -->

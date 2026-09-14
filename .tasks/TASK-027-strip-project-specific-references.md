@@ -1,6 +1,6 @@
 ---
 id: TASK-027
-title: "Strip project-specific references from the portable surface"
+title: Strip project-specific references from the portable surface
 type: chore
 status: todo
 epic: EPIC-001
@@ -9,7 +9,7 @@ branch: task-027-strip-project-specific-references
 pr: null
 merge_commit: null
 blocked_by: [TASK-022, TASK-024, TASK-025, TASK-026]
-blocks: []
+blocks: [TASK-029]
 ---
 
 # TASK-027: Strip project-specific references from the portable surface
