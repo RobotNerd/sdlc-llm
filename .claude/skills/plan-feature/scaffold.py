@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Deterministic scripting for the `plan-feature` skill (TASK-026).
+"""Deterministic scripting for the `plan-feature` skill.
 
-Same shape as `init-project`/`add-task`/`implement-task`/`refine-backlog`'s `scaffold.py`
-(TASK-021/022/024/025): `SKILL.md` owns the interview, the vertical-slice decomposition judgment,
+Same shape as `init-project`/`add-task`/`implement-task`/`refine-backlog`'s `scaffold.py`:
+`SKILL.md` owns the interview, the vertical-slice decomposition judgment,
 and both STOP checkpoints (spec draft, full decomposition before task creation). This script only
 writes what's already been decided (spec/epic files) and validates it (the cycle check, replacing
 `SKILL.md`'s old "eyeball it" placeholder; the post-creation `sync`/board check).

@@ -12,9 +12,8 @@ act unilaterally.
 
 Every mechanical check — diffing `.tasks/guidelines.md` against its portable-template mirror,
 finding dangling path references, and cross-checking a doc's claimed skill list against
-`.claude/skills/` — lives in `scaffold.py` next to this `SKILL.md` (TASK-047). This skill's own
-prose covers only the judgment: is a flagged difference actually a problem, and what to do about
-it.
+`.claude/skills/` — lives in `scaffold.py` next to this `SKILL.md`. This skill's own prose covers
+only the judgment: is a flagged difference actually a problem, and what to do about it.
 
 ## 1. Run the report
 
@@ -32,22 +31,21 @@ a false positive once you look at it; that judgment happens in the steps below, 
 
 If `guidelines_mirror_diff` is non-null, read it. `.tasks/guidelines.md` and
 `.claude/skills/init-project/templates/guidelines.md` are meant to mirror each other except for
-this repo's own extra specificity (SPEC-001 section pointers, an explicit skill path) — TASK-023
-documents the exact expected shape of that difference. For each changed hunk: is it one of the
-documented expected differences, or genuine drift (an edit that landed in one file but not the
-other)? Propose fixing genuine drift (make them consistent again) and **STOP** for confirmation
-before editing either file.
+this project's own extra specificity (e.g. spec section pointers, an explicit skill path) that
+doesn't belong in the portable template. For each changed hunk: is it one of those expected
+differences, or genuine drift (an edit that landed in one file but not the other)? Propose fixing
+genuine drift (make them consistent again) and **STOP** for confirmation before editing either
+file.
 
 ## 3. Dangling references
 
 For each doc with entries under `dangling_references`: read the actual sentence each reference
 appears in. A flagged reference is either genuinely dangling (the file was moved, renamed, or
-deleted and this doc wasn't updated — TASK-023's own Worklog is the precedent for what that looks
-like) or a false positive from the check's own heuristic (rare, but possible — note it if so, no
-action needed). For each genuine one, propose a fix: update the reference, or remove the sentence
-if what it described no longer exists. **ASK** the human if you can't tell which without more
-context (e.g., a design-rationale claim you can't verify by reading the repo). **STOP** for
-confirmation before editing.
+deleted and this doc wasn't updated) or a false positive from the check's own heuristic (rare, but
+possible — note it if so, no action needed). For each genuine one, propose a fix: update the
+reference, or remove the sentence if what it described no longer exists. **ASK** the human if you
+can't tell which without more context (e.g., a design-rationale claim you can't verify by reading
+the repo). **STOP** for confirmation before editing.
 
 ## 4. Skill-list mismatches
 
@@ -60,10 +58,10 @@ anymore (remove or fix it). Propose the specific edit and **STOP** for confirmat
 Beyond what the mechanical checks catch, read every doc in `docs_review_paths` for content that's
 gone stale (describes a state of the project that's no longer true — "the skills don't exist yet",
 a task count, a "still to be built" note) or redundant (restates something `sync`'s own mechanical
-behavior already enforces, or repeats what another doc in the list already says better — TASK-023
-is the precedent for this kind of trim). For each finding: propose a specific fix — a trim, a
-relocation, or a rewrite — and where the right answer depends on something you can't resolve by
-reading the repo, **ASK** rather than guess. **STOP** for confirmation before editing.
+behavior already enforces, or repeats what another doc in the list already says better). For each
+finding: propose a specific fix — a trim, a relocation, or a rewrite — and where the right answer
+depends on something you can't resolve by reading the repo, **ASK** rather than guess. **STOP**
+for confirmation before editing.
 
 ## 6. Apply confirmed edits and re-verify
 

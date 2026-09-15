@@ -8,6 +8,7 @@ since its whole job is filesystem + git side effects, not pure computation.
 
 import importlib.util
 import json
+import re
 import subprocess
 import sys
 from importlib.machinery import SourceFileLoader
@@ -156,6 +157,28 @@ def test_run_scaffolds_a_fresh_repo_and_sync_check_is_clean(tmp_path):
         text=True,
     )
     assert check.returncode == 0, check.stdout + check.stderr
+
+
+def test_run_scaffolds_a_fresh_repo_with_no_dangling_ids(tmp_path):
+    """id-grep over the actual scaffolded *output*, not just the template sources --
+    catches a stray hardcoded id that a template edit could reintroduce (TASK-027).
+    """
+    _init_git_repo(tmp_path)
+    answers_path = tmp_path / "answers.json"
+    answers_path.write_text(json.dumps(SAMPLE_ANSWERS))
+
+    result = _run_scaffold(tmp_path, answers_path)
+    assert result.returncode == 0, result.stderr
+
+    id_pattern = re.compile(r"\b(?:TASK|EPIC|SPEC)-\d{3}\b")
+    offenders = []
+    for rel_dir in (".tasks", ".github"):
+        for path in (tmp_path / rel_dir).rglob("*"):
+            if path.is_file():
+                match = id_pattern.search(path.read_text())
+                if match:
+                    offenders.append(f"{path.relative_to(tmp_path)}: {match.group(0)}")
+    assert offenders == [], "scaffolded output contains dangling ids:\n" + "\n".join(offenders)
 
 
 def test_run_refuses_second_time_in_same_repo(tmp_path):

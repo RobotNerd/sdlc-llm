@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Deterministic scripting for the `add-task` skill (TASK-022).
+"""Deterministic scripting for the `add-task` skill.
 
-Same shape as `init-project`'s `scaffold.py` (TASK-021): `SKILL.md` owns the interview (rough
+Same shape as `init-project`'s `scaffold.py`: `SKILL.md` owns the interview (rough
 description -> concrete acceptance criteria/testing strategy, size check, epic choice,
 `blocked_by`, priority rank) and every STOP; once the human has approved, the skill writes the
 confirmed answers to a JSON file and invokes this script once. Nothing here prompts

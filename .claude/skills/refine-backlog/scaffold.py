@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Deterministic scripting for the `refine-backlog` skill (TASK-025).
+"""Deterministic scripting for the `refine-backlog` skill.
 
-Same shape as `init-project`/`add-task`/`implement-task`'s `scaffold.py` (TASK-021/022/024):
+Same shape as `init-project`/`add-task`/`implement-task`'s `scaffold.py`:
 `SKILL.md` owns the human-facing proposals and decisions (which `wont-do`/re-interview/reorder
 suggestions to act on) and every STOP; this script performs the mechanical computation and
 reporting behind each one. It never decides anything on its own -- `mark-wont-do`/`reorder` only

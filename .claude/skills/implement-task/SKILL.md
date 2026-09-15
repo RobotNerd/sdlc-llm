@@ -11,7 +11,7 @@ means don't guess. Requires `.tasks/` to exist, `.tasks/bin/sync` to be runnable
 
 Every deterministic git/gh action, every `sync`/`sync check` call, the resume-detection lookup,
 TODO-picking, and the frontmatter field edits (`status`/`branch`/`pr`/`merge_commit`) live in
-`scaffold.py` next to this `SKILL.md` (TASK-024) — not in this prose. This skill's own job is
+`scaffold.py` next to this `SKILL.md` — not in this prose. This skill's own job is
 everything genuinely judgment- or content-driven: restating the plan, writing code/tests, deciding
 what's automatable, composing commit messages and PR titles/bodies, the bail-out call — each
 paired with exactly one `scaffold.py` invocation for the mechanical part that follows it.
@@ -20,7 +20,7 @@ Every `scaffold.py` subcommand takes its answers as a JSON file (a scratch path 
 a JSON result on success (exit `0`); on failure it prints a message to stderr and exits non-zero —
 `resume-state` and `gh-auth-status` take no input file.
 
-**Parameter (optional):** a specific task id (e.g. `TASK-016`) to work instead of auto-picking the
+**Parameter (optional):** a specific task id (e.g. `TASK-NNN`) to work instead of auto-picking the
 top of TODO. If given, `start` still verifies it's actually `todo` and unblocked — if it's already
 `in-progress`/`in-review`, `start` refuses and says so; that's a resume, not a new start (see §0).
 
@@ -116,7 +116,7 @@ On the next invocation (or when told the PR merged), run
   `.tasks/archive/`); if `delete_branch_after_merge`, delete the branch locally and on `<remote>`
   (tolerating an already-gone remote branch); confirm `sync check` exits `0`; and — the one
   scripted exception to "never push to `default_branch`" — commit the resulting `.tasks/` changes
-  with `bookkeeping_commit_message` and push directly to `<default_branch>` (SPEC-001's guardrail
+  with `bookkeeping_commit_message` and push directly to `<default_branch>` (a deliberate guardrail
   carve-out: recording an already-reviewed merge is not new work, so it doesn't need its own PR).
   Returns `{"merged": true, "merge_commit"}`.
 
@@ -129,7 +129,7 @@ first (content-authoring), then run
 `{"task_id", "status": "todo"|"blocked"}` — it sets that status and runs `sync`. Don't force a bad
 implementation through to a PR.
 
-## Guardrails (non-negotiable — SPEC-001 / CLAUDE.md)
+## Guardrails (non-negotiable)
 
 Enforced *in the script*, not only documented here:
 

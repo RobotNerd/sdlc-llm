@@ -11,8 +11,8 @@ judgement; every change here is the human's call.
 
 Every mechanical computation — the resync, the blocked-chain report, the stale-`todo` scan (an
 **active-days-elapsed** measure, not raw wall-clock age — see step 3), the under-specified scan,
-and applying a confirmed TODO reorder — lives in `scaffold.py` next to this `SKILL.md` (TASK-025).
-This skill's own prose covers only the human-facing proposals and decisions.
+and applying a confirmed TODO reorder — lives in `scaffold.py` next to this `SKILL.md`. This
+skill's own prose covers only the human-facing proposals and decisions.
 
 ## 1. Resync first
 

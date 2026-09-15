@@ -1,40 +1,38 @@
 #!/usr/bin/env python3
-"""sync — the deterministic engine for this repo's markdown kanban workflow.
+"""sync — the deterministic engine for the markdown kanban workflow.
 
-Built up task by task:
+Provides:
 
-- TASK-004: a hand-rolled frontmatter parser/renderer and a loader that
-  discovers SPEC/EPIC/TASK artifacts under `.tasks/`.
-- TASK-005: the generated-region engine — find/replace/append the text
-  between `<!-- BEGIN:name -->` / `<!-- END:name -->` markers that every
-  renderer (epic `children`, spec `epics`, board panels) sits on.
-- TASK-006: `derive_epic_status` (the seven ordered rules) and
-  `reconcile_blocks` (making `blocks` the exact reverse of `blocked_by`) —
-  pure functions over loaded records; neither writes anything.
-- TASK-007: `render_epic_children` / `render_spec_epics` — the two
-  non-board region bodies, meant to be handed to TASK-005's
-  `replace_region`/`ensure_region`.
-- TASK-008: `render_board_epics_panel` / `render_board_column` — BOARD.md's
+- A hand-rolled frontmatter parser/renderer and a loader that discovers
+  SPEC/EPIC/TASK artifacts under `.tasks/`.
+- The generated-region engine — find/replace/append the text between
+  `<!-- BEGIN:name -->` / `<!-- END:name -->` markers that every renderer
+  (epic `children`, spec `epics`, board panels) sits on.
+- `derive_epic_status` (the seven ordered rules) and `reconcile_blocks`
+  (making `blocks` the exact reverse of `blocked_by`) — pure functions
+  over loaded records; neither writes anything.
+- `render_epic_children` / `render_spec_epics` — the two non-board region
+  bodies, handed to the region engine's `replace_region`/`ensure_region`.
+- `render_board_epics_panel` / `render_board_column` — BOARD.md's
   roll-up panel and its four fully-generated status columns.
-- TASK-009: `merge_todo` / `apply_todo_merge` — the one place `sync`
-  merges instead of regenerating: reconciles the hand-ordered TODO list
-  with reality without ever reordering it.
-- TASK-010: `sync next-id <spec|epic|task>` — the next free id of a type,
+- `merge_todo` / `apply_todo_merge` — the one place `sync` merges instead
+  of regenerating: reconciles the hand-ordered TODO list with reality
+  without ever reordering it.
+- `sync next-id <spec|epic|task>` — the next free id of a type,
   scanning `.tasks/`, `.tasks/specs/`, and `.tasks/archive/` so an id is
   never reused after archiving.
-- TASK-011: `sync archive` — moves `done`/`wont-do` task files into
+- `sync archive` — moves `done`/`wont-do` task files into
   `.tasks/archive/`, preserving filename and frontmatter untouched.
-- TASK-012: `compute_mismatches` / `sync check` — runs every derivation
-  and renderer above in memory and diffs the result against disk,
+- `compute_mismatches` / `sync check` — runs every derivation and
+  renderer above in memory and diffs the result against disk,
   writing nothing.
-- TASK-013: `apply_all` / `run_sync` — the write mode: applies every
-  mismatch `compute_mismatches` would report (chaining a file's updates
-  where more than one applies, e.g. BOARD.md's several regions), then
-  archives if configured. Bare `.tasks/bin/sync` (no arguments) runs
-  this now.
+- `apply_all` / `run_sync` — the write mode: applies every mismatch
+  `compute_mismatches` would report (chaining a file's updates where more
+  than one applies, e.g. BOARD.md's several regions), then archives if
+  configured. Bare `.tasks/bin/sync` (no arguments) runs this now.
 
-It imports nothing outside the Python standard library — see
-`.tasks/specs/SPEC-001-llm-sdlc-workflow.md` §"The sync script" for why.
+It imports nothing outside the Python standard library, to stay
+dependency-free for any project it's vendored into.
 """
 
 from __future__ import annotations
@@ -50,9 +48,9 @@ from typing import Any
 class FrontmatterError(ValueError):
     """Raised when frontmatter falls outside the supported subset.
 
-    The supported subset (SPEC-001 §"The sync script"): bare and quoted
-    string scalars, `null`, `true`/`false`, integers, and single-level
-    inline `[a, b, c]` lists of those scalars. Trailing `# comment` text is
+    The supported subset: bare and quoted string scalars, `null`,
+    `true`/`false`, integers, and single-level inline `[a, b, c]` lists of
+    those scalars. Trailing `# comment` text is
     ignored on parse (and therefore not reproduced on render). Anything
     else — nested maps, block scalars (`|`/`>`), YAML anchors/aliases,
     multi-line values, tabs — is rejected with a specific error rather than
@@ -127,8 +125,8 @@ def parse_frontmatter(text: str) -> tuple[dict[str, Any], str, list[str]]:
 
     `fields` is keyed by frontmatter key; `order` preserves the order keys
     appeared in, so `render_frontmatter` can round-trip a file byte-for-byte
-    when it uses only the supported subset (SPEC-001's real task/epic/spec
-    files and config.md do). Raises `FrontmatterError` — naming the exact
+    when it uses only the supported subset (real task/epic/spec files and
+    config.md do). Raises `FrontmatterError` — naming the exact
     line — for anything outside that subset.
     """
     if not text.startswith("---\n"):
@@ -239,7 +237,7 @@ class Artifact:
 def discover(tasks_root: Path) -> dict[str, Artifact]:
     """Scan `.tasks/`, `.tasks/specs/`, and `.tasks/archive/` for artifacts.
 
-    Returns a dict keyed by artifact id (e.g. "TASK-004"). Raises
+    Returns a dict keyed by artifact id (e.g. "TASK-NNN"). Raises
     `FrontmatterError` on a malformed file, a file missing/misplaced its
     `id` field, or two files claiming the same id.
     """
@@ -276,8 +274,8 @@ _ID_KIND_PREFIXES = {"spec": "SPEC", "epic": "EPIC", "task": "TASK"}
 def next_id(tasks_root: Path, kind: str) -> str:
     """The next free id for `kind` ('spec' | 'epic' | 'task'): the max
     existing id of that kind across `.tasks/`, `.tasks/specs/`, and
-    `.tasks/archive/`, plus 1, zero-padded to three digits (SPEC-001
-    §'ID allocation'). Archived files count too -- an id is never reused.
+    `.tasks/archive/`, plus 1, zero-padded to three digits. Archived files
+    count too -- an id is never reused.
 
     Raises `ValueError` for a `kind` outside `spec`/`epic`/`task`.
     """
@@ -318,9 +316,9 @@ def archive(tasks_root: Path) -> list[Path]:
     Returns the destination paths of files actually moved.
 
     Task frontmatter (title, `pr`) is left exactly as it was: the moved
-    file itself is the durable "one-line reference" SPEC-001 asks for
-    once a task ages out of BOARD.md's capped `done` column -- while
-    still within the cap, `render_board_column` already surfaces title
+    file itself is the durable one-line reference needed once a task
+    ages out of BOARD.md's capped `done` column -- while still within
+    the cap, `render_board_column` already surfaces title
     and `pr` for every done task regardless of file location, since
     `discover()` scans `.tasks/archive/` too. No separate archive index
     is created.
@@ -369,8 +367,8 @@ _EPIC_TERMINAL_HUMAN_STATUS = "wont-do"
 def derive_epic_status(epic: Artifact, children: list[Artifact]) -> Artifact:
     """Compute an epic's status from its children's `status` fields.
 
-    Implements the seven ordered rules of SPEC-001 §'Epic status
-    derivation'; the first match wins:
+    Implements the seven ordered epic-status-derivation rules; the first
+    match wins:
 
     1. the epic's current status is already `wont-do` -> stays `wont-do`
        (a human cancelled it; `sync` never overwrites that decision)
@@ -408,10 +406,10 @@ def derive_epic_status(epic: Artifact, children: list[Artifact]) -> Artifact:
 
 def reconcile_blocks(tasks: dict[str, Artifact]) -> dict[str, Artifact]:
     """Recompute every task's `blocks` list as the exact reverse of every
-    `blocked_by` edge (SPEC-001 §'Relationships — stored on the child only'):
+    `blocked_by` edge (a relationship stored on the child only):
     `blocked_by` is the source of truth, so a pre-existing `blocks` value
     that disagrees is overwritten, not merged. Each recomputed list is
-    sorted (matching this repo's own convention of ascending task ids).
+    sorted (ascending task ids).
 
     Returns a new `{id: Artifact}` dict — a pure function, like
     `derive_epic_status`; nothing is written to disk. Raises `GraphError`
@@ -457,12 +455,11 @@ class RegionSpan:
 def _fenced_code_ranges(text: str) -> list[tuple[int, int]]:
     """Character ranges covered by ` ``` ` fenced code blocks.
 
-    A markdown file documenting the marker syntax (e.g. SPEC-001's own
-    "Generated regions" and "Epics panel" examples) can contain literal
-    `<!-- BEGIN:name -->` text as an illustration, not a real region. Found
-    while running TASK-007's own testing strategy against SPEC-001 — its
-    two fenced examples were misread as live `children`/`epics` regions.
-    Each range spans the opening ` ``` ` line through the closing one.
+    A markdown file documenting the marker syntax can contain literal
+    `<!-- BEGIN:name -->` text as an illustration, not a real region --
+    a fenced example like that would otherwise be misread as a live
+    `children`/`epics` region. Each range spans the opening ` ``` ` line
+    through the closing one.
     An unterminated trailing fence (no closing ` ``` `) is not treated as
     fenced, since there is nothing to exclude a match from.
     """
@@ -540,8 +537,8 @@ def find_region(text: str, name: str) -> RegionSpan | None:
 
 
 def _render_region_content(body: str) -> str:
-    """SPEC-001 §'Rendering details': no leading blank line after BEGIN, a
-    single trailing newline before END, and `_(none)_` for an empty body.
+    """Rendering details: no leading blank line after BEGIN, a single
+    trailing newline before END, and `_(none)_` for an empty body.
     """
     return (body if body else "_(none)_") + "\n"
 
@@ -603,9 +600,9 @@ def _reject_pipe(value: Any, what: str) -> None:
 def _epic_progress(children: list[Artifact]) -> tuple[int, int]:
     """(done_count, total_count) for an epic's children.
 
-    `done_count` includes `wont-do` children too (SPEC-001 §'Generated
-    regions': "`done` counts `done`+`wont-do`") -- an abandoned task still
-    counts as no-longer-outstanding work for progress purposes.
+    `done_count` includes `wont-do` children too ("`done` counts
+    `done`+`wont-do`") -- an abandoned task still counts as
+    no-longer-outstanding work for progress purposes.
     """
     total = len(children)
     done = sum(1 for c in children if c.fields.get("status") in ("done", "wont-do"))
@@ -613,9 +610,9 @@ def _epic_progress(children: list[Artifact]) -> tuple[int, int]:
 
 
 def render_epic_children(epic: Artifact, children: list[Artifact]) -> str:
-    """Render the body of an epic's `children` region (SPEC-001 §'Generated
-    regions'): a `| Task | Status | Title |` table ordered by id, a blank
-    line, then `Progress: <done>/<total> done`.
+    """Render the body of an epic's `children` region: a `| Task | Status |
+    Title |` table ordered by id, a blank line, then
+    `Progress: <done>/<total> done`.
 
     `children` should be exactly the tasks whose `epic` field names this
     epic (same contract as `derive_epic_status`) -- this function does not
@@ -664,9 +661,9 @@ def render_spec_epics(epics_with_children: list[tuple[Artifact, list[Artifact]]]
 
 
 def render_board_epics_panel(epics_with_children: list[tuple[Artifact, list[Artifact]]]) -> str:
-    """Render BOARD.md's `epics` roll-up panel (SPEC-001 §'BOARD.md
-    contract'): the same shape as `render_spec_epics`, restricted to
-    epics whose *current* status is not `done` and not `wont-do` — the
+    """Render BOARD.md's `epics` roll-up panel: the same shape as
+    `render_spec_epics`, restricted to epics whose *current* status is
+    not `done` and not `wont-do` — the
     panel shows open work, not a history. Each `epic` is expected to
     already carry its derived status, same contract as `render_spec_epics`.
     """
@@ -679,10 +676,9 @@ def render_board_epics_panel(epics_with_children: list[tuple[Artifact, list[Arti
 
 
 def render_board_column(tasks: list[Artifact], status: str, cap: int | None = None) -> str:
-    """Render one of BOARD.md's fully-generated status columns (SPEC-001
-    §'BOARD.md contract' / §'Rendering details'): a `| Task | Title | Epic
-    | Ref |` table of every task in `tasks` whose `status` equals `status`,
-    ordered by id.
+    """Render one of BOARD.md's fully-generated status columns: a
+    `| Task | Title | Epic | Ref |` table of every task in `tasks` whose
+    `status` equals `status`, ordered by id.
 
     `Ref` is the task's `branch` while `in-progress`; its `pr` URL for
     every other status (falling back to `branch` if `pr` isn't set yet,
@@ -742,9 +738,9 @@ def _outstanding_blockers(task: Artifact, tasks: dict[str, Artifact]) -> list[st
 
 
 def render_todo_line(task: Artifact, tasks: dict[str, Artifact]) -> str:
-    """Render one TODO line (SPEC-001 §'TODO — hand-maintained'): dash,
-    id, em-dash, title, two spaces, the epic tag in backticks (omitted
-    when the task has no epic), then ' ⛔ blocked_by TASK-A, TASK-B' (ids
+    """Render one TODO line: dash, id, em-dash, title, two spaces, the
+    epic tag in backticks (omitted when the task has no epic), then
+    ' ⛔ blocked_by TASK-A, TASK-B' (ids
     ascending) listing *outstanding* blockers only (see
     `_outstanding_blockers`) when there are any. No trailing newline.
 
@@ -873,18 +869,17 @@ _DONE_COLUMN_CAP = 20
 
 
 def compute_mismatches(tasks_root: Path) -> list[Mismatch]:
-    """Run every derivation and renderer TASK-004 through TASK-009 built,
-    in memory, and report everywhere the result disagrees with what's on
-    disk. Never writes anything -- this is the shared core `sync check`
-    (this task) is built on; a future write mode would apply these same
-    `Mismatch.expected` values instead of only reporting them.
+    """Run every derivation and renderer this module builds, in memory, and
+    report everywhere the result disagrees with what's on disk. Never
+    writes anything -- this is the shared core `sync check` is built on;
+    the write mode applies these same `Mismatch.expected` values instead
+    of only reporting them.
 
-    Covers (SPEC-001 §'The sync script'): epic `children` regions, spec
-    `epics` regions, the board `epics` panel, the four board columns, the
-    TODO merge, and epic `status` frontmatter. Also checks task `blocks`
-    against `reconcile_blocks` -- not itemized in TASK-012's acceptance
-    criteria, but "every derivation" (its own Description) includes it,
-    and skipping it would leave a real class of drift undetected.
+    Covers: epic `children` regions, spec `epics` regions, the board
+    `epics` panel, the four board columns, the TODO merge, and epic
+    `status` frontmatter. Also checks task `blocks` against
+    `reconcile_blocks` -- every derivation needs checking, and skipping
+    this one would leave a real class of drift undetected.
     """
     artifacts = discover(tasks_root)
     tasks = {a.id: a for a in artifacts.values() if a.kind == "task"}
@@ -980,11 +975,10 @@ def run_check(tasks_root: Path) -> int:
 # Bare `sync`: the write mode
 # ---------------------------------------------------------------------------
 #
-# Deliberately deferred out of TASK-012 and TASK-011 (see their Worklogs) --
-# `compute_mismatches` covered read-only diagnosis, which was all their own
-# acceptance criteria needed. Built here because TASK-013's own idempotency
-# test ("run sync, then sync again, confirm the second run is a no-op") has
-# no way to exist without something that actually writes.
+# `compute_mismatches` covers read-only diagnosis; the write mode below
+# applies the same `Mismatch.expected` values it reports. Needed so an
+# idempotency test ("run sync, then sync again, confirm the second run is
+# a no-op") has something that actually writes to exercise.
 
 
 def load_config(tasks_root: Path) -> dict[str, Any]:
