@@ -1,6 +1,6 @@
 ---
 name: init-project
-description: Scaffold the "kanban in markdown" workflow into this repo — .tasks/ with BOARD.md, config.md, guidelines.md, templates, a vendored sync script, and .github/pull_request_template.md — or, if already initialized, upgrade it: refresh every portable skill plus those same toolkit files from a source clone, never touching project-owned data (BOARD.md, config.md, spec/epic/task files, archive). Named init-project (not init) so it doesn't collide with a generic project-instructions-authoring init skill.
+description: Scaffold the "kanban in markdown" workflow into this repo — .tasks/ with BOARD.md, config.md, guidelines.md, templates, a vendored sync script, and .github/pull_request_template.md — or, if already initialized, upgrade it by refreshing every portable skill plus those same toolkit files from a source clone, never touching project-owned data (BOARD.md, config.md, spec/epic/task files, archive). Named init-project (not init) so it doesn't collide with a generic project-instructions-authoring init skill.
 ---
 
 # init-project

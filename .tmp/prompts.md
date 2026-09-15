@@ -105,6 +105,33 @@ My current ideas for hooks:
 
 <!-- /add-task New task in EPIC-001 at top of todo list. Turn the work done in TASK-027 to strip project-specific references into a new skill `strip-project-references`. This new skill should only exist in this repository--it is excluded from the set of skills that are copied into other projects when running the init-project skill. Like with previous skill creation, determine what portions of this new skill are mechanical, if any; if so, add those to a paired scaffold script following the pattern of the existing skills. Ask for any clarification needed in the docs that can't be resolved automatically. -->
 
+<!-- /add-task Create a new bug task in EPIC-001. Place at top of TODO list. This is a fix/refactor of the init-project skill coming out of TASK-029. Right now the skill only works within this repository, but it needs to be applied to a separate target git repo. I can think of two potential ways to handle it, but I'm open to suggestions if you can think of different/better approaches:
+
+1. Clone this repo `sdlc-llm` as well as the target repo `T` where the init-project skill should be applied. Launch claude code in the `sdlc-llm` path. Invoke `init-project` and provide the local path to `T` as a parameter. The skill then applies everything to repo `T` at that path.
+
+2. Make the `sdlc-llm` repo public on github. Clone the target repo `T` locally and launch a claude code session. Tell claude to use the init-project skill at the `sdlc-llm` github repo url and apply it to the local copy of `T`.
+
+I think (2) isn't a very good approach, so I'm leaning towards (1).
+
+Also add a small fix to the description in @.claude/skills/init-project/SKILL.md so that it renders properly in visual studio code. Here's the error that's showing up:
+
+```
+Failed to parse frontmatter
+Nested mappings are not allowed in compact mappings at line 2, column 14:
+
+description: Scaffold the "kanban in markdown" workflow into this repo — .tasks…
+```
+
+The problem appears to be the second `:` on line 3 in this spot `initialized, upgrade it: refresh`. -->
+
+<!-- I changed my mind about this acceptance criteria:
+
+- A managed file already present in the target is overwritten without prompting — the chosen behaviour; `run` still refuses only when the target already has `.tasks/`.
+
+Change it so that it shows a diff and requires the human to rerun with `--force` to overwrite. I was confused and didn't realize `upgrade` was a separate action from `run`.
+
+Please update TASK-049 to reflect this change. Note that I removed an acceptance criteria in TASK-049 for fixing the frontmatter on the `init-project` skill since it looks like you already fixed it. -->
+
 ---
 
 > TODO: Come back to planning this later
