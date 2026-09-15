@@ -103,7 +103,8 @@ message changes from "a future `upgrade` skill's job" to naming the real subcomm
 
 - [ ] `scaffold.py upgrade` exists with `--source`, `--ref`, `--dry-run`, `--force`; stdlib only.
 - [ ] Refuses (non-zero, writes nothing) when `.tasks/` is absent, pointing at `run`.
-- [ ] Refreshes all five skills plus `guidelines.md`, `.tasks/templates/*`, `.tasks/bin/sync`
+- [ ] Refreshes every portable skill (all skills under `.claude/skills/` except any marked
+      repo-only — see Notes) plus `guidelines.md`, `.tasks/templates/*`, `.tasks/bin/sync`
       (executable), and `.github/pull_request_template.md` from the cloned source.
 - [ ] `BOARD.md`, `config.md`, every `SPEC-*`/`EPIC-*`/`TASK-*` and `.tasks/archive/` are
       byte-identical before and after an upgrade.
@@ -142,3 +143,9 @@ _(empty — appended during implementation)_
 - Depends on TASK-027 and TASK-028 having already landed in `scaffold.py` and
   `init-project/SKILL.md` to avoid a guaranteed rewrite conflict.
 - `config.md` migration is deliberately out of scope here — see TASK-030.
+- `.claude/skills/strip-project-references/` (added after this task was written — see its own
+  task) must be **excluded** from `managed_files()`'s skill-copy list: it's a repo-only
+  maintenance tool for keeping *this* repo's own portable surface clean, meaningless (and
+  possibly always-failing, same reasoning as TASK-036's hook) once copied into a project that
+  didn't author the portable surface itself. Check for other repo-only skills the same way when
+  this lands, in case more were added by then.
