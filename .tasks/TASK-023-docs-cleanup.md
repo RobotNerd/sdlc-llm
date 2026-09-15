@@ -2,11 +2,11 @@
 id: TASK-023
 title: "Docs cleanup: remove redundant/deprecated info, relocate .tmp/ content, add README usage example"
 type: refactor
-status: in-progress
+status: in-review
 epic: EPIC-001
 created: 2026-09-13
 branch: task-023-docs-cleanup
-pr: null
+pr: "https://github.com/RobotNerd/sdlc-llm/pull/40"
 merge_commit: null
 blocked_by: []
 blocks: []
