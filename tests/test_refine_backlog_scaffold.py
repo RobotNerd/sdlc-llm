@@ -299,6 +299,12 @@ def _git(args, cwd, check=True):
 @pytest.fixture
 def repo(tmp_path):
     subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+    # Don't rely on git's `init.defaultBranch` -- it's "main" on this machine but not
+    # necessarily in CI (that mismatch is exactly what broke this fixture on GitHub
+    # Actions: `default_branch: "main"` in config.md, but the actual initial branch
+    # there wasn't literally named "main", so `git log main` failed with "unknown
+    # revision"). Pin it explicitly, matching `git_repo`'s fixture above.
+    _git(["checkout", "-q", "-b", "main"], cwd=tmp_path)
     _git(["config", "user.email", "t@example.com"], cwd=tmp_path)
     _git(["config", "user.name", "Test"], cwd=tmp_path)
     (tmp_path / "README.md").write_text("# scratch\n")

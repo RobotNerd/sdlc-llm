@@ -2,11 +2,11 @@
 id: TASK-025
 title: "refine-backlog: move mechanical steps to a stdlib script; activity-aware stale detection"
 type: refactor
-status: in-progress
+status: in-review
 epic: EPIC-001
 created: 2026-09-14
 branch: task-025-refine-backlog-script-split
-pr: null
+pr: "https://github.com/RobotNerd/sdlc-llm/pull/35"
 merge_commit: null
 blocked_by: []
 blocks: [TASK-027]
@@ -130,6 +130,32 @@ but a less intuitive knob to tune than a day-count, given commit granularity var
 - Re-read `SKILL.md` (testing strategy step 5): every remaining step is either a human-facing
   proposal/decision (narrate the blocked chain, ask about `wont-do`/re-interview/reorder) or
   exactly one `scaffold.py` call for the mechanical part.
+- **CI failure found post-PR, fixed here** (user caught it: "test step failed... I think on
+  `test_report_flags_add_tasks_unfilled_body_placeholders`"): the `test` job failed on GitHub
+  Actions with `subprocess.CalledProcessError: Command ['git', 'log', 'main', ...] returned
+  non-zero exit status 128` inside `active_days_elapsed`. Root cause: the `repo` test fixture did
+  a bare `git init` and relied on git's `init.defaultBranch` config defaulting to `main` — true on
+  this machine, not necessarily true on the GitHub Actions runner (whose initial branch turned out
+  to be something else) — while the fixture's own `config.md` hardcodes `default_branch: "main"`.
+  `git log main` then failed with "unknown revision" since no local branch was literally named
+  `main`. Confirmed the root cause (not a guess) by reproducing locally with
+  `GIT_CONFIG_GLOBAL=<a config forcing init.defaultBranch=master>`, seeing the same failure, then
+  confirming the fix (explicitly `git checkout -b main` right after `git init`, matching what the
+  `git_repo` fixture in the same file already did correctly) passes under that same simulated
+  config. Not a production bug — `active_days_elapsed` querying `git log <default_branch>` is a
+  reasonable assumption for this tool's real usage (a solo dev's own already-initialized repo,
+  where `default_branch` is virtually always a real local branch), just an under-specified test
+  fixture. `pytest` 300 passed again after the fix, including under the simulated CI-like config.
+- **Separately flagged for the human, not fixed here (out of this task's scope):** while
+  investigating, found that `implement-task`'s `wrap-up` (TASK-024) records `pr:`/
+  `status: in-review` and runs `sync` *after* pushing and opening the PR, but never commits+pushes
+  that resulting change itself — leaving it as local, uncommitted drift on the task branch unless
+  a human/LLM operator notices and does a manual follow-up commit+push (exactly the "record PR,
+  set status in-review" bookkeeping step done by hand for TASK-022/024 before `wrap-up` existed).
+  This task's own PR (#35) hit exactly that: `wrap-up` opened it, but its `pr:`/`status`/board
+  update sat uncommitted until caught here and pushed as a manual follow-up. `implement-task/
+  scaffold.py` is a different skill's file, out of TASK-025's scope to fix — worth a follow-up
+  task so every future `wrap-up` call doesn't silently leave the same gap.
 
 ## Notes
 
