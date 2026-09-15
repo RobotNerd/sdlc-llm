@@ -101,6 +101,12 @@ My current ideas for hooks:
 - creating follow up tasks: user can choose if they want the LLM to create additional tasks automatically or if the user needs to be notified; e.g. the LLM determines that a task is too big and needs to be split up; default to allowing new task creation, but add a configurable limiter to prevent task explosion
 - switch to TDD: LLM should write test cases first, verify they fail, then implement and re-test until test cases pass -->
 
+<!-- Merged, clean up then use /add-task to create a new task in EPIC-001 and place it at the top of the TODO list. Use TASK-023 as an example for creating a new skill to update the docs in this project. This will be invoked periodically by the human. Keep a list of docs in the config that should alwyas be reviewed and updated, as well as a list that should always be ignored. It looks like the sync script already looks for ignored_paths but I don't see it in the config, so maybe this needs to be fixed (include on this task if so). Determine what portions of this new skill are mechanical, if any; if so, add those to a paired scaffold script following the pattern of the existing skills. Ask for any clarification needed in the docs that can't be resolved automatically. -->
+
+<!-- /add-task New task in EPIC-001 at top of todo list. Turn the work done in TASK-027 to strip project-specific references into a new skill `strip-project-references`. This new skill should only exist in this repository--it is excluded from the set of skills that are copied into other projects when running the init-project skill. Like with previous skill creation, determine what portions of this new skill are mechanical, if any; if so, add those to a paired scaffold script following the pattern of the existing skills. Ask for any clarification needed in the docs that can't be resolved automatically. -->
+
+---
+
 > TODO: Come back to planning this later
 
 /plan-feature Context/session management and multiple agents. Goes on board after all current epics, blocked by all current epics. The goal is to add the option to this workflow to run multiple agents.
@@ -140,6 +146,3 @@ NOTE: Claude's initial analysis:
   On cost, plainly: a Pro plan's usage limit is one account-wide pool on a rolling 5-hour/weekly window, shared across everything you run. Three simultaneous long-lived instances don't triple your budget — they draw on the same pool
   three times as fast, so you'd hit the weekly ceiling sooner in wall-clock time for the same total spend. Worth designing the defaults around that reality rather than around "more instances = more capacity."
 ```
-
----
-
