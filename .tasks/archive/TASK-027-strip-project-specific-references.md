@@ -2,12 +2,12 @@
 id: TASK-027
 title: Strip project-specific references from the portable surface
 type: chore
-status: in-review
+status: done
 epic: EPIC-001
 created: 2026-09-14
 branch: task-027-strip-project-specific-references
 pr: "https://github.com/RobotNerd/sdlc-llm/pull/43"
-merge_commit: null
+merge_commit: 25669e6718dc0fcfedcfd46d40d59253d4e0b653
 blocked_by: [TASK-022, TASK-024, TASK-025, TASK-026]
 blocks: [TASK-029, TASK-036]
 ---
