@@ -38,8 +38,9 @@ addition in the same task.
 
 Decisions already made (do not re-litigate in implementation):
 - Source location is `--target` only — no `--source`/clone added to `run`.
-- A pre-existing managed file already present in the target is overwritten silently by `run`;
-  `.tasks/` already existing is still the only thing that makes `run` refuse.
+- A pre-existing managed file already present in the target is a conflict `run` refuses on: show
+  a diff and require `--force` to overwrite — the same posture `upgrade` already uses via
+  `classify_managed_files`/`locally_modified`, not a silent overwrite.
 - `upgrade` gets `--target` in this same task.
 
 ## Acceptance criteria
@@ -52,8 +53,10 @@ Decisions already made (do not re-litigate in implementation):
       degenerate source==target case (no `--target` given) a no-op, as today.
 - [ ] `strip-project-references` stays excluded (`_REPO_ONLY_SKILLS`) from what lands in the
       target.
-- [ ] A managed file already present in the target is overwritten without prompting — the chosen
-      behaviour; `run` still refuses only when the target already has `.tasks/`.
+- [ ] `run --target <path>` where the target already has a managed file that differs from the
+      incoming source: reuses `classify_managed_files`/the `upgrade` code path — prints a diff for
+      each conflicting file, writes nothing, exits non-zero, and tells the human to re-run with
+      `--force` to overwrite. Only after `--force` are those files written.
 - [ ] `--target` pointing at a non-existent path, or at a path not inside a git repo, exits
       non-zero with a clear message naming the path.
 - [ ] `sync` and `sync check` run with the **target** as cwd, and
@@ -68,8 +71,6 @@ Decisions already made (do not re-litigate in implementation):
       scan, and both command lines shown to the human.
 - [ ] `SKILL.md`'s finish step tells the human to start a new Claude Code session inside the
       target repo to use the copied skills.
-- [ ] `SKILL.md`'s frontmatter `description` parses as valid YAML — the bare `: ` inside the
-      scalar is gone — and its wording reflects scaffolding "a target repo" rather than only
 - [ ] `README.md`'s `init-project` bullet mentions the two-clone / `--target` usage.
 - [ ] `python3 .tasks/bin/sync check` is clean and the full `pytest` suite passes.
 
@@ -85,10 +86,11 @@ Decisions already made (do not re-litigate in implementation):
    classification reports `locally_modified: []` with the skill files under `up_to_date`.
 3. Negative tests: `--target /nonexistent` and `--target <a plain non-git tmp dir>` both exit
    non-zero naming the path; `--target` at a repo that already has `.tasks/` exits 2.
-4. Regression: the existing no-`--target` `run`/`upgrade` tests still pass unchanged.
-5. Confirm `SKILL.md`'s frontmatter parses as YAML (e.g. load it with `yaml.safe_load` on the
-   text between the `---` markers, or open the file in VS Code and confirm the parse error is
-   gone).
+4. Conflict test: pre-create a managed file in the target (e.g. a hand-edited
+   `.claude/skills/add-task/SKILL.md`) that differs from the source, run
+   `run answers.json --target <T>`, and assert it exits non-zero, prints a diff naming that file,
+   and leaves the target's copy untouched; re-run with `--force` and assert it's overwritten.
+5. Regression: the existing no-`--target` `run`/`upgrade` tests still pass unchanged.
 6. Manual end-to-end: `git init` a scratch repo `T`, run the skill against it from this clone,
    then `cd T` and confirm `python3 .tasks/bin/sync check` exits 0 and the copied skills are
    present under `.claude/skills/`.
@@ -105,6 +107,10 @@ _(empty — appended during implementation)_
   and `write_manifest` already take explicit paths; the change is mostly threading a target root
   through `cmd_run`/`cmd_upgrade` and deleting one filter line.
 - `run`'s source stays `_repo_root_of(SKILL_DIR)` — no clone, no network, no public repo required.
+- `run`'s conflict handling should reuse `classify_managed_files`/the diff-printing block `upgrade`
+  already has, rather than a second implementation — `run` has no prior manifest to consult
+  (`load_manifest` returns `{}` on a fresh target), so every differing pre-existing file classifies
+  as `locally_modified` and needs `--force`; add `--force` to `run`'s argparser alongside `--target`.
 - Watch `tests/test_portable_surface.py`: new `SKILL.md` wording must not introduce a banned
   "this repo's own …" phrase or a dangling `TASK-`/`EPIC-` id.
 - Files expected to change: `.claude/skills/init-project/scaffold.py`,

@@ -124,13 +124,13 @@ description: Scaffold the "kanban in markdown" workflow into this repo — .task
 
 The problem appears to be the second `:` on line 3 in this spot `initialized, upgrade it: refresh`. -->
 
-I changed my mind about this acceptance criteria:
+<!-- I changed my mind about this acceptance criteria:
 
 - A managed file already present in the target is overwritten without prompting — the chosen behaviour; `run` still refuses only when the target already has `.tasks/`.
 
 Change it so that it shows a diff and requires the human to rerun with `--force` to overwrite. I was confused and didn't realize `upgrade` was a separate action from `run`.
 
-Please update TASK-049 to reflect this change. Note that I removed an acceptance criteria in TASK-049 for fixing the frontmatter on the `init-project` skill since it looks like you already fixed it.
+Please update TASK-049 to reflect this change. Note that I removed an acceptance criteria in TASK-049 for fixing the frontmatter on the `init-project` skill since it looks like you already fixed it. -->
 
 ---
 
