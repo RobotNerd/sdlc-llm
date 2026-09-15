@@ -2,11 +2,11 @@
 id: TASK-022
 title: "add-task: move deterministic portions to a stdlib script, define its parameters"
 type: refactor
-status: in-progress
+status: in-review
 epic: EPIC-001
 created: 2026-09-13
 branch: task-022-add-task-script-split
-pr: null
+pr: https://github.com/RobotNerd/sdlc-llm/pull/32
 merge_commit: null
 blocked_by: []
 blocks: [TASK-027]
