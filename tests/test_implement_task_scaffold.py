@@ -1,17 +1,20 @@
-"""Unit/integration tests for `.claude/skills/implement-task/scaffold.py` (TASK-024).
+"""Unit/integration tests for `.claude/skills/implement-task/scaffold.py` (TASK-024/046).
 
 The four pure functions AC7 calls out (`resume_phase`, `compute_branch_name`/`slugify`,
 `decide_push_args`, `pick_top_unblocked`) are tested directly against the already-loaded `sync`
 module (see `conftest.py`) and small fixtures -- no real git/gh needed. `cmd_start`/`cmd_bail_out`/
 `cmd_resume_state` are exercised as real subprocesses against a scratch repo with a genuine bare
 "origin" remote (built by `init-project`'s and `add-task`'s own scaffold scripts), since their job
-is real git side effects. `wrap-up`/`finish-merge` need real `gh` (network + a real PR) and are
-proven instead by a live dry run against a scratch branch, documented in the task's Worklog --
-same precedent TASK-016 itself set.
+is real git side effects. `wrap-up` is exercised the same way, with a fake `gh` stub on `PATH`
+(TASK-046) standing in for `gh pr create`/`gh pr checks` -- deterministic, no network, but still a
+real `git` subprocess end to end. `finish-merge`'s `gh pr view`-driven branching isn't covered this
+way (out of TASK-046's scope) and is proven instead by a live dry run against a real scratch
+branch/PR, documented in TASK-024's own Worklog -- same precedent TASK-016 itself set.
 """
 
 import importlib.util
 import json
+import os
 import subprocess
 import sys
 from importlib.machinery import SourceFileLoader
@@ -325,6 +328,120 @@ def _sync_check(cwd):
     return subprocess.run(
         [sys.executable, str(cwd / ".tasks" / "bin" / "sync"), "check"], cwd=cwd, capture_output=True, text=True
     )
+
+
+FAKE_PR_URL = "https://example.invalid/pr/1"
+
+
+@pytest.fixture
+def fake_gh(tmp_path_factory):
+    """A `gh` stub on its own directory: `pr create` prints a fixed fake PR URL (deterministic,
+    no network); `pr checks` reports nothing configured (a plausible real response, and `wrap-up`
+    must not fail on it regardless). Prepend this directory to `PATH` to use it in a subprocess.
+    """
+    bin_dir = tmp_path_factory.mktemp("fake-gh-bin")
+    gh_path = bin_dir / "gh"
+    gh_path.write_text(
+        "#!/usr/bin/env python3\n"
+        "import sys\n"
+        "args = sys.argv[1:]\n"
+        "if args[:2] == ['pr', 'create']:\n"
+        f"    print({FAKE_PR_URL!r})\n"
+        "    sys.exit(0)\n"
+        "if args[:2] == ['pr', 'checks']:\n"
+        "    print('no checks configured')\n"
+        "    sys.exit(1)\n"
+        "sys.exit(0)\n"
+    )
+    gh_path.chmod(0o755)
+    return bin_dir
+
+
+def _run_wrap_up(cwd, answers, fake_gh):
+    answers_path = cwd.parent / "wrap-up-answers.json"
+    answers_path.write_text(json.dumps(answers))
+    env = os.environ.copy()
+    env["PATH"] = f"{fake_gh}{os.pathsep}{env['PATH']}"
+    return subprocess.run(
+        [sys.executable, str(SCRIPT_PATH), "wrap-up", str(answers_path)],
+        cwd=cwd, capture_output=True, text=True, env=env,
+    )
+
+
+def test_wrap_up_commits_and_pushes_its_own_bookkeeping(repo, fake_gh):
+    _add_task(repo, "First task")
+    _push_tasks(repo)
+    started = _run_start(repo, task_id="TASK-001")
+    assert started.returncode == 0, started.stderr
+    _git(["add", "-A"], cwd=repo)
+    _git(["commit", "-q", "-m", "wip"], cwd=repo)  # phase 1's changes, committed as phase 2 would
+
+    (repo / "feature.txt").write_text("the change\n")
+    result = _run_wrap_up(repo, {
+        "task_id": "TASK-001",
+        "paths": ["feature.txt"],
+        "commit_message": "feat(TASK-001): add the feature",
+        "pr_title": "feat(TASK-001): add the feature",
+        "pr_body": "body",
+        "bookkeeping_commit_message": "chore(TASK-001): record PR, set status in-review",
+    }, fake_gh)
+
+    assert result.returncode == 0, result.stderr
+    output = json.loads(result.stdout)
+    assert output["pr_url"] == FAKE_PR_URL
+
+    # nothing left uncommitted after a successful run
+    assert implement_task_scaffold.dirty_files(repo) == []
+
+    # the remote branch's history, not just the local working tree, has the update
+    _git(["fetch", "origin"], cwd=repo)
+    remote_task_text = subprocess.run(
+        ["git", "show", f"origin/task-001-first-task:.tasks/TASK-001-first-task.md"],
+        cwd=repo, capture_output=True, text=True, check=True,
+    ).stdout
+    assert "status: in-review" in remote_task_text
+    assert FAKE_PR_URL in remote_task_text
+    assert _sync_check(repo).returncode == 0
+
+
+def test_wrap_up_skips_empty_bookkeeping_commit(repo, fake_gh):
+    _add_task(repo, "First task")
+    _push_tasks(repo)
+    started = _run_start(repo, task_id="TASK-001")
+    assert started.returncode == 0, started.stderr
+    _git(["add", "-A"], cwd=repo)
+    _git(["commit", "-q", "-m", "wip"], cwd=repo)
+
+    # Pre-set the task file to exactly what `wrap-up` would end up writing (the fake PR URL,
+    # `status: in-review`) and re-sync, so that when `wrap-up` sets those same fields again,
+    # there's genuinely nothing left to commit for the bookkeeping step.
+    task_path = repo / ".tasks" / "TASK-001-first-task.md"
+    text = task_path.read_text()
+    # `render_frontmatter` quotes any scalar containing a colon (a URL always does) --
+    # match that canonical form here, or a later re-render would see a spurious diff.
+    text = text.replace("pr: null", f'pr: "{FAKE_PR_URL}"').replace("status: in-progress", "status: in-review")
+    task_path.write_text(text)
+    subprocess.run([sys.executable, str(repo / ".tasks" / "bin" / "sync")], cwd=repo, check=True)
+    _git(["add", "-A"], cwd=repo)
+    _git(["commit", "-q", "-m", "pre-set to what wrap-up will write"], cwd=repo)
+    before_log = _git(["log", "--oneline"], cwd=repo).stdout
+
+    (repo / "feature.txt").write_text("the change\n")
+    result = _run_wrap_up(repo, {
+        "task_id": "TASK-001",
+        "paths": ["feature.txt"],
+        "commit_message": "feat(TASK-001): add the feature",
+        "pr_title": "feat(TASK-001): add the feature",
+        "pr_body": "body",
+        "bookkeeping_commit_message": "chore(TASK-001): record PR, set status in-review",
+    }, fake_gh)
+
+    assert result.returncode == 0, result.stderr
+    after_log = _git(["log", "--oneline"], cwd=repo).stdout
+    # exactly one new commit (the "paths" commit) -- no separate, empty bookkeeping commit
+    assert len(after_log.splitlines()) == len(before_log.splitlines()) + 1
+    assert "record PR" not in after_log
+    assert implement_task_scaffold.dirty_files(repo) == []
 
 
 def test_start_refuses_on_dirty_tree(repo):

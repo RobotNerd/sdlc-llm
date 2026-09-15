@@ -84,14 +84,17 @@ any code.**
 2. Compose: a conventional commit message citing the task id; a PR title (same convention); a PR
    body from `.github/pull_request_template.md` filled in (acceptance criteria checked off, test
    results for every Testing strategy step, including what the human ran for non-automatable
-   ones).
+   ones); a bookkeeping commit message for step 3's own `pr:`/`status:` update (e.g.
+   `chore(TASK-NNN): record PR, set status in-review`).
 3. Run `python3 .claude/skills/implement-task/scaffold.py wrap-up <answers.json>` with
    `{"task_id", "paths" (the in-scope file list from step 2.4 above), "commit_message", "pr_title",
-   "pr_body"}`. It adds+commits those paths, rebases onto `<remote>/<default_branch>` if
-   `rebase_before_pr` (stashing/popping `.tmp/prompts.md` around it), pushes (plain, or
-   `--force-with-lease` only when the rebase actually rewrote already-pushed history), runs
-   `gh pr create`, records `pr:` + `status: in-review`, runs `sync`, and reports `gh pr checks` —
-   returning `{"pr_url", "checks_output", "checks_exit"}`.
+   "pr_body", "bookkeeping_commit_message"}`. It adds+commits those paths, rebases onto
+   `<remote>/<default_branch>` if `rebase_before_pr` (stashing/popping `.tmp/prompts.md` around
+   it), pushes (plain, or `--force-with-lease` only when the rebase actually rewrote
+   already-pushed history), runs `gh pr create`, records `pr:` + `status: in-review`, runs `sync`,
+   then commits+pushes that resulting change too (using `bookkeeping_commit_message`) — no separate
+   manual follow-up commit needed — and reports `gh pr checks`, returning `{"pr_url",
+   "checks_output", "checks_exit"}`.
 4. On a rebase conflict it leaves the repo mid-rebase and exits non-zero with `git status`'s
    output — **STOP**, resolve it by hand (`git rebase --continue`, `git stash pop` if it mentions
    one), then re-run `wrap-up`. Don't guess a resolution.
