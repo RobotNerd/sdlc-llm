@@ -2,12 +2,12 @@
 id: TASK-028
 title: Replace .tmp/prompts.md special-case with an ignored_paths config key
 type: refactor
-status: in-review
+status: done
 epic: EPIC-001
 created: 2026-09-14
 branch: task-028-ignored-paths-config-key
 pr: "https://github.com/RobotNerd/sdlc-llm/pull/46"
-merge_commit: null
+merge_commit: d4c2f27f97132fe7c4b29b3d466d25958c6f2145
 blocked_by: [TASK-024]
 blocks: [TASK-029, TASK-034]
 ---
