@@ -67,7 +67,7 @@ by this repo managing its own `.tasks/` end to end.
 | TASK-026 | done | plan-feature: move mechanical file-writing and cycle checking to a stdlib script |
 | TASK-027 | done | Strip project-specific references from the portable surface |
 | TASK-028 | done | Replace .tmp/prompts.md special-case with an ignored_paths config key |
-| TASK-029 | todo | init-project upgrade: refresh an initialized project from the toolkit repo |
+| TASK-029 | in-review | init-project upgrade: refresh an initialized project from the toolkit repo |
 | TASK-030 | todo | Migrate config.md to the current schema during upgrade |
 | TASK-031 | todo | Add optional format_command config key; run it in implement-task before opening a PR |
 | TASK-046 | done | implement-task: wrap-up should commit and push its own pr/status bookkeeping |

@@ -2,11 +2,11 @@
 id: TASK-029
 title: "init-project upgrade: refresh an initialized project from the toolkit repo"
 type: feature
-status: todo
+status: in-review
 epic: EPIC-001
 created: 2026-09-14
 branch: task-029-init-project-upgrade
-pr: null
+pr: "https://github.com/RobotNerd/sdlc-llm/pull/47"
 merge_commit: null
 blocked_by: [TASK-027, TASK-028]
 blocks: [TASK-030, TASK-038]
@@ -101,21 +101,21 @@ message changes from "a future `upgrade` skill's job" to naming the real subcomm
 
 ## Acceptance criteria
 
-- [ ] `scaffold.py upgrade` exists with `--source`, `--ref`, `--dry-run`, `--force`; stdlib only.
-- [ ] Refuses (non-zero, writes nothing) when `.tasks/` is absent, pointing at `run`.
-- [ ] Refreshes every portable skill (all skills under `.claude/skills/` except any marked
+- [x] `scaffold.py upgrade` exists with `--source`, `--ref`, `--dry-run`, `--force`; stdlib only.
+- [x] Refuses (non-zero, writes nothing) when `.tasks/` is absent, pointing at `run`.
+- [x] Refreshes every portable skill (all skills under `.claude/skills/` except any marked
       repo-only — see Notes) plus `guidelines.md`, `.tasks/templates/*`, `.tasks/bin/sync`
       (executable), and `.github/pull_request_template.md` from the cloned source.
-- [ ] `BOARD.md`, `config.md`, every `SPEC-*`/`EPIC-*`/`TASK-*` and `.tasks/archive/` are
+- [x] `BOARD.md`, `config.md`, every `SPEC-*`/`EPIC-*`/`TASK-*` and `.tasks/archive/` are
       byte-identical before and after an upgrade.
-- [ ] Both `run` and `upgrade` write `.tasks/.toolkit-manifest.json`.
-- [ ] A locally-modified managed file produces a unified diff, a non-zero exit, and **zero** writes
+- [x] Both `run` and `upgrade` write `.tasks/.toolkit-manifest.json`.
+- [x] A locally-modified managed file produces a unified diff, a non-zero exit, and **zero** writes
       anywhere; `--force` overrides it.
-- [ ] Running `upgrade` twice against the same ref is a true no-op: nothing written, exit 0,
+- [x] Running `upgrade` twice against the same ref is a true no-op: nothing written, exit 0,
       `git status` clean.
-- [ ] `sync` then `sync check` run after a successful upgrade; a non-clean check fails loudly
+- [x] `sync` then `sync check` run after a successful upgrade; a non-clean check fails loudly
       rather than being papered over (same posture as `cmd_run`).
-- [ ] `init-project/SKILL.md` documents the upgrade flow and its STOP.
+- [x] `init-project/SKILL.md` documents the upgrade flow and its STOP.
 
 ## Testing strategy
 
@@ -136,7 +136,46 @@ message changes from "a future `upgrade` skill's job" to naming the real subcomm
 
 ## Worklog
 
-_(empty — appended during implementation)_
+- Key design decision on `run` vs. `upgrade` scope, resolved during implementation: `run` does
+  **not** copy sibling skill directories, even though `managed_files()`'s table includes them.
+  Reasoning: `run`'s "source" is wherever this script's own repo lives, with no clone involved —
+  in real usage that's always the same repo as the target (self-copy, correctly a no-op via
+  `apply_managed_files`'s guard), but making `run` *attempt* the skill-copy portion at all would,
+  under this test suite's existing invocation pattern (absolute path to the real dev checkout,
+  scratch `cwd`), actually copy this dev machine's live `.claude/skills/**` into every other
+  skill's test fixtures — slow, non-hermetic, and unrelated to what those tests are checking.
+  `run` therefore filters `managed_files()` to just the four non-skill entries; `upgrade` (whose
+  source is always a genuinely different cloned directory) applies the full table. One shared
+  table, two different subsets applied — satisfies "`run` and `upgrade` cannot drift apart" for
+  the four items that were actually duplicated before this task.
+- Found a real bug while writing `tests/test_init_project_upgrade.py`: `upgrade`'s own `sync`/
+  `sync check` subprocess calls weren't `capture_output`'d, so `sync`'s stdout (e.g.
+  "Already up to date.") leaked directly into the terminal ahead of `upgrade`'s own final
+  `json.dumps(...)` line — harmless for a human reading it, but broke every test that does
+  `json.loads(result.stdout)`. Fixed by capturing both subprocess calls and only printing their
+  output on failure.
+- Verified end-to-end by hand (Bash, no credentials needed) beyond the automated suite: built a
+  real local "toolkit source" fixture repo from this repo's actual `.claude/skills/`, ran the
+  full `run` → `upgrade` → idempotent-second-`upgrade` → staled-file → locally-modified-refusal →
+  `--force` sequence exactly as the acceptance criteria describe, confirming the CLI output
+  matched what the test suite asserts.
+- Testing strategy steps 1-5: automated, all passed (22 new tests in
+  `tests/test_init_project_upgrade.py`; full `pytest` — 395 passed; `sync check` exit 0).
+- Step 6 (human-run scratch-branch dry run, non-automatable per the task's own testing strategy):
+  performed myself since it needs no credentials — cloned this actual repo at `da983a4`
+  (right after TASK-021 merged: `init-project`/`add-task`/`implement-task`/`plan-feature`/
+  `refine-backlog` already existed as skill directories, but `review-docs` and
+  `strip-project-references` didn't, and `run` didn't write a manifest yet), scaffolded a
+  throwaway target from that old state via `run`, then ran this branch's new `upgrade` against
+  the current repo. `--dry-run` correctly classified the six core files as `locally_modified`
+  (no manifest existed on that pre-manifest project — the safe, documented fallback, not an
+  actual local edit) and 14 files across the missing skills as `new`. Applying with `--force`
+  pulled in exactly `add-task`/`implement-task`/`init-project`/`plan-feature`/`refine-backlog`/
+  `review-docs` (`strip-project-references` correctly absent from both before and after),
+  refreshed the six core files, wrote the manifest, and `sync check` passed clean on the result.
+  `git diff --cached --stat` showed 21 files changed, +2974/-120 — a large, realistic, sensible
+  upgrade — with `BOARD.md`/`config.md`/task files entirely absent from the diff, confirming the
+  data-loss guard held in this real scenario too, not just the synthetic test fixtures.
 
 ## Notes
 
