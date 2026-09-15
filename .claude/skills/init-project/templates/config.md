@@ -2,7 +2,10 @@
   Template for .tasks/config.md, filled in by the init-project skill from
   its interview answers. `workflow_version` always starts at 1;
   `allow_auto_merge` always starts `false` (reinforces the never-merge
-  guardrail — not something init-time should offer to turn on).
+  guardrail — not something init-time should offer to turn on);
+  `docs_review_paths`/`docs_ignore_paths` always start at the generic
+  defaults below — a human adds project-specific paths later by editing
+  config.md directly.
   Placeholders:
     {{test_command}}               e.g. `pytest`, `npm test`, or `null`
     {{lint_command}}                 e.g. `ruff check .`, or `null`
@@ -21,6 +24,8 @@ workflow_version: 1
 test_command: {{test_command}}
 lint_command: {{lint_command}}
 docs_paths: {{docs_paths}}
+docs_review_paths: [CLAUDE.md, README.md, .tasks/guidelines.md]
+docs_ignore_paths: []
 default_branch: {{default_branch}}
 branch_prefix: {{branch_prefix}}
 remote: {{remote}}
@@ -44,6 +49,9 @@ skill logic stays identical across projects, only this file changes.
 - **`lint_command`** — `null` means skills skip the lint step rather than fail on a command that
   doesn't exist. Set it once a linter is configured.
 - **`docs_paths`** — files `implement-task` phase 3 considers touching as part of "update docs".
+- **`docs_review_paths`** / **`docs_ignore_paths`** — `review-docs`'s own lists: which docs it
+  always audits for staleness, and which paths it never scans into or flags. Not something
+  init-time offers to change beyond these generic defaults.
 - **`remote` / `rebase_before_pr` / `merge_strategy` / `delete_branch_after_merge`** — the git
   automation settings `implement-task`'s phases 1/3/4 read. `merge_strategy` documents how the
   *human* merges; the skill itself never merges.

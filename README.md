@@ -53,7 +53,7 @@ pytest
 
 ## Skills
 
-Five Claude Code skills drive the workflow end to end. Each pairs a `SKILL.md` checklist
+Six Claude Code skills drive the workflow end to end. Each pairs a `SKILL.md` checklist
 (interviews, judgment calls, STOP markers) with a `scaffold.py` (stdlib-only, the mechanical
 file/`git`/`gh`/`sync` work behind each step):
 
@@ -79,6 +79,14 @@ records it.
 
 - **`init-project`** — scaffold `.tasks/` in a new repo. (Named `init-project`, not `init`, so it
   doesn't collide with a generic `init` skill.)
+- **`add-task`** — interview a request into real acceptance criteria, allocate an ID, place it in
+  TODO.
+- **`implement-task`** — the four-phase loop above.
+- **`refine-backlog`** — a periodic pass: reprioritize, recompute blocked status, flag stale or
+  underspecified tasks.
+- **`plan-feature`** — spec → epics → vertical-slice tasks.
+- **`review-docs`** — a periodic pass: audit `docs_review_paths` for staleness, dangling
+  cross-references, and drift, and propose fixes.
 
 ## Example usage
 
