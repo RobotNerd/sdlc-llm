@@ -71,3 +71,4 @@ TASK-018; until then, follow SPEC-001's `implement-task` phases by hand, per `CL
 ## Status
 
 See `.tasks/BOARD.md` for current progress.
+scratch dry-run marker
