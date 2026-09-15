@@ -63,7 +63,7 @@ by this repo managing its own `.tasks/` end to end.
 | TASK-022 | done | add-task: move deterministic portions to a stdlib script, define its parameters |
 | TASK-023 | todo | Docs cleanup: remove redundant/deprecated info, relocate .tmp/ content, add README usage example |
 | TASK-024 | done | implement-task: move deterministic git/gh actions to a stdlib script |
-| TASK-025 | in-review | refine-backlog: move mechanical steps to a stdlib script; activity-aware stale detection |
+| TASK-025 | done | refine-backlog: move mechanical steps to a stdlib script; activity-aware stale detection |
 | TASK-026 | todo | plan-feature: move mechanical file-writing and cycle checking to a stdlib script |
 | TASK-027 | todo | Strip project-specific references from the portable surface |
 | TASK-028 | todo | Replace .tmp/prompts.md special-case with an ignored_paths config key |
@@ -71,5 +71,5 @@ by this repo managing its own `.tasks/` end to end.
 | TASK-030 | todo | Migrate config.md to the current schema during upgrade |
 | TASK-031 | todo | Add optional format_command config key; run it in implement-task before opening a PR |
 
-Progress: 23/31 done
+Progress: 24/31 done
 <!-- END:children -->

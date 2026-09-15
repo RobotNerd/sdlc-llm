@@ -2,12 +2,12 @@
 id: TASK-025
 title: "refine-backlog: move mechanical steps to a stdlib script; activity-aware stale detection"
 type: refactor
-status: in-review
+status: done
 epic: EPIC-001
 created: 2026-09-14
 branch: task-025-refine-backlog-script-split
 pr: "https://github.com/RobotNerd/sdlc-llm/pull/35"
-merge_commit: null
+merge_commit: 3977234248d7e636fddb565095b2145d536be39a
 blocked_by: []
 blocks: [TASK-027]
 ---
