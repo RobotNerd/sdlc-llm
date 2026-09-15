@@ -2,12 +2,12 @@
 id: TASK-047
 title: "review-docs skill: periodic pass to catch stale docs and dangling references"
 type: feature
-status: in-review
+status: done
 epic: EPIC-001
 created: 2026-09-15
 branch: task-047-review-docs-skill-periodic-pass-to-catch-stale-docs-and-dangling-references
 pr: "https://github.com/RobotNerd/sdlc-llm/pull/42"
-merge_commit: null
+merge_commit: ab2ff7bbfc0f6d7edf0ebddd6f58059cf14c4301
 blocked_by: []
 blocks: []
 ---
