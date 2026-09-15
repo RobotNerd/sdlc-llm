@@ -494,6 +494,33 @@ def cmd_wrap_up(args: argparse.Namespace) -> int:
         print(sync_result.stderr, file=sys.stderr)
         return sync_result.returncode
 
+    # Commit+push the pr:/status: in-review update and sync's regenerated board/epic --
+    # otherwise this sits as uncommitted local drift and the PR's own diff never reflects
+    # it (found for real on TASK-025/026: `wrap-up` reported success both times, but
+    # `git status` immediately after showed this exact change uncommitted).
+    bookkeeping_add = subprocess.run(["git", "add", "--", ".tasks"], cwd=root, capture_output=True, text=True)
+    if bookkeeping_add.returncode != 0:
+        print(bookkeeping_add.stderr, file=sys.stderr)
+        return bookkeeping_add.returncode
+    if subprocess.run(["git", "diff", "--cached", "--quiet"], cwd=root).returncode != 0:
+        bookkeeping_commit = subprocess.run(
+            ["git", "commit", "-m", answers["bookkeeping_commit_message"]],
+            cwd=root, capture_output=True, text=True,
+        )
+        if bookkeeping_commit.returncode != 0:
+            print(bookkeeping_commit.stderr, file=sys.stderr)
+            return bookkeeping_commit.returncode
+        bookkeeping_push_args = decide_push_args(
+            current_branch=current_branch(root), task_branch=branch,
+            default_branch=default_branch, remote=remote, force=False,
+        )
+        bookkeeping_push = subprocess.run(
+            ["git", *bookkeeping_push_args], cwd=root, capture_output=True, text=True
+        )
+        if bookkeeping_push.returncode != 0:
+            print(bookkeeping_push.stderr, file=sys.stderr)
+            return bookkeeping_push.returncode
+
     checks = subprocess.run(["gh", "pr", "checks", pr_url], cwd=root, capture_output=True, text=True)
     print(json.dumps({
         "pr_url": pr_url,
