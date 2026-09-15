@@ -62,7 +62,7 @@ by this repo managing its own `.tasks/` end to end.
 | TASK-021 | done | init-project: move deterministic scaffolding to a stdlib Python script |
 | TASK-022 | done | add-task: move deterministic portions to a stdlib script, define its parameters |
 | TASK-023 | todo | Docs cleanup: remove redundant/deprecated info, relocate .tmp/ content, add README usage example |
-| TASK-024 | todo | implement-task: move deterministic git/gh actions to a stdlib script |
+| TASK-024 | in-progress | implement-task: move deterministic git/gh actions to a stdlib script |
 | TASK-025 | todo | refine-backlog: move mechanical steps to a stdlib script; activity-aware stale detection |
 | TASK-026 | todo | plan-feature: move mechanical file-writing and cycle checking to a stdlib script |
 | TASK-027 | todo | Strip project-specific references from the portable surface |
