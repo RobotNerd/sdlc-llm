@@ -6,8 +6,7 @@ workflow_version: 1
 
 The operating rules for this repo's "kanban in markdown" workflow. This file states the rules;
 `.tasks/config.md` holds the per-project values they refer to; `.tasks/specs/SPEC-001-*.md` is
-the full spec these rules are drawn from. `.tmp/workflow-plan.md` is the narrative walkthrough for
-a human who wants the mental model, not just the checklist.
+the full spec these rules are drawn from.
 
 Terminology: **task**, always — never "ticket" or "story".
 
@@ -23,32 +22,30 @@ Terminology: **task**, always — never "ticket" or "story".
 - [ ] A **task** (`.tasks/TASK-NNN-slug.md`) is one unit of work: one branch, one PR, one sitting.
       No sub-tasks — split the task or promote it to an epic instead. Links to its epic via
       `epic:` (nullable — a loose chore needs none).
-- [ ] IDs are allocated by `sync next-id <type>` — never by counting files yourself. It scans
-      `.tasks/`, `.tasks/specs/`, and `.tasks/archive/`, so an archived ID is never reused.
+- [ ] IDs are allocated by `sync next-id <type>` — never by counting files yourself (SPEC-001
+      §"ID allocation").
 
 ### Board
 
 - [ ] `.tasks/BOARD.md` is mostly generated. The **TODO list is the only hand-maintained part** —
-      it is priority order, which nothing can infer. `sync` may drop a line whose task left
-      `todo`, append a new `todo` task at the end, and re-annotate a line's epic tag and blocked
-      marker, but it must **never reorder** TODO.
+      it is priority order, which nothing can infer, and `sync` never reorders it (SPEC-001
+      §"TODO").
 - [ ] Everything between `<!-- BEGIN:name -->` / `<!-- END:name -->` markers — in `BOARD.md`,
       every `EPIC-*.md`, and every `SPEC-*.md` — is generated. **Never hand-edit inside a marked
-      region.** Change the source task/epic file and run `.tasks/bin/sync` (bare, no args) to
-      regenerate it (see SPEC-001 §"Rendering details"). `sync check` is the read-only form —
-      use it to verify, never to fix.
+      region.** Change the source task/epic file and run `.tasks/bin/sync` to regenerate it (see
+      SPEC-001 §"Rendering details"). `sync check` is the read-only form — use it to verify, never
+      to fix.
 
 ## Working a task — `implement-task`, four phases
 
-Each phase ends in a **STOP** for human input. Until the `implement-task` skill exists
-(TASK-016), follow this checklist by hand.
+Run this via the `implement-task` skill (`.claude/skills/implement-task/`); if it isn't set up in
+this repo yet, follow this checklist by hand. Each phase ends in a **STOP** for human input.
 
-1. **Start.** Refuse to begin if the working tree is dirty (`.tmp/prompts.md`'s constant edits are
-   the known exception — it is not part of any task). Pick the top unblocked TODO task, announcing
-   any blocked ones skipped. `git fetch <remote>`, branch from `<remote>/<default_branch>` as
-   `<branch_prefix><NNN>-<slug>`. Set `status: in-progress` and `branch:`, then run `sync` to
-   regenerate the board and epic. **Restate the plan and acceptance criteria for approval before
-   writing anything.** — STOP —
+1. **Start.** Refuse to begin if the working tree is dirty. Pick the top unblocked TODO task,
+   announcing any blocked ones skipped. `git fetch <remote>`, branch from
+   `<remote>/<default_branch>` as `<branch_prefix><NNN>-<slug>`. Set `status: in-progress` and
+   `branch:`, then run `sync` to regenerate the board and epic. **Restate the plan and acceptance
+   criteria for approval before writing anything.** — STOP —
 2. **Implement + test.** Write the change and its tests. Run `test_command` (and `lint_command`,
    if not `null`). Walk the task's Testing strategy; hand anything non-automatable to the human
    and record the result in the task's **Worklog** — never skip silently. Stay in scope: check
