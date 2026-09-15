@@ -61,7 +61,7 @@ by this repo managing its own `.tasks/` end to end.
 | TASK-020 | done | CI workflow running sync check on every PR |
 | TASK-021 | done | init-project: move deterministic scaffolding to a stdlib Python script |
 | TASK-022 | done | add-task: move deterministic portions to a stdlib script, define its parameters |
-| TASK-023 | in-review | Docs cleanup: remove redundant/deprecated info, relocate .tmp/ content, add README usage example |
+| TASK-023 | done | Docs cleanup: remove redundant/deprecated info, relocate .tmp/ content, add README usage example |
 | TASK-024 | done | implement-task: move deterministic git/gh actions to a stdlib script |
 | TASK-025 | done | refine-backlog: move mechanical steps to a stdlib script; activity-aware stale detection |
 | TASK-026 | done | plan-feature: move mechanical file-writing and cycle checking to a stdlib script |
@@ -72,5 +72,5 @@ by this repo managing its own `.tasks/` end to end.
 | TASK-031 | todo | Add optional format_command config key; run it in implement-task before opening a PR |
 | TASK-046 | done | implement-task: wrap-up should commit and push its own pr/status bookkeeping |
 
-Progress: 26/32 done
+Progress: 27/32 done
 <!-- END:children -->
