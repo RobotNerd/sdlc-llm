@@ -24,9 +24,10 @@ TEMPLATES_DIR = SKILL_DIR / "templates"
 VENDORED_SYNC = SKILL_DIR / "vendored-sync"
 
 # Every key `.tasks/config.md`'s template expects. Keep in sync with
-# `templates/config.md`'s `{{placeholder}}`s -- `workflow_version` and
-# `allow_auto_merge` are deliberately absent: SKILL.md never asks about
-# either, they're fixed by the template itself.
+# `templates/config.md`'s `{{placeholder}}`s -- `workflow_version`,
+# `allow_auto_merge`, `docs_review_paths`, and `docs_ignore_paths` are
+# deliberately absent: SKILL.md never asks about any of them, they're
+# fixed by the template itself.
 REQUIRED_KEYS = (
     "test_command",
     "lint_command",

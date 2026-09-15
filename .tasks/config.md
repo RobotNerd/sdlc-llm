@@ -3,6 +3,8 @@ workflow_version: 1
 test_command: pytest
 lint_command: null
 docs_paths: [README.md, CLAUDE.md]
+docs_review_paths: [CLAUDE.md, README.md, .tasks/guidelines.md, .claude/skills/init-project/templates/guidelines.md]
+docs_ignore_paths: [.tmp/prompts.md]
 default_branch: main
 branch_prefix: task-
 remote: origin
@@ -29,6 +31,12 @@ describes: the skills' logic stays identical across projects, only this file cha
   separate decision, not bundled into this bootstrap. `null` means skills skip the lint step
   rather than fail on a command that doesn't exist. Update this once a linter is chosen.
 - **`docs_paths`** — files `implement-task` phase 3 considers touching as part of "update docs".
+- **`docs_review_paths`** / **`docs_ignore_paths`** — `review-docs`'s own lists: which docs it
+  always audits for staleness, and which paths it never scans into or flags. Deliberately
+  separate from `docs_paths` (a different concern — per-task doc updates, not periodic audit) and
+  from `ignored_paths` (`implement-task`'s dirty-tree/rebase-stash scope). This repo's own
+  `docs_review_paths` includes the portable-template mirror
+  (`.claude/skills/init-project/templates/guidelines.md`) that only this dogfooding repo has.
 - **`remote` / `rebase_before_pr` / `merge_strategy` / `delete_branch_after_merge`** — the git
   automation settings from SPEC-001's `implement-task` phases 1/3/4. `merge_strategy: squash`
   documents how the *human* merges; the skill itself never merges (see `guidelines.md`).
