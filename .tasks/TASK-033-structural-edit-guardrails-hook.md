@@ -9,7 +9,7 @@ branch: task-033-structural-edit-guardrails-hook
 pr: null
 merge_commit: null
 blocked_by: [TASK-032]
-blocks: []
+blocks: [TASK-039, TASK-040]
 ---
 
 # TASK-033: Structural edit guardrails hook: generated regions and epic status

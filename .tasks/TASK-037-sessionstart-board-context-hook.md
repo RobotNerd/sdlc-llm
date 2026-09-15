@@ -1,6 +1,6 @@
 ---
 id: TASK-037
-title: "SessionStart board-context hook"
+title: SessionStart board-context hook
 type: feature
 status: todo
 epic: EPIC-002
@@ -9,7 +9,7 @@ branch: task-037-sessionstart-board-context-hook
 pr: null
 merge_commit: null
 blocked_by: [TASK-032]
-blocks: []
+blocks: [TASK-039, TASK-040]
 ---
 
 # TASK-037: SessionStart board-context hook

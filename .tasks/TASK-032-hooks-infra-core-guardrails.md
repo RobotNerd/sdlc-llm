@@ -9,7 +9,7 @@ branch: task-032-hooks-infra-core-guardrails
 pr: null
 merge_commit: null
 blocked_by: []
-blocks: [TASK-033, TASK-034, TASK-035, TASK-036, TASK-037, TASK-038]
+blocks: [TASK-033, TASK-034, TASK-035, TASK-036, TASK-037, TASK-038, TASK-039, TASK-040, TASK-045]
 ---
 
 # TASK-032: Hooks infrastructure + shared guardrails module + core git/gh guardrail hooks
@@ -28,7 +28,16 @@ Introduce:
   guardrail as a pure function.
 
 Three guardrails, as functions in `guardrails.py` plus their hook wiring:
-1. Deny `gh pr merge` outright.
+1. Deny `gh pr merge` **unless** it is invoked through the future autonomous-merge path
+   (SPEC-003/EPIC-003, not yet built) with a recorded critic approval and under that batch's
+   merge cap. Concretely: allow only when a to-be-defined marker/record exists (e.g. a field or
+   file EPIC-003's merge step writes just before calling `gh pr merge`) proving the call is the
+   scripted, critic-gated path — not a bare model decision to merge. Until EPIC-003 lands, no such
+   marker can ever exist, so this hook denies every `gh pr merge` unconditionally in practice; the
+   exception is future-proofed now instead of built as an absolute deny that would need loosening
+   later. Coordinate with EPIC-003 slice 7 (its own task) on the exact marker shape when that
+   slice is implemented — don't invent one speculatively here beyond leaving the hook's structure
+   able to check for it.
 2. Deny `git push` of task work to `default_branch`. Allow only the phase-4 bookkeeping
    pattern: a push to `default_branch` whose diff touches only board-managed paths (`BOARD.md`,
    `EPIC-*.md`, a task file's `status`/`merge_commit`/`pr` fields, `.tasks/archive/**`).
@@ -51,6 +60,10 @@ SPEC-002's Alternatives for why.
 - [ ] Each has a hook-script test: feed the documented `PreToolUse` JSON shape on stdin, assert
       the `deny` decision for a violating `tool_input.command` and `allow` (or no output) for
       everything else.
+- [ ] The `gh pr merge` guardrail's structure supports a future "verified critic-gated merge"
+      exception without redesign — it denies unconditionally today (no marker can exist yet) but
+      the check is written as "deny unless marker present," not a bare unconditional deny, so
+      EPIC-003 slice 7 can wire in the real marker later without touching this hook's shape.
 - [ ] `pytest` and `python3 .tasks/bin/sync check` both pass.
 
 ## Testing strategy
@@ -76,3 +89,7 @@ _(empty — appended during implementation)_
 - This is the foundational slice for EPIC-002 — every other task in the epic depends on it.
 - The shared-module decision (hooks and skill scripts both call `guardrails.py`) is documented in
   SPEC-002; keep new guardrail logic there, not duplicated into a hook script or a skill script.
+- Amended 2026-09-14 (before implementation started) to future-proof the `gh pr merge` guardrail
+  for EPIC-003/SPEC-003's opt-in, critic-gated, capped auto-merge — see guardrail 1's Description
+  and its acceptance criterion above. No behavior change today; this only shapes the check so it
+  doesn't need a redesign later.

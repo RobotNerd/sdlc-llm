@@ -1,6 +1,6 @@
 ---
 id: TASK-038
-title: "Wire hooks into upgrade and config migration"
+title: Wire hooks into upgrade and config migration
 type: feature
 status: todo
 epic: EPIC-002
@@ -9,7 +9,7 @@ branch: task-038-wire-hooks-into-upgrade
 pr: null
 merge_commit: null
 blocked_by: [TASK-032, TASK-029, TASK-030]
-blocks: []
+blocks: [TASK-039, TASK-040]
 ---
 
 # TASK-038: Wire hooks into upgrade and config migration

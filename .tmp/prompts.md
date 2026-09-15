@@ -85,23 +85,25 @@ My current ideas for hooks:
 - The code formatting tool is run before creating a PR (see TASK-031).
 - Ensure that re-running init-project to upgrade a project doesn't modify the excluded files. -->
 
----
+<!-- /plan-feature Create a new epic to refactor the `implement-task` skill to make it more automated. The tasks in this epic are placed at the bottom of the TODO list, and for now are planned to be implemented after all of the tasks in EPIC-002.
 
-/plan-feature Create a new epic to refactor the `implement-task` skill to be more automated:
-- user provides an epic, a task range, task list, or a stopping task and LLM works through all tasks autonomously
+- The user can provide an epic, a task range, task list, or a stopping task and LLM works through all tasks autonomously:
   - epic provided: LLM attempts to implement all tasks in the epic
   - task range: implement all tasks from start to end in the range
   - task list: a list of individual tasks to work, which might not be in the same order as the TODO list on the board
   - stopping task: LLM starts with the first task at the top of the TODO section on the board and works all tasks in order from the TODO list until completing the stopping task
-- before working, LLM must verify that the set of tasks provided by the user is valid; implement this as a script to offload the decision making from the LLM
+- before working, LLM must verify that the set of tasks provided by the user is valid; implement this as a script (or hook if that makes sense) to offload the decision making to be deterministic
 - determine conditions when LLM should interrupt work and notify the user; these are my rough ideas, and I need suggestions/best practices from you
   - running into an issue the requires clarification from the user
-  - running out of context; need strategies to avoid this
+  - running out of context; note that I need strategies to avoid this, which may need to be a separate epic itself
   - running into an unexpected blocker
-  - using too many tokens; need strategies to keep token usage low, especially if spawning additional worker agents
-- creating follow up tasks: user can choose if they want the LLM to create additional tasks automatically or if the user needs to be notified; e.g. the LLM determines that a task is too big and needs to be split up; default to allowing new task creation, but add a limiter to prevent task explosion
-- switch to TDD: LLM should write test cases first, verify they fail, then implement and re-test until test cases pass
+  - using too many tokens; need strategies to keep token usage low, especially if we decide to start spawning additional worker agents
+- creating follow up tasks: user can choose if they want the LLM to create additional tasks automatically or if the user needs to be notified; e.g. the LLM determines that a task is too big and needs to be split up; default to allowing new task creation, but add a configurable limiter to prevent task explosion
+- switch to TDD: LLM should write test cases first, verify they fail, then implement and re-test until test cases pass -->
 
----
+/plan-feature Context/session management and multiple agents. Goes on board after existing epics.
 
-TODO: /add-task use higher model (e.g. Opus) as the orchestrator and spin off lower models (e.g. Sonnet) to implement the tasks; each model and its effort level is configurable; how to balance context and token usage to keep the process efficient?
+- Session hand-off when context gets too full (configurable percentage threshold). Write a short hand-off doc, clear the session, and have LLM continue from the hand-off doc.
+- Consider running two simultaneous instances of claude code: the orchestrator (e.g. opus, high effort) and the worker (e.g. sonnet, high effort); model/effort is configurable; each instance would stay live until hitting the threshold mentioned above, at which point it would do a session hand-off to a new instance of itself; orchestrator would focus on planning tasks (e.g. creating tasks) and the worker focus on implementation of each task; potentially keep a third, light-weight critic agent (haiku) in a similar session; at its discretion, the orchestrator can task the critic with reviewing PRs implemented by the worker agent, although this wouldn't necessarily happen for every task (see TASK-NNN).
+
+These are my rough ideas, but I don't know the latest best practices for how to handle this. Keep in mind that I'm currently on the $20/month pro plan of claude code. I may ugrade to a more expensive plan later, but even when I do, I won't to be smart about conserving tokens and context to support better scaling.

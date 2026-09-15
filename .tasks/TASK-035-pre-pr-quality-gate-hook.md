@@ -9,7 +9,7 @@ branch: task-035-pre-pr-quality-gate-hook
 pr: null
 merge_commit: null
 blocked_by: [TASK-032, TASK-031]
-blocks: []
+blocks: [TASK-039, TASK-040]
 ---
 
 # TASK-035: Pre-PR quality gate hook: sync check, test, lint, format

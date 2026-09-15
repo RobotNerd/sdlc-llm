@@ -11,6 +11,7 @@ between `<!-- BEGIN -->` / `<!-- END -->` markers — change the task/epic file 
 |---|---|---|
 | EPIC-001 | in-progress | 21/31 done |
 | EPIC-002 | todo | 0/7 done |
+| EPIC-003 | todo | 0/7 done |
 <!-- END:epics -->
 
 ## TODO
@@ -32,6 +33,13 @@ between `<!-- BEGIN -->` / `<!-- END -->` markers — change the task/epic file 
 - TASK-036 — SPEC/TASK-reference scan hook (repo-only, never copied)  `EPIC-002` ⛔ blocked_by TASK-027, TASK-032
 - TASK-037 — SessionStart board-context hook  `EPIC-002` ⛔ blocked_by TASK-032
 - TASK-038 — Wire hooks into upgrade and config migration  `EPIC-002` ⛔ blocked_by TASK-029, TASK-030, TASK-032
+- TASK-039 — Batch selection + deterministic validation script  `EPIC-003` ⛔ blocked_by TASK-032, TASK-033, TASK-034, TASK-035, TASK-036, TASK-037, TASK-038
+- TASK-040 — TDD mode for implement-task phase 2  `EPIC-003` ⛔ blocked_by TASK-032, TASK-033, TASK-034, TASK-035, TASK-036, TASK-037, TASK-038
+- TASK-041 — Core autonomous loop: iterate a validated batch without manual re-invocation  `EPIC-003` ⛔ blocked_by TASK-039
+- TASK-042 — Interrupt taxonomy: isolated skip-task vs. systemic halt-batch routing  `EPIC-003` ⛔ blocked_by TASK-041
+- TASK-043 — Context/token usage safety-valve interrupt + usage reporting  `EPIC-003` ⛔ blocked_by TASK-041
+- TASK-044 — Follow-up task creation policy with a configurable per-batch limit  `EPIC-003` ⛔ blocked_by TASK-041
+- TASK-045 — Opt-in, critic-gated, per-batch-capped auto-merge  `EPIC-003` ⛔ blocked_by TASK-032, TASK-041
 
 ## In Progress
 

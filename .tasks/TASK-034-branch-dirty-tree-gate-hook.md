@@ -1,6 +1,6 @@
 ---
 id: TASK-034
-title: "Branch-name + dirty-tree gate hook"
+title: Branch-name + dirty-tree gate hook
 type: feature
 status: todo
 epic: EPIC-002
@@ -9,7 +9,7 @@ branch: task-034-branch-dirty-tree-gate-hook
 pr: null
 merge_commit: null
 blocked_by: [TASK-032, TASK-028]
-blocks: []
+blocks: [TASK-039, TASK-040]
 ---
 
 # TASK-034: Branch-name + dirty-tree gate hook

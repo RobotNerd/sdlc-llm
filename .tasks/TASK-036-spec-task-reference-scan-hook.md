@@ -1,6 +1,6 @@
 ---
 id: TASK-036
-title: "SPEC/TASK-reference scan hook (repo-only, never copied)"
+title: SPEC/TASK-reference scan hook (repo-only, never copied)
 type: feature
 status: todo
 epic: EPIC-002
@@ -9,7 +9,7 @@ branch: task-036-spec-task-reference-scan-hook
 pr: null
 merge_commit: null
 blocked_by: [TASK-032, TASK-027]
-blocks: []
+blocks: [TASK-039, TASK-040]
 ---
 
 # TASK-036: SPEC/TASK-reference scan hook (repo-only, never copied)
