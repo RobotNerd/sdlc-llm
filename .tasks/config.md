@@ -2,7 +2,7 @@
 workflow_version: 1
 test_command: pytest
 lint_command: null
-docs_paths: [README.md, CLAUDE.md, .tmp/workflow-plan.md]
+docs_paths: [README.md, CLAUDE.md]
 default_branch: main
 branch_prefix: task-
 remote: origin
@@ -29,8 +29,6 @@ describes: the skills' logic stays identical across projects, only this file cha
   separate decision, not bundled into this bootstrap. `null` means skills skip the lint step
   rather than fail on a command that doesn't exist. Update this once a linter is chosen.
 - **`docs_paths`** — files `implement-task` phase 3 considers touching as part of "update docs".
-  Includes `.tmp/workflow-plan.md` because it is the living description of this workflow and
-  drifts whenever a process decision changes, not just when application docs change.
 - **`remote` / `rebase_before_pr` / `merge_strategy` / `delete_branch_after_merge`** — the git
   automation settings from SPEC-001's `implement-task` phases 1/3/4. `merge_strategy: squash`
   documents how the *human* merges; the skill itself never merges (see `guidelines.md`).

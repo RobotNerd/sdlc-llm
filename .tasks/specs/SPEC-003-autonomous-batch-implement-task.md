@@ -21,9 +21,9 @@ every mechanical checkpoint along the way.
 Making this autonomous also surfaces two problems that don't exist in single-task mode: (1) the
 review gate between "PR open" and "next task starts" was one person, working serially, by
 design — removing that gate for real autonomy is a genuine trade against the standing "a human
-always reviews and merges" guardrail (SPEC-001 §Guardrails, restated in `guidelines.md` and
-`.tmp/workflow-plan.md`, which explicitly notes that auto-merge "defeats the purpose of opening a
-PR at all"); and (2) a long unattended run has failure modes single-task mode never has to
+always reviews and merges" guardrail (SPEC-001 §Guardrails; §"Resolved during planning" notes why
+— auto-merge "defeats the purpose of opening a PR at all", even solo); and (2) a long unattended
+run has failure modes single-task mode never has to
 consider — running out of context, spending unbounded tokens, or autonomously creating enough new
 tasks to explode the backlog.
 

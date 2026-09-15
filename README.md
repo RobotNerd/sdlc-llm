@@ -5,8 +5,8 @@ Work items live as plain markdown files in `.tasks/`, an LLM (Claude Code) drive
 four-phase lifecycle, and a small stdlib-only Python script, `sync`, keeps every generated view of
 that data consistent.
 
-This repo builds itself with its own workflow: `.tasks/` holds the spec and tasks for the v1
-toolkit, and the resulting toolkit now manages that same directory (see `TASK-019` — the first
+This repo builds itself with its own workflow: `.tasks/` holds the specs and tasks for the
+toolkit, and the resulting toolkit manages that same directory (see `TASK-019` — the first
 real `sync` run on this repo was a no-op, since the hand-written board/epic regions it replaced
 already matched byte-for-byte what `sync` produces).
 
@@ -53,20 +53,68 @@ pytest
 
 ## Skills
 
-Five Claude Code skills drive the workflow end to end (still to be built — TASK-014 through
-TASK-018; until then, follow SPEC-001's `implement-task` phases by hand, per `CLAUDE.md` and
-`.tmp/workflow-plan.md`):
+Five Claude Code skills drive the workflow end to end. Each pairs a `SKILL.md` checklist
+(interviews, judgment calls, STOP markers) with a `scaffold.py` (stdlib-only, the mechanical
+file/`git`/`gh`/`sync` work behind each step):
+
+**Feeding the backlog**
+
+```
+plan-feature   → writes a SPEC, decomposes into vertical slices, creates epic(s)
+add-task       → interviews you into real acceptance criteria, allocates an ID, places it in TODO
+refine-backlog → periodic: reprioritize, recompute blocked status, flag stale/underspecified tasks
+```
+
+**Executing a task** — `implement-task`, four phases with a hard STOP between each:
+
+| Phase | Does | Ends |
+|---|---|---|
+| 1. Start | dirty-tree check, pick top unblocked TODO task, branch, `status: in-progress`, restate plan | before any code |
+| 2. Implement + test | code, unit tests, run the Testing strategy, record results in Worklog, stay in scope | after tests |
+| 3. Wrap up | commit, rebase, push, `gh pr create`, `status: in-review` | PR open, not merged |
+| 4. Merge — observed | a human reviews and squash-merges; the skill records the merge, archives, cleans up | done |
+
+The skill never merges — it opens the PR and stops; phase 4 only observes the human's merge and
+records it.
 
 - **`init-project`** — scaffold `.tasks/` in a new repo. (Named `init-project`, not `init`, so it
   doesn't collide with a generic `init` skill.)
-- **`add-task`** — interview a request into real acceptance criteria, allocate an ID, place it in
-  TODO.
-- **`implement-task`** — the four-phase loop (start → implement + test → wrap up → observed
-  merge), each phase ending in a stop for human input. The skill never merges — a human reviews
-  and squash-merges every PR.
-- **`refine-backlog`** — a periodic pass: reprioritize, recompute blocked status, flag stale or
-  underspecified tasks.
-- **`plan-feature`** — spec → epics → vertical-slice tasks.
+
+## Example usage
+
+A new feature, from idea to merged PR:
+
+```
+/plan-feature
+```
+Interviews you for the problem/goals/non-goals/alternatives, drafts `SPEC-002-*.md` and **stops**
+for your approval. Once approved, decomposes the feature into vertical slices, groups them under
+`EPIC-002-*.md`, checks the slice dependency graph for cycles, **stops** again, then fans out to
+`add-task` for each slice (in dependency order) — landing several `TASK-*.md` files in TODO.
+
+```
+/implement-task
+```
+Picks the top unblocked TODO task (or pass a specific `TASK-NNN`), branches from
+`origin/main`, sets `status: in-progress`, and **restates the plan** for approval. Once approved:
+writes the code and tests, runs `test_command`, walks the task's Testing strategy. Then commits,
+rebases, pushes, opens a PR (acceptance criteria checked off, test results filled in) — **stops**
+for review. You review and squash-merge on GitHub.
+
+```
+/implement-task
+```
+Re-invoked, it detects the PR merged, records `merge_commit:`, sets `status: done`, runs `sync`
+(archiving the task and updating the board/epic), and deletes the branch — no further input
+needed.
+
+```
+/refine-backlog
+```
+A periodic pass: reports the blocked-task chain, flags any `todo` task that's gone stale (by
+actual development activity, not wall-clock age) as a `wont-do` candidate, flags under-specified
+tasks for re-interview, and lets you confirm or reorder TODO priority. Proposes changes and waits
+— never acts unilaterally.
 
 ## Status
 
