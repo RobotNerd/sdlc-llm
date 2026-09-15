@@ -70,6 +70,7 @@ by this repo managing its own `.tasks/` end to end.
 | TASK-029 | todo | init-project upgrade: refresh an initialized project from the toolkit repo |
 | TASK-030 | todo | Migrate config.md to the current schema during upgrade |
 | TASK-031 | todo | Add optional format_command config key; run it in implement-task before opening a PR |
+| TASK-046 | todo | implement-task: wrap-up should commit and push its own pr/status bookkeeping |
 
-Progress: 24/31 done
+Progress: 24/32 done
 <!-- END:children -->
