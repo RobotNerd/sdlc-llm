@@ -72,7 +72,7 @@ by this repo managing its own `.tasks/` end to end.
 | TASK-031 | todo | Add optional format_command config key; run it in implement-task before opening a PR |
 | TASK-046 | done | implement-task: wrap-up should commit and push its own pr/status bookkeeping |
 | TASK-047 | done | review-docs skill: periodic pass to catch stale docs and dangling references |
-| TASK-048 | in-review | Add strip-project-references skill: detect and fix portable-surface reference leaks |
+| TASK-048 | done | Add strip-project-references skill: detect and fix portable-surface reference leaks |
 
-Progress: 29/34 done
+Progress: 30/34 done
 <!-- END:children -->
