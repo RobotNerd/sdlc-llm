@@ -59,6 +59,14 @@ Anything mechanical belongs to `sync`, not to model judgement:
 Two consequences for me: **never hand-edit between `BEGIN:`/`END:` markers**, and **never set an
 epic's status** (except `wont-do`, which is yours).
 
+**Planned second enforcement layer (EPIC-002, not yet built):** `sync` enforces determinism by
+being the only thing that writes generated regions, but every *guardrail* (never hand-edit a
+region, never hand-edit epic `status`, never `gh pr merge`, force-push discipline) is still only
+prose a skill is expected to follow — compliance today is probabilistic. EPIC-002 moves the
+mechanically-checkable subset of these into Claude Code `PreToolUse` hooks that structurally deny
+the violating tool call, sharing one guardrail-logic module (`.tasks/bin/guardrails.py`) with the
+skills' own scripts so the rule is defined once. See SPEC-002 for the full design.
+
 ## The one thing that is yours
 
 **TODO order.** `sync` may drop lines whose task left `todo`, append new ones, and re-annotate
@@ -87,6 +95,17 @@ refine-backlog→  periodic: reprioritise, recompute blocked, flag stale / under
 The STOPs exist because the original design did all of this in one uninterrupted run *including
 auto-merge* — which defeats the purpose of opening a PR at all. **The skill never merges** — it
 opens the PR and stops; phase 4 only observes the human's merge and records it.
+
+**Planned exception (EPIC-003, not yet built):** `implement-task` will gain the ability to accept
+a *batch* of tasks (an epic, a numeric range, an explicit list, or a stopping task) and work
+through them with far less babysitting — announcing each plan instead of blocking on it, and
+self-scheduling to resume once a PR merges rather than waiting for manual re-invocation. This does
+**not** change today's rule: a human still reviews and merges every PR by default. The one
+deliberate, opt-in exception is a critic-gated, per-batch-capped auto-merge (repurposing
+`config.md`'s `allow_auto_merge`, currently fixed `false`) — off unless a project turns it on, and
+even then bounded by a per-batch cap that forces a human checkpoint regardless of how many merges
+the critic has approved. See SPEC-003 for the full design and why the alternatives (no gate at
+all; a heavier code-review-quality critic) were rejected.
 
 Two more behaviours worth knowing: **resumability** (on invocation it infers the current phase
 from branch existence + frontmatter + PR state, rather than restarting) and the **bail-out path**
@@ -179,23 +198,46 @@ On my next turn I poll `gh pr view --json state,mergeCommit`; once merged I reco
 set `status: done`, run `sync` (updates the board/epic, archives the task), delete the task
 branch, and fast-forward local `main`. I never run `gh pr merge`.
 
-## Gaps
+## Gaps (bootstrap-era — now closed)
 
-Updated 2026-09-12, 14/20 tasks done (TASK-019 landed: `sync`'s first real run on this repo was
-a no-op, proving the hand-written regions were spec-accurate all along). See
-`.tmp/session-handoff.md` for exactly where things stand and how to resume.
+The bootstrap this Part 2 describes is complete. Left here as a historical record of how the
+toolkit first became able to manage its own `.tasks/`, not as a live status table — see
+`.tasks/BOARD.md` for actual current progress and `.tmp/session-handoff.md` for exactly where a
+session should resume.
 
 | Gap | Status |
 |---|---|
-| **No `sync`** | ✅ Closed — TASK-004 through TASK-013. `.tasks/bin/sync check` (read-only) and `.tasks/bin/sync` (write mode, TASK-013) both exist and are fully tested. |
+| **No `sync`** | ✅ Closed — TASK-004 through TASK-013. |
 | **Epic status won't roll up** | ✅ Closed — TASK-006 (`derive_epic_status`, 7 rules). |
 | **No `.tasks/archive/`** | ✅ Closed — TASK-011 (`sync archive`). |
-| **`sync`'s write mode not yet run on this repo for real** | ✅ Closed — TASK-019. Bare `sync` now owns `BOARD.md`/`EPIC-001`/`SPEC-001`'s generated regions; the first real run was an empty diff. Phase 1/3/4 of the per-task loop run `sync` instead of hand-editing from here on. |
-| **Merge is manual** — by design | Unchanged, and staying this way: I open every PR and stop; you review and squash-merge on GitHub; I observe the result next turn. |
-| **Git driver is checklist prose, not code** | Unchanged. I still run `git`/`gh` by following the phase checklist by hand each task (no skill exists yet to encode it — that's TASK-016). |
-| **No skills exist** | Unchanged — TASK-014 through TASK-018, not started. |
-| **No CI** | Unchanged — TASK-020, not started. "Merge gated on green CI" is still "tests pass locally" + your eyeball. |
-| **`gh` degradation path untested** | Unchanged — exercising it is part of TASK-016's own testing strategy. |
+| **`sync`'s write mode not yet run on this repo for real** | ✅ Closed — TASK-019 (first real run was an empty diff). |
+| **No skills exist** | ✅ Closed — all five (TASK-014–018) built and in use. |
+| **No CI** | ✅ Closed — TASK-020, `sync check` + `pytest` gate every PR. |
+| **Git driver is checklist prose, not code** | Partial — `init-project` is scripted (TASK-021); `add-task`/`implement-task`/`refine-backlog`/`plan-feature` still are not (TASK-022/024/025/026, currently the top of TODO). |
+| **Merge is manual** — by design | Still true today. EPIC-003 (planned, blocked on all of EPIC-002) will add one narrow, opt-in, critic-gated exception — see "Two loops" above. Default behavior is unchanged. |
+
+## Where things stand now (updated 2026-09-14)
+
+`.tasks/BOARD.md`'s epics panel is the source of truth for current progress. As of this update:
+
+- **EPIC-001 (MVP), 21/31 done** — the original v1 toolkit plus a second wave: one
+  script-extraction task per remaining skill (TASK-022/024/025/026), a docs cleanup (TASK-023),
+  and, added this session, stripping project-specific references from the portable surface
+  (TASK-027), an `ignored_paths` config key (TASK-028), an `init-project upgrade` path with a
+  content manifest (TASK-029), config-schema migration during upgrade (TASK-030), and an optional
+  `format_command` (TASK-031).
+- **EPIC-002 (SPEC-002), 0/7 done** — workflow guardrails enforced as Claude Code hooks sharing
+  one logic module with the skills' own scripts. Every task blocked on the relevant EPIC-001 work
+  (TASK-024/027/028/029/030/031). See "The determinism boundary" above.
+- **EPIC-003 (SPEC-003), 0/7 done** — `implement-task` gains batch/autonomous execution: a
+  deterministic batch-selection script, an announce-don't-block loop that self-schedules to resume
+  after each merge, an interrupt taxonomy (skip-task vs. halt-batch), a capped follow-up-task-
+  creation policy, an opt-in TDD mode, and the critic-gated capped auto-merge exception above.
+  Deliberately placed to start only after EPIC-002 is fully done — every task is `blocked_by` all
+  seven EPIC-002 tasks.
+- TASK-023 (docs cleanup, EPIC-001) is still queued to give this file and `README.md`/`CLAUDE.md`
+  a fuller pass once the script-extraction wave lands — the updates above are additive, not that
+  cleanup.
 
 ## Verification
 
