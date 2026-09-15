@@ -35,9 +35,10 @@ poll on invocation, don't loop waiting.
 ## 0. Resume detection — run this first, every invocation
 
 Run `python3 .claude/skills/implement-task/scaffold.py resume-state`. It gathers the working
-tree's dirtiness (ignoring `.tmp/prompts.md`), finds the one task (if any) whose `status` is
-`in-progress`/`in-review` with a `branch:` that still exists locally or on the remote, and — when
-that task is `in-review` with a `pr` set — queries `gh pr view` for its live state. It returns
+tree's dirtiness (ignoring `.tasks/config.md`'s `ignored_paths`), finds the one task (if any)
+whose `status` is `in-progress`/`in-review` with a `branch:` that still exists locally or on the
+remote, and — when that task is `in-review` with a `pr` set — queries `gh pr view` for its live
+state. It returns
 `{"phase": ..., "task_id": ..., "detail": ...}`:
 
 | `phase` | Resume at |
@@ -89,8 +90,8 @@ any code.**
 3. Run `python3 .claude/skills/implement-task/scaffold.py wrap-up <answers.json>` with
    `{"task_id", "paths" (the in-scope file list from step 2.4 above), "commit_message", "pr_title",
    "pr_body", "bookkeeping_commit_message"}`. It adds+commits those paths, rebases onto
-   `<remote>/<default_branch>` if `rebase_before_pr` (stashing/popping `.tmp/prompts.md` around
-   it), pushes (plain, or `--force-with-lease` only when the rebase actually rewrote
+   `<remote>/<default_branch>` if `rebase_before_pr` (stashing/popping any dirty `ignored_paths`
+   around it), pushes (plain, or `--force-with-lease` only when the rebase actually rewrote
    already-pushed history), runs `gh pr create`, records `pr:` + `status: in-review`, runs `sync`,
    then commits+pushes that resulting change too (using `bookkeeping_commit_message`) — no separate
    manual follow-up commit needed — and reports `gh pr checks`, returning `{"pr_url",

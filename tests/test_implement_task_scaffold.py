@@ -263,6 +263,34 @@ def _git(args, cwd, check=True):
     return subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True, check=check)
 
 
+def _set_ignored_paths(cwd, paths):
+    """Rewrite the scaffolded `ignored_paths: []` line in `.tasks/config.md` -- not committed,
+    caller's job (matches how other tests hand-edit frontmatter, e.g. `blocked_by`).
+    """
+    config_path = cwd / ".tasks" / "config.md"
+    text = config_path.read_text().replace("ignored_paths: []", f"ignored_paths: [{', '.join(paths)}]")
+    config_path.write_text(text)
+
+
+def test_dirty_files_excludes_given_ignore_paths(tmp_path):
+    _git(["init", "-q"], cwd=tmp_path)
+    _git(["config", "user.email", "t@example.com"], cwd=tmp_path)
+    _git(["config", "user.name", "Test"], cwd=tmp_path)
+    (tmp_path / "README.md").write_text("# scratch\n")
+    _git(["add", "-A"], cwd=tmp_path)
+    _git(["commit", "-q", "-m", "init"], cwd=tmp_path)
+
+    (tmp_path / ".tmp").mkdir()
+    (tmp_path / ".tmp" / "prompts.md").write_text("wip\n")
+    (tmp_path / "other.txt").write_text("also dirty\n")
+
+    all_dirty = implement_task_scaffold.dirty_files(tmp_path)
+    assert set(all_dirty) == {".tmp/prompts.md", "other.txt"}
+
+    ignoring_prompts = implement_task_scaffold.dirty_files(tmp_path, ignore=(".tmp/prompts.md",))
+    assert ignoring_prompts == ["other.txt"]
+
+
 @pytest.fixture
 def repo(tmp_path):
     origin = tmp_path / "origin.git"
@@ -609,3 +637,88 @@ def test_resume_state_is_phase3_when_in_progress_and_clean(repo):
 
     assert result.returncode == 0, result.stderr
     assert json.loads(result.stdout) == {"phase": "phase3", "task_id": "TASK-001"}
+
+
+# ---------------------------------------------------------------------------
+# `ignored_paths` (TASK-028): a dirty configured path never blocks start/resume, and gets
+# stashed/restored around wrap-up's rebase same as `.tmp/prompts.md` used to be hardcoded to.
+# ---------------------------------------------------------------------------
+
+
+def test_start_ignores_dirty_configured_ignored_path(repo):
+    _set_ignored_paths(repo, [".tmp/prompts.md"])
+    _add_task(repo, "First task")
+    _push_tasks(repo)
+    (repo / ".tmp").mkdir(exist_ok=True)
+    (repo / ".tmp" / "prompts.md").write_text("scratch notes\n")
+
+    result = _run_start(repo)
+
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout)["task_id"] == "TASK-001"
+
+
+def test_start_still_refuses_on_a_dirty_file_not_in_ignored_paths(repo):
+    _set_ignored_paths(repo, [".tmp/prompts.md"])
+    _add_task(repo, "First task")
+    _push_tasks(repo)
+    (repo / ".tmp").mkdir(exist_ok=True)
+    (repo / ".tmp" / "prompts.md").write_text("scratch notes\n")
+    (repo / "README.md").write_text("dirty\n")
+
+    result = _run_start(repo)
+
+    assert result.returncode != 0
+    assert "README.md" in result.stderr
+    assert ".tmp/prompts.md" not in result.stderr
+
+
+def test_resume_state_ignores_dirty_configured_ignored_path(repo):
+    _set_ignored_paths(repo, [".tmp/prompts.md"])
+    _add_task(repo, "First task")
+    _push_tasks(repo)
+    started = _run_start(repo, task_id="TASK-001")
+    assert started.returncode == 0, started.stderr
+    _git(["add", "-A"], cwd=repo)
+    _git(["commit", "-q", "-m", "wip"], cwd=repo)
+    (repo / ".tmp").mkdir(exist_ok=True)
+    (repo / ".tmp" / "prompts.md").write_text("scratch notes\n")
+
+    result = subprocess.run(
+        [sys.executable, str(SCRIPT_PATH), "resume-state"], cwd=repo, capture_output=True, text=True
+    )
+
+    assert result.returncode == 0, result.stderr
+    # dirty, but only the ignored path -- still phase3, not phase2
+    assert json.loads(result.stdout) == {"phase": "phase3", "task_id": "TASK-001"}
+
+
+def test_wrap_up_stashes_and_restores_dirty_ignored_paths_around_rebase(repo, fake_gh):
+    _set_ignored_paths(repo, [".tmp/prompts.md"])
+    _add_task(repo, "First task")
+    _push_tasks(repo)
+    started = _run_start(repo, task_id="TASK-001")
+    assert started.returncode == 0, started.stderr
+    _git(["add", "-A"], cwd=repo)
+    _git(["commit", "-q", "-m", "wip"], cwd=repo)
+
+    (repo / ".tmp").mkdir(exist_ok=True)
+    (repo / ".tmp" / "prompts.md").write_text("scratch notes\n")
+    (repo / "feature.txt").write_text("the change\n")
+
+    result = _run_wrap_up(repo, {
+        "task_id": "TASK-001",
+        "paths": ["feature.txt"],
+        "commit_message": "feat(TASK-001): add the feature",
+        "pr_title": "feat(TASK-001): add the feature",
+        "pr_body": "body",
+        "bookkeeping_commit_message": "chore(TASK-001): record PR, set status in-review",
+    }, fake_gh)
+
+    assert result.returncode == 0, result.stderr
+    # the ignored path survived the rebase, still dirty (never committed, never lost)
+    assert (repo / ".tmp" / "prompts.md").read_text() == "scratch notes\n"
+    assert ".tmp/prompts.md" in implement_task_scaffold.dirty_files(repo)
+    # and it's genuinely not part of the pushed commit
+    show = _git(["show", "--stat", "HEAD"], cwd=repo).stdout
+    assert "prompts.md" not in show

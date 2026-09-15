@@ -66,7 +66,7 @@ by this repo managing its own `.tasks/` end to end.
 | TASK-025 | done | refine-backlog: move mechanical steps to a stdlib script; activity-aware stale detection |
 | TASK-026 | done | plan-feature: move mechanical file-writing and cycle checking to a stdlib script |
 | TASK-027 | done | Strip project-specific references from the portable surface |
-| TASK-028 | todo | Replace .tmp/prompts.md special-case with an ignored_paths config key |
+| TASK-028 | in-review | Replace .tmp/prompts.md special-case with an ignored_paths config key |
 | TASK-029 | todo | init-project upgrade: refresh an initialized project from the toolkit repo |
 | TASK-030 | todo | Migrate config.md to the current schema during upgrade |
 | TASK-031 | todo | Add optional format_command config key; run it in implement-task before opening a PR |

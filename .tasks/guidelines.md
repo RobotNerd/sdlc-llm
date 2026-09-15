@@ -41,7 +41,8 @@ Terminology: **task**, always — never "ticket" or "story".
 Run this via the `implement-task` skill (`.claude/skills/implement-task/`); if it isn't set up in
 this repo yet, follow this checklist by hand. Each phase ends in a **STOP** for human input.
 
-1. **Start.** Refuse to begin if the working tree is dirty. Pick the top unblocked TODO task,
+1. **Start.** Refuse to begin if the working tree is dirty (`ignored_paths` in `config.md`
+   excepted). Pick the top unblocked TODO task,
    announcing any blocked ones skipped. `git fetch <remote>`, branch from
    `<remote>/<default_branch>` as `<branch_prefix><NNN>-<slug>`. Set `status: in-progress` and
    `branch:`, then run `sync` to regenerate the board and epic. **Restate the plan and acceptance

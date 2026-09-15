@@ -14,6 +14,8 @@ import sys
 from importlib.machinery import SourceFileLoader
 from pathlib import Path
 
+import sync as sync_mod  # loaded by conftest.py from .tasks/bin/sync
+
 SKILL_DIR = Path(__file__).resolve().parent.parent / ".claude" / "skills" / "init-project"
 SCRIPT_PATH = SKILL_DIR / "scaffold.py"
 
@@ -157,6 +159,9 @@ def test_run_scaffolds_a_fresh_repo_and_sync_check_is_clean(tmp_path):
         text=True,
     )
     assert check.returncode == 0, check.stdout + check.stderr
+
+    fields, _body, _order = sync_mod.parse_frontmatter((tmp_path / ".tasks" / "config.md").read_text())
+    assert fields["ignored_paths"] == []
 
 
 def test_run_scaffolds_a_fresh_repo_with_no_dangling_ids(tmp_path):
