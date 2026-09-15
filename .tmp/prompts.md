@@ -101,9 +101,45 @@ My current ideas for hooks:
 - creating follow up tasks: user can choose if they want the LLM to create additional tasks automatically or if the user needs to be notified; e.g. the LLM determines that a task is too big and needs to be split up; default to allowing new task creation, but add a configurable limiter to prevent task explosion
 - switch to TDD: LLM should write test cases first, verify they fail, then implement and re-test until test cases pass -->
 
-/plan-feature Context/session management and multiple agents. Goes on board after existing epics.
+> TODO: Come back to planning this later
 
-- Session hand-off when context gets too full (configurable percentage threshold). Write a short hand-off doc, clear the session, and have LLM continue from the hand-off doc.
-- Consider running two simultaneous instances of claude code: the orchestrator (e.g. opus, high effort) and the worker (e.g. sonnet, high effort); model/effort is configurable; each instance would stay live until hitting the threshold mentioned above, at which point it would do a session hand-off to a new instance of itself; orchestrator would focus on planning tasks (e.g. creating tasks) and the worker focus on implementation of each task; potentially keep a third, light-weight critic agent (haiku) in a similar session; at its discretion, the orchestrator can task the critic with reviewing PRs implemented by the worker agent, although this wouldn't necessarily happen for every task (see TASK-NNN).
+/plan-feature Context/session management and multiple agents. Goes on board after all current epics, blocked by all current epics. The goal is to add the option to this workflow to run multiple agents.
 
-These are my rough ideas, but I don't know the latest best practices for how to handle this. Keep in mind that I'm currently on the $20/month pro plan of claude code. I may ugrade to a more expensive plan later, but even when I do, I won't to be smart about conserving tokens and context to support better scaling.
+- Session hand-off when context gets too full (configurable percentage threshold). Write a short hand-off doc, clear the session, and have LLM continue from the hand-off doc. (see TASK-043)
+- Option to run multiple simultaneous "longish-lived" instances of claude code:
+  - the orchestrator (e.g. opus, high effort)
+  - the worker (e.g. sonnet, high effort)
+  - the critic (haiku, ? effort, see TASK-045)
+- model/effort for each is configurable
+- configation options: disabled, only orchestrator and worker, all three
+- each instance would stay live until hitting the threshold mentioned earlier (e.g. context too full, TASK-043), at which point it would do a session hand-off to a new instance of itself
+- orchestrator focuses on planning tasks (e.g. creating tasks)
+- the worker focus on implementation of each task
+- if worker thinks planning is necessary, likes splitting up the current task, it passes that work back to the orchestrator
+- at its discretion, the orchestrator can task the critic with reviewing PRs implemented by the worker agent, although this wouldn't necessarily happen for every task
+
+These are my rough ideas, but I don't know the latest best practices for how to handle this type of multi-agent workflow. Keep in mind that I'm currently on the $20/month plan of claude code. I may ugrade to a more expensive plan later, but even when I do, I want to be smart about conserving tokens and context to support better scaling.
+
+NOTE: Claude's initial analysis:
+
+```
+ On session hand-off: Claude Code already has native machinery for most of this — /compact (with custom preservation instructions, settable in CLAUDE.md), automatic compaction at a configurable context threshold, and — on Pro/Max
+  specifically — an offer to "resume from a summary" when reopening a large session after a break. This is strikingly close to what .tmp/session-handoff.md already does by hand in this very repo. TASK-043 (EPIC-003) was explicitly built
+  as a stopgap deferring "the real strategy" to a future epic — this is that epic, and it should upgrade TASK-043 rather than duplicate it, and it benefits every implement-task run, not just multi-instance ones.
+
+  On multi-instance architecture — this is the important finding. Claude Code has two different primitives, and they're not equally suited to what you described:                                                                                                             No changes this session
+
+  - Agent teams (experimental, opt-in via an env var): teammates share one session's lifetime — they're cleaned up when the lead session ends, can't be resumed after /resume, and Anthropic's own docs measure them at ~7x the token cost of
+    a standard session when teammates plan first. Built for bounded parallel exploration (research, competing hypotheses), not standing, long-lived roles.
+  - Cross-session messaging: lets genuinely independent, separately-launched Claude Code processes (interactive or headless -p) message each other by name, each with its own normal lifecycle — resumable, can /compact//clear on its own,
+    can run indefinitely as a background worker.
+
+  Your description — "each instance stays live until hitting the threshold, then hands off to a new instance of itself" — is exactly what cross-session messaging between independent processes supports, and exactly what agent teams don't
+  (an in-process teammate can't survive a hand-off). So I'd steer this design away from agent teams entirely.
+
+  On cost, plainly: a Pro plan's usage limit is one account-wide pool on a rolling 5-hour/weekly window, shared across everything you run. Three simultaneous long-lived instances don't triple your budget — they draw on the same pool
+  three times as fast, so you'd hit the weekly ceiling sooner in wall-clock time for the same total spend. Worth designing the defaults around that reality rather than around "more instances = more capacity."
+```
+
+---
+
