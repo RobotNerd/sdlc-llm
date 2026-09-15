@@ -2,12 +2,12 @@
 id: TASK-026
 title: "plan-feature: move mechanical file-writing and cycle checking to a stdlib script"
 type: refactor
-status: in-review
+status: done
 epic: EPIC-001
 created: 2026-09-14
 branch: task-026-plan-feature-script-split
 pr: "https://github.com/RobotNerd/sdlc-llm/pull/36"
-merge_commit: null
+merge_commit: ba022c0a122d7b1795065ddefbb2c11a96ffd72d
 blocked_by: []
 blocks: [TASK-027]
 ---
