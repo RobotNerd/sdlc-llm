@@ -1,0 +1,494 @@
+"""Unit/integration tests for `.claude/skills/implement-task/scaffold.py` (TASK-024).
+
+The four pure functions AC7 calls out (`resume_phase`, `compute_branch_name`/`slugify`,
+`decide_push_args`, `pick_top_unblocked`) are tested directly against the already-loaded `sync`
+module (see `conftest.py`) and small fixtures -- no real git/gh needed. `cmd_start`/`cmd_bail_out`/
+`cmd_resume_state` are exercised as real subprocesses against a scratch repo with a genuine bare
+"origin" remote (built by `init-project`'s and `add-task`'s own scaffold scripts), since their job
+is real git side effects. `wrap-up`/`finish-merge` need real `gh` (network + a real PR) and are
+proven instead by a live dry run against a scratch branch, documented in the task's Worklog --
+same precedent TASK-016 itself set.
+"""
+
+import importlib.util
+import json
+import subprocess
+import sys
+from importlib.machinery import SourceFileLoader
+from pathlib import Path
+
+import pytest
+
+import sync as sync_mod  # loaded by conftest.py from .tasks/bin/sync
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+SKILL_DIR = REPO_ROOT / ".claude" / "skills" / "implement-task"
+SCRIPT_PATH = SKILL_DIR / "scaffold.py"
+INIT_PROJECT_SCRIPT = REPO_ROOT / ".claude" / "skills" / "init-project" / "scaffold.py"
+ADD_TASK_SCRIPT = REPO_ROOT / ".claude" / "skills" / "add-task" / "scaffold.py"
+
+_loader = SourceFileLoader("implement_task_scaffold", str(SCRIPT_PATH))
+_spec = importlib.util.spec_from_loader("implement_task_scaffold", _loader)
+implement_task_scaffold = importlib.util.module_from_spec(_spec)
+sys.modules["implement_task_scaffold"] = implement_task_scaffold
+_loader.exec_module(implement_task_scaffold)
+
+
+INIT_PROJECT_ANSWERS = {
+    "test_command": "pytest",
+    "lint_command": None,
+    "docs_paths": ["README.md"],
+    "default_branch": "main",
+    "branch_prefix": "task-",
+    "remote": "origin",
+    "rebase_before_pr": True,
+    "merge_strategy": "squash",
+    "delete_branch_after_merge": True,
+    "ci_checks": [],
+    "archive_done": True,
+}
+
+
+# ---------------------------------------------------------------------------
+# resume_phase -- every row of SPEC-001 §0's table
+# ---------------------------------------------------------------------------
+
+
+def test_resume_phase_no_in_flight_task():
+    assert implement_task_scaffold.resume_phase(
+        in_flight=None, working_tree_dirty=False, gh_pr_state=None
+    ) == {"phase": "phase1"}
+
+
+def test_resume_phase_in_flight_but_branch_gone():
+    in_flight = {"id": "TASK-001", "status": "in-progress", "pr": None, "merge_commit": None, "branch_exists": False}
+    assert implement_task_scaffold.resume_phase(
+        in_flight=in_flight, working_tree_dirty=False, gh_pr_state=None
+    ) == {"phase": "phase1"}
+
+
+def test_resume_phase_in_progress_dirty_is_phase2():
+    in_flight = {"id": "TASK-001", "status": "in-progress", "pr": None, "merge_commit": None, "branch_exists": True}
+    result = implement_task_scaffold.resume_phase(in_flight=in_flight, working_tree_dirty=True, gh_pr_state=None)
+    assert result == {"phase": "phase2", "task_id": "TASK-001"}
+
+
+def test_resume_phase_in_progress_clean_is_phase3():
+    in_flight = {"id": "TASK-001", "status": "in-progress", "pr": None, "merge_commit": None, "branch_exists": True}
+    result = implement_task_scaffold.resume_phase(in_flight=in_flight, working_tree_dirty=False, gh_pr_state=None)
+    assert result == {"phase": "phase3", "task_id": "TASK-001"}
+
+
+def test_resume_phase_in_progress_with_pr_is_ambiguous():
+    in_flight = {
+        "id": "TASK-001", "status": "in-progress", "pr": "https://x/1", "merge_commit": None, "branch_exists": True
+    }
+    result = implement_task_scaffold.resume_phase(in_flight=in_flight, working_tree_dirty=False, gh_pr_state=None)
+    assert result["phase"] == "ambiguous"
+
+
+def test_resume_phase_in_review_open_is_phase4_open():
+    in_flight = {
+        "id": "TASK-001", "status": "in-review", "pr": "https://x/1", "merge_commit": None, "branch_exists": True
+    }
+    result = implement_task_scaffold.resume_phase(in_flight=in_flight, working_tree_dirty=False, gh_pr_state="OPEN")
+    assert result == {"phase": "phase4_open", "task_id": "TASK-001"}
+
+
+def test_resume_phase_in_review_merged_not_yet_recorded_is_phase4_merged():
+    in_flight = {
+        "id": "TASK-001", "status": "in-review", "pr": "https://x/1", "merge_commit": None, "branch_exists": True
+    }
+    result = implement_task_scaffold.resume_phase(in_flight=in_flight, working_tree_dirty=False, gh_pr_state="MERGED")
+    assert result == {"phase": "phase4_merged", "task_id": "TASK-001"}
+
+
+def test_resume_phase_in_review_merged_already_recorded_is_ambiguous():
+    in_flight = {
+        "id": "TASK-001", "status": "in-review", "pr": "https://x/1", "merge_commit": "abc123", "branch_exists": True
+    }
+    result = implement_task_scaffold.resume_phase(in_flight=in_flight, working_tree_dirty=False, gh_pr_state="MERGED")
+    assert result["phase"] == "ambiguous"
+
+
+def test_resume_phase_in_review_closed_not_merged():
+    in_flight = {
+        "id": "TASK-001", "status": "in-review", "pr": "https://x/1", "merge_commit": None, "branch_exists": True
+    }
+    result = implement_task_scaffold.resume_phase(in_flight=in_flight, working_tree_dirty=False, gh_pr_state="CLOSED")
+    assert result == {"phase": "phase4_closed_not_merged", "task_id": "TASK-001"}
+
+
+def test_resume_phase_in_review_no_pr_is_ambiguous():
+    in_flight = {"id": "TASK-001", "status": "in-review", "pr": None, "merge_commit": None, "branch_exists": True}
+    result = implement_task_scaffold.resume_phase(in_flight=in_flight, working_tree_dirty=False, gh_pr_state=None)
+    assert result["phase"] == "ambiguous"
+
+
+def test_resume_phase_unexpected_status_is_ambiguous():
+    in_flight = {"id": "TASK-001", "status": "blocked", "pr": None, "merge_commit": None, "branch_exists": True}
+    result = implement_task_scaffold.resume_phase(in_flight=in_flight, working_tree_dirty=False, gh_pr_state=None)
+    assert result["phase"] == "ambiguous"
+
+
+# ---------------------------------------------------------------------------
+# compute_branch_name / slugify
+# ---------------------------------------------------------------------------
+
+
+def test_compute_branch_name_formats():
+    assert implement_task_scaffold.compute_branch_name("task-", "TASK-024", "my-slug") == "task-024-my-slug"
+
+
+def test_slugify_normalizes_title():
+    assert implement_task_scaffold.slugify("Add a Widget: v2!") == "add-a-widget-v2"
+
+
+def test_slugify_raises_on_unslugifiable_title():
+    with pytest.raises(ValueError):
+        implement_task_scaffold.slugify("!!!")
+
+
+def test_compute_branch_name_round_trips_every_real_task_branch():
+    """Real task slugs in this repo are short, hand-chosen summaries, not a mechanical
+    `slugify(full title)` -- see `compute_branch_name`'s docstring. What's actually
+    testable against real data is the `<prefix><number>-<slug>` join/format logic
+    itself: split every real archived+active task's own `branch` into its slug
+    suffix, feed that back in, and confirm the formatting reproduces it exactly.
+    """
+    config = sync_mod.load_config(REPO_ROOT / ".tasks")
+    branch_prefix = config["branch_prefix"]
+    artifacts = sync_mod.discover(REPO_ROOT / ".tasks")
+    tasks = [a for a in artifacts.values() if a.kind == "task" and a.fields.get("branch")]
+    assert len(tasks) > 10  # sanity: this repo has plenty of real tasks to check against
+
+    for task in tasks:
+        branch = task.fields["branch"]
+        number = task.id.split("-", 1)[1]
+        prefix_and_number = f"{branch_prefix}{number}-"
+        assert branch.startswith(prefix_and_number), f"{task.id}: {branch!r}"
+        slug = branch[len(prefix_and_number):]
+        assert implement_task_scaffold.compute_branch_name(branch_prefix, task.id, slug) == branch
+
+
+# ---------------------------------------------------------------------------
+# decide_push_args
+# ---------------------------------------------------------------------------
+
+
+def test_decide_push_args_plain():
+    args = implement_task_scaffold.decide_push_args(
+        current_branch="task-001-x", task_branch="task-001-x", default_branch="main", remote="origin", force=False
+    )
+    assert args == ["push", "origin", "task-001-x"]
+
+
+def test_decide_push_args_force_with_lease():
+    args = implement_task_scaffold.decide_push_args(
+        current_branch="task-001-x", task_branch="task-001-x", default_branch="main", remote="origin", force=True
+    )
+    assert args == ["push", "--force-with-lease", "origin", "task-001-x"]
+
+
+def test_decide_push_args_refuses_wrong_branch():
+    with pytest.raises(ValueError):
+        implement_task_scaffold.decide_push_args(
+            current_branch="main", task_branch="task-001-x", default_branch="main", remote="origin", force=False
+        )
+
+
+def test_decide_push_args_refuses_default_branch():
+    with pytest.raises(ValueError):
+        implement_task_scaffold.decide_push_args(
+            current_branch="main", task_branch="main", default_branch="main", remote="origin", force=False
+        )
+
+
+# ---------------------------------------------------------------------------
+# pick_top_unblocked
+# ---------------------------------------------------------------------------
+
+
+def _board_with_todo(todo_lines: list[str]) -> str:
+    body = "\n".join(todo_lines)
+    return f"# Board\n\n## Epics\n\n_(none)_\n\n## TODO\n\n{body}\n\n## In Progress\n\n_(none)_\n"
+
+
+def test_pick_top_unblocked_takes_first_unblocked():
+    board = _board_with_todo([
+        "- TASK-001 — First",
+        "- TASK-002 — Second",
+    ])
+    result = implement_task_scaffold.pick_top_unblocked(board, sync_mod)
+    assert result == {"task_id": "TASK-001", "skipped": []}
+
+
+def test_pick_top_unblocked_skips_blocked_lines():
+    board = _board_with_todo([
+        "- TASK-001 — First ⛔ blocked_by TASK-000",
+        "- TASK-002 — Second",
+        "- TASK-003 — Third",
+    ])
+    result = implement_task_scaffold.pick_top_unblocked(board, sync_mod)
+    assert result["task_id"] == "TASK-002"
+    assert result["skipped"] == [{"id": "TASK-001", "reason": "blocked_by TASK-000"}]
+
+
+def test_pick_top_unblocked_all_blocked_returns_none():
+    board = _board_with_todo([
+        "- TASK-001 — First ⛔ blocked_by TASK-000",
+        "- TASK-002 — Second ⛔ blocked_by TASK-000",
+    ])
+    result = implement_task_scaffold.pick_top_unblocked(board, sync_mod)
+    assert result["task_id"] is None
+    assert len(result["skipped"]) == 2
+
+
+def test_pick_top_unblocked_empty_todo_returns_none():
+    board = _board_with_todo([])
+    result = implement_task_scaffold.pick_top_unblocked(board, sync_mod)
+    assert result == {"task_id": None, "skipped": []}
+
+
+# ---------------------------------------------------------------------------
+# Integration: cmd_start / cmd_bail_out / cmd_resume_state against a real
+# scratch repo with a genuine bare "origin" remote
+# ---------------------------------------------------------------------------
+
+
+def _git(args, cwd, check=True):
+    return subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True, check=check)
+
+
+@pytest.fixture
+def repo(tmp_path):
+    origin = tmp_path / "origin.git"
+    subprocess.run(["git", "init", "--bare", "-q", str(origin)], check=True)
+
+    work = tmp_path / "work"
+    _git(["clone", "-q", str(origin), str(work)], cwd=tmp_path)
+    _git(["config", "user.email", "t@example.com"], cwd=work)
+    _git(["config", "user.name", "Test"], cwd=work)
+    (work / "README.md").write_text("# scratch\n")
+    _git(["add", "-A"], cwd=work)
+    _git(["commit", "-q", "-m", "init"], cwd=work)
+    _git(["branch", "-M", "main"], cwd=work)
+    _git(["push", "-u", "origin", "main"], cwd=work)
+
+    answers_path = work / "init-answers.json"
+    answers_path.write_text(json.dumps(INIT_PROJECT_ANSWERS))
+    result = subprocess.run(
+        [sys.executable, str(INIT_PROJECT_SCRIPT), "run", str(answers_path)],
+        cwd=work, capture_output=True, text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    _git(["add", "-A"], cwd=work)
+    _git(["commit", "-q", "-m", "scaffold .tasks"], cwd=work)
+    _git(["push"], cwd=work)
+    return work
+
+
+def _add_task(cwd, title, priority_mode="end", priority_after=None, blocked_by=None):
+    answers = {
+        "title": title,
+        "type": "feature",
+        "epic": None,
+        "blocked_by": blocked_by or [],
+        "priority_mode": priority_mode,
+    }
+    if priority_after:
+        answers["priority_after"] = priority_after
+    answers_path = cwd.parent / "add-task-answers.json"
+    answers_path.write_text(json.dumps(answers))
+    result = subprocess.run(
+        [sys.executable, str(ADD_TASK_SCRIPT), "run", str(answers_path)],
+        cwd=cwd, capture_output=True, text=True,
+    )
+    assert result.returncode == 0, result.stderr
+
+
+def _push_tasks(cwd):
+    _git(["add", "-A"], cwd=cwd)
+    _git(["commit", "-q", "-m", "add tasks"], cwd=cwd)
+    _git(["push"], cwd=cwd)
+
+
+def _run_start(cwd, task_id=None):
+    answers_path = cwd.parent / "start-answers.json"
+    answers_path.write_text(json.dumps({"task_id": task_id}))
+    return subprocess.run(
+        [sys.executable, str(SCRIPT_PATH), "start", str(answers_path)], cwd=cwd, capture_output=True, text=True
+    )
+
+
+def _sync_check(cwd):
+    return subprocess.run(
+        [sys.executable, str(cwd / ".tasks" / "bin" / "sync"), "check"], cwd=cwd, capture_output=True, text=True
+    )
+
+
+def test_start_refuses_on_dirty_tree(repo):
+    _add_task(repo, "First task")
+    _push_tasks(repo)
+    (repo / "README.md").write_text("dirty\n")
+
+    result = _run_start(repo)
+
+    assert result.returncode != 0
+    assert "dirty" in result.stderr
+    assert implement_task_scaffold.current_branch(repo) == "main"
+
+
+def test_start_auto_picks_top_unblocked_and_skips_blocked(repo):
+    _add_task(repo, "First task")
+    _add_task(repo, "Second task", blocked_by=["TASK-001"])
+    _add_task(repo, "Third task")
+    _push_tasks(repo)
+
+    result = _run_start(repo)
+
+    assert result.returncode == 0, result.stderr
+    output = json.loads(result.stdout)
+    assert output["task_id"] == "TASK-001"
+    assert output["skipped"] == []  # TASK-001 is first and unblocked, nothing to skip
+
+
+def test_start_skips_blocked_task_when_it_is_first(repo):
+    _add_task(repo, "First task")
+    _add_task(repo, "Second task")
+    _push_tasks(repo)
+    # reorder so the blocked one is first: mark TASK-001 blocked_by TASK-002 by hand
+    task_path = repo / ".tasks" / "TASK-001-first-task.md"
+    text = task_path.read_text().replace("blocked_by: []", "blocked_by: [TASK-002]")
+    task_path.write_text(text)
+    subprocess.run([sys.executable, str(repo / ".tasks" / "bin" / "sync")], cwd=repo, check=True)
+    _push_tasks(repo)
+
+    result = _run_start(repo)
+
+    assert result.returncode == 0, result.stderr
+    output = json.loads(result.stdout)
+    assert output["task_id"] == "TASK-002"
+    assert output["skipped"] == [{"id": "TASK-001", "reason": "blocked_by TASK-002"}]
+
+
+def test_start_refuses_explicit_task_not_todo(repo):
+    _add_task(repo, "First task")
+    _push_tasks(repo)
+    first = _run_start(repo)
+    assert first.returncode == 0, first.stderr
+    # `start` only sets frontmatter + runs sync -- committing is phase 3's job. Commit
+    # here (as phase 2 would before moving on) so the tree is clean and the second
+    # `start` call actually reaches the status check instead of the dirty-tree one.
+    _git(["add", "-A"], cwd=repo)
+    _git(["commit", "-q", "-m", "wip"], cwd=repo)
+
+    result = _run_start(repo, task_id="TASK-001")
+
+    assert result.returncode != 0
+    assert "resume" in result.stderr
+
+
+def test_start_refuses_explicit_task_still_blocked(repo):
+    _add_task(repo, "First task")
+    _add_task(repo, "Second task", blocked_by=["TASK-001"])
+    _push_tasks(repo)
+
+    result = _run_start(repo, task_id="TASK-002")
+
+    assert result.returncode != 0
+    assert "TASK-001" in result.stderr
+
+
+def test_start_creates_branch_and_sets_frontmatter(repo):
+    _add_task(repo, "First task")
+    _push_tasks(repo)
+
+    result = _run_start(repo, task_id="TASK-001")
+
+    assert result.returncode == 0, result.stderr
+    output = json.loads(result.stdout)
+    assert output["task_id"] == "TASK-001"
+    assert implement_task_scaffold.current_branch(repo) == output["branch"]
+
+    task_text = (repo / ".tasks" / "TASK-001-first-task.md").read_text()
+    assert "status: in-progress" in task_text
+    assert f"branch: {output['branch']}" in task_text
+    assert _sync_check(repo).returncode == 0
+
+
+def test_bail_out_reverts_status_to_todo(repo):
+    _add_task(repo, "First task")
+    _push_tasks(repo)
+    started = _run_start(repo, task_id="TASK-001")
+    assert started.returncode == 0, started.stderr
+
+    answers_path = repo.parent / "bail-answers.json"
+    answers_path.write_text(json.dumps({"task_id": "TASK-001", "status": "todo"}))
+    result = subprocess.run(
+        [sys.executable, str(SCRIPT_PATH), "bail-out", str(answers_path)], cwd=repo, capture_output=True, text=True
+    )
+
+    assert result.returncode == 0, result.stderr
+    task_text = (repo / ".tasks" / "TASK-001-first-task.md").read_text()
+    assert "status: todo" in task_text
+    assert _sync_check(repo).returncode == 0
+
+
+def test_bail_out_refuses_unknown_status(repo):
+    _add_task(repo, "First task")
+    _push_tasks(repo)
+    answers_path = repo.parent / "bail-answers.json"
+    answers_path.write_text(json.dumps({"task_id": "TASK-001", "status": "done"}))
+
+    result = subprocess.run(
+        [sys.executable, str(SCRIPT_PATH), "bail-out", str(answers_path)], cwd=repo, capture_output=True, text=True
+    )
+
+    assert result.returncode != 0
+    assert "done" in result.stderr
+
+
+def test_resume_state_is_phase1_on_fresh_repo(repo):
+    _add_task(repo, "First task")
+    _push_tasks(repo)
+
+    result = subprocess.run(
+        [sys.executable, str(SCRIPT_PATH), "resume-state"], cwd=repo, capture_output=True, text=True
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout) == {"phase": "phase1"}
+
+
+def test_resume_state_is_phase2_when_in_progress_and_dirty(repo):
+    _add_task(repo, "First task")
+    _push_tasks(repo)
+    started = _run_start(repo, task_id="TASK-001")
+    assert started.returncode == 0, started.stderr
+    (repo / "scratch.txt").write_text("wip\n")
+
+    result = subprocess.run(
+        [sys.executable, str(SCRIPT_PATH), "resume-state"], cwd=repo, capture_output=True, text=True
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout) == {"phase": "phase2", "task_id": "TASK-001"}
+
+
+def test_resume_state_is_phase3_when_in_progress_and_clean(repo):
+    _add_task(repo, "First task")
+    _push_tasks(repo)
+    started = _run_start(repo, task_id="TASK-001")
+    assert started.returncode == 0, started.stderr
+    # `start` leaves the frontmatter/sync changes uncommitted (that's phase 3's job) --
+    # commit them so the tree is genuinely clean, matching "code already committed".
+    _git(["add", "-A"], cwd=repo)
+    _git(["commit", "-q", "-m", "wip"], cwd=repo)
+
+    result = subprocess.run(
+        [sys.executable, str(SCRIPT_PATH), "resume-state"], cwd=repo, capture_output=True, text=True
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout) == {"phase": "phase3", "task_id": "TASK-001"}

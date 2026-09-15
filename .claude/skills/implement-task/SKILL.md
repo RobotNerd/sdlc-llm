@@ -9,9 +9,20 @@ A numbered checklist, not prose. **STOP** means pause for the human before conti
 means don't guess. Requires `.tasks/` to exist, `.tasks/bin/sync` to be runnable, and `git`/`gh`
 (authenticated).
 
+Every deterministic git/gh action, every `sync`/`sync check` call, the resume-detection lookup,
+TODO-picking, and the frontmatter field edits (`status`/`branch`/`pr`/`merge_commit`) live in
+`scaffold.py` next to this `SKILL.md` (TASK-024) — not in this prose. This skill's own job is
+everything genuinely judgment- or content-driven: restating the plan, writing code/tests, deciding
+what's automatable, composing commit messages and PR titles/bodies, the bail-out call — each
+paired with exactly one `scaffold.py` invocation for the mechanical part that follows it.
+
+Every `scaffold.py` subcommand takes its answers as a JSON file (a scratch path is fine) and prints
+a JSON result on success (exit `0`); on failure it prints a message to stderr and exits non-zero —
+`resume-state` and `gh-auth-status` take no input file.
+
 **Parameter (optional):** a specific task id (e.g. `TASK-016`) to work instead of auto-picking the
-top of TODO. If given, still verify it's actually unblocked before starting fresh — if it's
-already `in-progress`/`in-review`, this is a resume, not a new start (see §0).
+top of TODO. If given, `start` still verifies it's actually `todo` and unblocked — if it's already
+`in-progress`/`in-review`, `start` refuses and says so; that's a resume, not a new start (see §0).
 
 **STOP semantics, as actually run (not a stricter reading than this):** Phase 1 ends in a hard
 STOP — restate the plan, wait for explicit approval before writing anything. Once approved,
@@ -23,40 +34,35 @@ poll on invocation, don't loop waiting.
 
 ## 0. Resume detection — run this first, every invocation
 
-Don't assume phase 1. Infer where things stand:
+Run `python3 .claude/skills/implement-task/scaffold.py resume-state`. It gathers the working
+tree's dirtiness (ignoring `.tmp/prompts.md`), finds the one task (if any) whose `status` is
+`in-progress`/`in-review` with a `branch:` that still exists locally or on the remote, and — when
+that task is `in-review` with a `pr` set — queries `gh pr view` for its live state. It returns
+`{"phase": ..., "task_id": ..., "detail": ...}`:
 
-1. `git status --short` (ignoring `.tmp/prompts.md` — see §1.1).
-2. Is there a task whose `status` is `in-progress` or `in-review`, with a `branch:` that exists
-   (locally or on the remote)? That's the task in flight, if any.
-3. Read its `status` and `pr`. If `pr` is set, `gh pr view <pr> --json
-   state,mergeCommit,statusCheckRollup` for live state.
-
-| Signal | Resume at |
+| `phase` | Resume at |
 |---|---|
-| No task `in-progress`/`in-review` with a branch | Phase 1 — pick a task |
-| `in-progress`, branch exists, no `pr`, code not yet committed | Phase 2 |
-| `in-progress`, branch exists, changes committed but not pushed / no PR | Phase 3 |
-| `in-review`, `pr` set, `gh pr view` state `OPEN` | Phase 4 — report status, stop again |
-| `in-review`, `pr` set, `gh pr view` state `MERGED`, `merge_commit` not yet recorded | Phase 4 — record + clean up |
-| `in-review`, `pr` set, `gh pr view` state `CLOSED` (not merged) | **STOP** — surface to the human; don't guess whether it was declined or needs rework |
-
-Anything that doesn't match cleanly: **STOP**, describe the ambiguous state, ask rather than guess.
+| `phase1` | Phase 1 — pick a task |
+| `phase2` | Phase 2 |
+| `phase3` | Phase 3 |
+| `phase4_open` | Phase 4 — report status, stop again |
+| `phase4_merged` | Phase 4 — record + clean up |
+| `phase4_closed_not_merged` | **STOP** — surface to the human; don't guess whether it was declined or needs rework |
+| `ambiguous` | **STOP**, show `detail`, ask rather than guess |
 
 ## 1. Start
 
-1. **Dirty-tree check.** `git status --short`. `.tmp/prompts.md` is the one standing exception —
-   it's the human's private prompt scratch pad, always treated as dirty, never read or acted on.
-   Anything else dirty → **STOP**, surface it.
-2. **Pick the task.** If a task id parameter was given, use it (still confirm below it's actually
-   `todo` and unblocked, or that it's a resume per §0). Otherwise read `.tasks/BOARD.md`'s TODO
-   top to bottom, skip any line carrying `⛔ blocked_by ...`, announce which ones were skipped and
-   why, and take the first unblocked one.
-3. `git fetch <remote>` (from `.tasks/config.md`), then branch from `<remote>/<default_branch>` as
-   `<branch_prefix><NNN>-<slug>`.
-4. Set that task's `status: in-progress` and `branch:` in its frontmatter.
-5. Run `python3 .tasks/bin/sync` — regenerates the board and epic.
-6. Restate the plan: the task's Description, Acceptance criteria, and Testing strategy, plus how
-   you intend to implement it. **STOP — wait for explicit approval before writing any code.**
+Run `python3 .claude/skills/implement-task/scaffold.py start <answers.json>` with
+`{"task_id": "TASK-NNN"}` (the given parameter) or `{"task_id": null}` to auto-pick the top
+unblocked TODO task. It refuses (non-zero, nothing changed) if the working tree is dirty, if the
+given/picked task isn't `todo`, or if it's still blocked. Otherwise it fetches, branches from
+`<remote>/<default_branch>` as `<branch_prefix><NNN>-<slug>`, sets `status: in-progress` +
+`branch:`, and runs `sync` — returning `{"task_id", "branch", "skipped"}` (`skipped` lists any
+blocked TODO tasks it passed over while auto-picking; announce them and why).
+
+Once it succeeds: restate the plan — the task's Description, Acceptance criteria, and Testing
+strategy, plus how you intend to implement it. **STOP — wait for explicit approval before writing
+any code.**
 
 ## 2. Implement + test
 
@@ -67,63 +73,78 @@ Anything that doesn't match cleanly: **STOP**, describe the ambiguous state, ask
    the result in the task's **Worklog**. Never skip one silently.
 4. Before committing, check `git diff --name-only` against the task's own scope. **Do not fix
    unrelated things on this branch** — note anything else noticed as a candidate for a separate
-   task instead.
+   task instead. This scope list is exactly what you'll pass as `wrap-up`'s `paths` next.
 5. If anything here needs a human decision, stop right there and ask (see STOP semantics above).
    Otherwise continue straight into phase 3 — the plan was already approved in phase 1.
 
 ## 3. Wrap up
 
-1. Update the files in `docs_paths` (`.tasks/config.md`) if this task's change touches them.
-2. Commit — conventional commit message, citing the task id.
-3. If `rebase_before_pr`: stash `.tmp/prompts.md` if it's dirty
-   (`git stash push -m "user prompts.md wip" .tmp/prompts.md`), `git fetch <remote>`, rebase onto
-   `<remote>/<default_branch>`, then `git stash pop`. On a real conflict, **STOP** and surface
-   it — don't guess a resolution.
-4. Push — plain push normally; `--force-with-lease` only if the rebase actually rewrote
-   already-pushed history, and only on this task's own branch.
-5. `gh pr create` — title citing the task id (conventional-commit style); body from
-   `.github/pull_request_template.md` filled in: acceptance criteria checked off, test results
-   filled in for every Testing strategy step (including what the human ran for non-automatable
+1. Update the files in `docs_paths` (`.tasks/config.md`) if this task's change touches them —
+   content-authoring, stays here, not in the script.
+2. Compose: a conventional commit message citing the task id; a PR title (same convention); a PR
+   body from `.github/pull_request_template.md` filled in (acceptance criteria checked off, test
+   results for every Testing strategy step, including what the human ran for non-automatable
    ones).
-6. Record the returned URL in `pr:`, set `status: in-review`, run `sync`.
-7. Report `gh pr checks <pr>` to the human — a red or pending check gets surfaced, never worked
+3. Run `python3 .claude/skills/implement-task/scaffold.py wrap-up <answers.json>` with
+   `{"task_id", "paths" (the in-scope file list from step 2.4 above), "commit_message", "pr_title",
+   "pr_body"}`. It adds+commits those paths, rebases onto `<remote>/<default_branch>` if
+   `rebase_before_pr` (stashing/popping `.tmp/prompts.md` around it), pushes (plain, or
+   `--force-with-lease` only when the rebase actually rewrote already-pushed history), runs
+   `gh pr create`, records `pr:` + `status: in-review`, runs `sync`, and reports `gh pr checks` —
+   returning `{"pr_url", "checks_output", "checks_exit"}`.
+4. On a rebase conflict it leaves the repo mid-rebase and exits non-zero with `git status`'s
+   output — **STOP**, resolve it by hand (`git rebase --continue`, `git stash pop` if it mentions
+   one), then re-run `wrap-up`. Don't guess a resolution.
+5. Otherwise: show the human `checks_output` — a red or pending check gets surfaced, never worked
    around. **STOP here — the human reviews and merges. Never run `gh pr merge`.**
 
 ## 4. Merge — observed, never performed
 
-On the next invocation (or when told the PR merged):
+On the next invocation (or when told the PR merged), run
+`python3 .claude/skills/implement-task/scaffold.py finish-merge <answers.json>` with
+`{"task_id", "bookkeeping_commit_message"}` (compose the latter now — conventional, e.g.
+`chore(TASK-NNN): phase 4 — record merge, archive, unblock downstream`).
 
-1. Confirm via `gh pr view <pr> --json state,mergeCommit`. If not `MERGED` yet, report current
-   state (`gh pr checks` too) and stop again — don't poll in a tight loop, wait to be re-invoked.
-2. Once `MERGED`: `git checkout <default_branch> && git pull --ff-only`.
-3. Record `merge_commit:`, set `status: done`.
-4. Run `sync` — regenerates the board/epic and archives the task to `.tasks/archive/`.
-5. If `delete_branch_after_merge`: delete the branch locally (`git branch -d`); on `<remote>` too,
-   if it isn't already gone (many platforms auto-delete on merge — check before erroring).
-6. Confirm `sync check` exits `0`.
-7. Commit this bookkeeping directly to `<default_branch>` and push — SPEC-001's guardrail
-   carve-out: recording an already-reviewed merge is not new work, so it doesn't need its own PR.
+- If the PR isn't `MERGED` yet, it returns `{"merged": false, "state", "checks_output"}` and
+  changes nothing — report the state and checks, and stop again; don't poll in a tight loop, wait
+  to be re-invoked.
+- If `MERGED`, it does everything phase 4 owns in one call: `checkout <default_branch>` +
+  `pull --ff-only`; record `merge_commit:` + `status: done`; run `sync` (archives the task to
+  `.tasks/archive/`); if `delete_branch_after_merge`, delete the branch locally and on `<remote>`
+  (tolerating an already-gone remote branch); confirm `sync check` exits `0`; and — the one
+  scripted exception to "never push to `default_branch`" — commit the resulting `.tasks/` changes
+  with `bookkeeping_commit_message` and push directly to `<default_branch>` (SPEC-001's guardrail
+  carve-out: recording an already-reviewed merge is not new work, so it doesn't need its own PR).
+  Returns `{"merged": true, "merge_commit"}`.
 
 ## Bail-out
 
 If, at any point before the PR is opened, the task turns out wrong, underspecified, or blocked on
-something unexpected: stop, write findings into the task file (Worklog and/or Notes), set
-`status` back to `todo` or `blocked`, run `sync`, and surface it to the human. Don't force a bad
+something unexpected: stop, write findings into the task file (Worklog and/or Notes) yourself
+first (content-authoring), then run
+`python3 .claude/skills/implement-task/scaffold.py bail-out <answers.json>` with
+`{"task_id", "status": "todo"|"blocked"}` — it sets that status and runs `sync`. Don't force a bad
 implementation through to a PR.
 
 ## Guardrails (non-negotiable — SPEC-001 / CLAUDE.md)
 
-- Never push *task work* to `default_branch`. The one exception is phase 4's own bookkeeping
-  commit (step 7 above).
-- **Never run `gh pr merge`.** The human always does the squash-merge on GitHub.
-- `--force-with-lease` only, only on the current task's own branch, only immediately after a
-  rebase.
-- Never touch files outside the task's own scope.
-- Never hand-edit a `BEGIN:`/`END:` region or an epic's `status` — that's `sync`'s job.
+Enforced *in the script*, not only documented here:
+
+- Never push *task work* to `default_branch`. The one exception is `finish-merge`'s own
+  bookkeeping commit, and only once it has independently confirmed the PR is `MERGED` and the
+  current branch actually is `default_branch`.
+- **Never run `gh pr merge`.** The human always does the squash-merge on GitHub — no subcommand
+  here does this.
+- `wrap-up`'s push refuses outright (raises before running any `git` command) if the current
+  branch isn't the task's own branch, or if that branch is `default_branch`; `--force-with-lease`
+  only fires when a rebase actually rewrote already-pushed history.
+- Never touch files outside the task's own scope — `wrap-up` only ever adds the `paths` it's given.
+- Never hand-edit a `BEGIN:`/`END:` region or an epic's `status` — that's `sync`'s job, always
+  invoked through the script, never by hand.
 
 ## If `gh` is missing or not authenticated
 
-Check with `gh auth status` before any `gh`-dependent step. If it fails: stop at that exact
-point, print the precise `git`/`gh` commands for the human to run themselves, and note that the
-next invocation should resume from re-checking `gh pr view` (or wherever `gh` was needed) rather
-than restarting the task.
+Run `python3 .claude/skills/implement-task/scaffold.py gh-auth-status` before any `gh`-dependent
+step. If it fails: stop at that exact point, print the precise `git`/`gh` commands for the human to
+run themselves, and note that the next invocation should resume from `resume-state` (or wherever
+`gh` was needed) rather than restarting the task.
