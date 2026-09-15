@@ -2,11 +2,11 @@
 id: TASK-901
 title: SCRATCH DRY RUN -- safe to delete, never merged (TASK-046 testing)
 type: chore
-status: in-progress
+status: in-review
 epic: null
 created: 2026-09-14
 branch: task-901-scratch-dry-run-safe-to-delete-never-merged-task-046-testing
-pr: null
+pr: "https://github.com/RobotNerd/sdlc-llm/pull/38"
 merge_commit: null
 blocked_by: []
 blocks: []
