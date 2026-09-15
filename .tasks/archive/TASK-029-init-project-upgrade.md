@@ -2,12 +2,12 @@
 id: TASK-029
 title: "init-project upgrade: refresh an initialized project from the toolkit repo"
 type: feature
-status: in-review
+status: done
 epic: EPIC-001
 created: 2026-09-14
 branch: task-029-init-project-upgrade
 pr: "https://github.com/RobotNerd/sdlc-llm/pull/47"
-merge_commit: null
+merge_commit: 9e9bd0c59496f5afe0f4bc76a1137ed527227740
 blocked_by: [TASK-027, TASK-028]
 blocks: [TASK-030, TASK-038]
 ---
