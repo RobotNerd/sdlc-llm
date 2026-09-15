@@ -9,7 +9,7 @@ branch: task-024-implement-task-script-split
 pr: null
 merge_commit: null
 blocked_by: []
-blocks: []
+blocks: [TASK-027, TASK-028, TASK-031]
 ---
 
 # TASK-024: implement-task: move deterministic git/gh actions to a stdlib script

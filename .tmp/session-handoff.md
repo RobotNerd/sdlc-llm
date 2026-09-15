@@ -1,115 +1,116 @@
-# Session handoff — resume at TASK-003
+# Session handoff
 
-Written 2026-09-13, at the end of a long session, to let a fresh Claude Code session pick up
-cleanly. Read this first; it points at everything else.
+Written 2026-09-14, so a fresh session can resume cleanly. Skills, `guidelines.md`, and
+`.tmp/workflow-plan.md` are self-documenting for the workflow mechanics — this file only holds
+what isn't written down anywhere else.
 
-## State right now
+## State
 
-- `main` is at `9d97d2d`, pushed, working tree clean except `.tmp/prompts.md` (see below).
-- **12 of 20 MVP tasks done** (TASK-001, 002, 004–013). `.tasks/bin/sync check` exits 0 — the repo
-  is fully self-consistent.
-- No branch is checked out for in-progress work; no PR is open. **TASK-003 has not been started.**
-- `.tasks/BOARD.md`'s TODO list is current and is the actual priority order — start at its top
-  line (TASK-003) unless the user says otherwise.
+Nothing is in-progress; `main` is clean. This was a pure planning session — no implementation
+happened. `.tasks/BOARD.md`'s epics panel: **EPIC-001 21/31 done, EPIC-002 0/7 done, EPIC-003
+0/7 done**. TODO order (top to bottom) is unchanged from before this session for EPIC-001's
+existing tasks (TASK-022/024/025/026/023), with everything below appended by today's planning:
+TASK-027 through TASK-045.
 
-## Read these, in order, before doing anything
+## What happened this session
 
-1. **`CLAUDE.md`** (repo root) — orientation and conventions.
-2. **`.tmp/workflow-plan.md`** — the mental model (Part 1) and the bootstrap operating procedure
-   (Part 2), including the per-task loop and the current Gaps table. This is the process doc; keep
-   it current if you change how the process works.
-3. **`.tasks/specs/SPEC-001-llm-sdlc-workflow.md`** — the spec everything is built from. Long, but
-   authoritative — when in doubt about a design question, it's answered here or should be added
-   here.
-4. **`.tasks/guidelines.md`** and **`.tasks/config.md`** — the short, concrete versions of the
-   workflow rules and per-project settings (git remote, branch prefix, `rebase_before_pr`,
-   `merge_strategy: squash`, `archive_done`, etc.).
-5. This file, for what's specific to *right now*.
+Three rounds of planning, each producing a spec + epic + tasks, all placed at the bottom of TODO
+and left `todo` (nothing started):
 
-## The per-task loop (do this for TASK-003, then repeat)
+1. **`/add-task` — the portable-surface cleanup wave.** Added TASK-027 (strip `TASK-NNN`/
+   `SPEC-NNN`/`EPIC-NNN` provenance references and other project-specific content from
+   `.claude/skills/**`, `blocked_by` the four remaining script-extraction tasks), TASK-028
+   (`ignored_paths` config key, replacing the hardcoded `.tmp/prompts.md` exception in
+   `implement-task`), TASK-029 (`init-project upgrade` — clone-based refresh of an already-
+   initialized project, with a `.toolkit-manifest.json` drift-detection manifest so a locally
+   modified file gets a diff+STOP instead of being silently overwritten), TASK-030 (additive
+   `config.md` schema migration during upgrade — never overwrites existing values), and TASK-031
+   (optional `format_command`, run by `implement-task` after rebase/before push, gated on
+   TASK-024 since the formatter step belongs in that task's new script, not in prose about to be
+   replaced).
 
-Full detail in `.tmp/workflow-plan.md`'s "The per-task loop" section. Short version:
+2. **`/plan-feature` — EPIC-002, workflow guardrail hooks (SPEC-002).** The core finding: a
+   `PreToolUse`/`Bash` hook only sees commands run as a real tool call, so once TASK-024 moves
+   `implement-task`'s git/gh actions into a script, a hook watching for `git push` would never
+   fire on the normal path — the model's tool call becomes `python3 .../implement-task.py`, not
+   `git push` directly. Resolved by a **shared stdlib module**, `.tasks/bin/guardrails.py`
+   (vendored like `sync`), that both the hooks and the skills' own scripts call — one definition,
+   two enforcement points. Seven tasks (TASK-032–038): infra + shared module + core git/gh
+   guardrails; structural edit guardrails (region hand-edits, epic-status hand-edits); a
+   branch-name/dirty-tree gate; a pre-PR quality gate (`sync check`/test/lint/format, deny +
+   report, never auto-fixes); a repo-only SPEC/TASK-reference scan (deliberately excluded from
+   what `init-project`/`upgrade` copy elsewhere); a `SessionStart` board-context hook; and wiring
+   all of it into `upgrade`'s manifest/config-merge. Every task blocked on the EPIC-001 work it
+   needs (TASK-024/027/028/029/030/031).
 
-1. **Start.** Confirm working tree clean (ignore `.tmp/prompts.md` — see below). `git fetch origin`,
-   branch from `origin/main` as `task-NNN-slug`. Set the task's `status: in-progress` in its
-   frontmatter. Hand-update `.tasks/BOARD.md` (drop from TODO, add to the In Progress region) and
-   `.tasks/EPIC-001-mvp.md`'s `children` row to match. Restate the plan and acceptance criteria for
-   the user's approval before writing anything.
-2. **Implement + test.** Write the code/content and its tests. If it's Python touching
-   `.tasks/bin/sync`, install in a scratch venv (`python3 -m venv /tmp/venv && source
-   /tmp/venv/bin/activate && pip install -e '.[dev]' -q`) and run `pytest`, then clean up the venv
-   afterward. Run `python3 .tasks/bin/sync check` against the real repo before and after your
-   change to confirm you haven't introduced drift. Stay strictly in the task's scope.
-3. **Wrap up.** Commit (conventional, cites the task ID). `git fetch origin && git rebase
-   origin/main` (stash `.tmp/prompts.md` first if it's dirty — see below), push, `gh pr create`
-   with acceptance criteria as a checklist. Record the returned PR URL in `pr:`, set
-   `status: in-review`, update `BOARD.md` (In Progress → In Review) and `EPIC-001`'s row. **Stop —
-   do not merge.**
-4. **Merge — wait for the user.** When they say "I merged it, go ahead with TASK-NNN": confirm via
-   `gh pr view <n> --json state,mergeCommit`, `git checkout main && git pull`, record
-   `merge_commit:`, set `status: done`, `git mv` the task file into `.tasks/archive/`, update
-   `BOARD.md` (In Review → Done, refresh any ⛔ markers that just cleared) and `EPIC-001`'s
-   `children` row + `Progress:` line, and `SPEC-001`'s `epics` region progress count. Run
-   `python3 .tasks/bin/sync check` to confirm clean. Commit this bookkeeping **directly to `main`**
-   (see the guardrail carve-out in SPEC-001 §Guardrails — recording an already-reviewed merge isn't
-   new work) and push. Then start the next task.
+3. **`/plan-feature` — EPIC-003, autonomous batch execution for `implement-task` (SPEC-003).**
+   The user wants `implement-task` to work through many tasks (by epic, numeric ID range,
+   explicit list, or "TODO top-to-here" stopping task) without needing to be re-invoked at every
+   mechanical checkpoint. Biggest decision made here: **the user explicitly asked to change the
+   standing "a human always reviews and merges" guardrail** — not remove it, but add a narrow,
+   opt-in exception. Landed design: auto-merge stays off by default (`allow_auto_merge`,
+   currently hardcoded `false`, becomes a real toggle); when enabled, a cheap/fast-model **critic**
+   runs a narrow checklist (acceptance criteria met, scope respected, gates green — not an
+   open-ended review) and must explicitly approve before `gh pr merge`; a per-batch cap forces a
+   human checkpoint regardless of accumulated approvals. I recommended this scoped/capped/opt-in
+   shape over an unconditional auto-merge specifically because of the user's stated token-budget
+   concern (Pro plan, not unlimited) and because the repo's own `.tmp/workflow-plan.md` already
+   documents *why* auto-merge was rejected once before ("defeats the purpose of opening a PR at
+   all") — the user agreed with capping it. **Amended TASK-032 (EPIC-002, not yet built)** in the
+   same session so its `gh pr merge` guardrail hook is designed from the start as "deny unless a
+   verified marker is present," not an unconditional deny that EPIC-003 would need to redesign
+   later. Seven tasks (TASK-039–045): batch selection + deterministic validation (a dedicated
+   script, not a new `sync` subcommand — keeps `sync` skill-agnostic); an opt-in TDD mode
+   (`tdd_enforced`, default `true`, independent of batch mode); the core loop (announce-don't-
+   block plans, self-scheduled polling via `ScheduleWakeup` to resume after each merge without
+   manual re-invocation); an interrupt taxonomy (4 isolated/skip-task conditions, 1 systemic/
+   halt-batch — `git`/`gh` infra failure); a context/token usage safety-valve (explicitly a
+   stopgap — the user flagged that real context-management strategy may need its own future
+   epic, and that's deliberately out of scope here); a capped follow-up-task-creation policy
+   (`autonomous_new_task_limit`, default 3, flag-and-continue past the cap); and the critic-gated
+   capped auto-merge itself. Every task blocked, directly or transitively, on all seven EPIC-002
+   tasks — this epic is only meant to start once EPIC-002 is fully done, per the user's explicit
+   sequencing instruction.
 
-## Things that will trip you up if you don't know them
+`.tmp/workflow-plan.md` was updated to reflect all of this: the bootstrap-era "Gaps" table is now
+marked historical/closed, a new "Where things stand now" section summarizes the three epics, and
+two short "planned exception" notes were added inline (determinism-boundary section for the hooks
+layer, the STOP/merge section for the future auto-merge exception) — both careful to describe
+these as *planned*, since none of it is built yet.
 
-- **`.tmp/prompts.md` is always "dirty."** It's the user's own scratch pad for drafting prompts —
-  never read or act on its contents. Treat it as the one exception to the dirty-working-tree check.
-  Before any `git rebase`, do `git stash push -m "user prompts.md wip" .tmp/prompts.md`, rebase,
-  then `git stash pop`.
-- **`blocked_by` is a static, declared list — never pruned.** It records history; it does not
-  shrink as blockers complete. "Is this task still blocked" is computed at render time (see
-  `_outstanding_blockers` in `.tasks/bin/sync`) by checking each listed blocker's current status.
-  Don't edit a task's `blocked_by` just because a blocker finished — only `sync`'s TODO-marker logic
-  needs to know that, and it already does.
-- **`sync`'s write mode exists (TASK-013) but hasn't been run on this real repo yet, on purpose.**
-  Keep hand-editing `BOARD.md`/`EPIC-001-mvp.md`/`SPEC-001`'s progress numbers during phase-4
-  bookkeeping, verified with `python3 .tasks/bin/sync check` (read-only). Don't run bare
-  `python3 .tasks/bin/sync` (no args — it now writes) against this repo. That first real run is
-  TASK-019's entire point; running it early would make that task's acceptance criterion
-  meaningless. If you're not sure whether TASK-019 has landed yet, check whether
-  `.tasks/TASK-019-*.md` still exists in `.tasks/` (not yet done) or `.tasks/archive/` (done).
-- **Epic status has only ever exercised derivation rule 7** (mixed `todo`/`done`, none active) on
-  this real repo, because nothing here has gone `blocked` or `wont-do`. All 7 rules are proven by
-  `tests/test_derivation.py` and `tests/test_end_to_end.py`'s matrix — don't re-derive that
-  confidence by hand, it's already there.
-- **`gh` is installed and authenticated** (as `RobotNerd`, ssh protocol) — git/PR automation is
-  fully in scope for you to run directly, not something to ask permission for each time. The user
-  reviews and squash-merges every PR themselves; you never run `gh pr merge`.
-- **Archived task files still count everywhere.** `discover()` scans `.tasks/`, `.tasks/specs/`,
-  and `.tasks/archive/` together — an archived task is still a real child of its epic, still
-  affects `next_id`, still shows in the board's Done column (capped at 20 most recent).
-- **Two real bugs were found and fixed via testing along the way** (both fully resolved, just worth
-  knowing the shape of the mistake if something looks similar): `find_region` originally matched a
-  region name as a bare substring (`epics` matching inside `epics2`) — fixed with a boundary check
-  (TASK-005). `find_region` also didn't know about markdown fenced code blocks, so an illustrative
-  example in SPEC-001's own prose was misread as a live region — fixed with fence-awareness
-  (TASK-007). Full detail in those tasks' Worklogs under `.tasks/archive/`.
-- **TASK-004 was done before TASK-005** despite TODO listing 005 first, because 005's AC needed the
-  pytest harness that's 004's scope — confirmed with the user at the time, TODO order itself was
-  never changed. Not expected to recur, but if the top-of-TODO task turns out to depend on
-  something not yet built that a *lower* TODO item would supply, that's the precedent: flag it,
-  don't silently reorder, get a decision.
+## Conventions established but not yet written into any skill or doc
 
-## Remaining work (in `.tasks/BOARD.md`'s current TODO order)
+- **Script-extraction shape** (applies to the remaining `add-task`/`refine-backlog`/`plan-feature`
+  script tasks, and now to TASK-024): follow TASK-021's `scaffold.py` + `SKILL.md` rewrite as the
+  template. Confirmed answers/inputs go to the script as a JSON file (not CLI flags) when there
+  are several or list-valued fields. The script is stdlib-only, never prompts interactively, and
+  refuses cleanly (stderr message, non-zero exit, writes nothing) on bad input. `SKILL.md` keeps a
+  cheap narrative pre-check for anything the script would refuse on so an interview isn't wasted
+  on a doomed run, even though the script independently re-verifies the same thing defensively.
+- **Testing a `*-script.py`**: import it in `tests/` via `SourceFileLoader` with a unique module
+  name (same pattern `conftest.py` already uses for `.tasks/bin/sync`) — several skills will each
+  have a similarly-named script, so a bare `import scaffold` would collide across test files.
+  Prefer real subprocess + `tmp_path` integration tests over mocks for anything touching the
+  filesystem or git.
+- **Scratch-branch dry-run testing**: a throwaway branch off `origin/main`, deleted (never
+  merged) once done. Only open a real throwaway PR on it when the task needs to prove actual
+  `git`/`gh` mechanics; skip opening a PR for a file-only dry run.
+- **Cross-epic `blocked_by` is normal and expected** in this system — EPIC-002 and EPIC-003 both
+  block on specific EPIC-001 tasks by id, and `sync` reconciles the corresponding `blocks` fields
+  automatically regardless of which epic either task belongs to.
+- **Shared logic modules over duplicated logic**: when the same rule needs to be enforced from two
+  different call sites (a hook at the tool boundary and a skill's own script on its normal path),
+  put the rule in one stdlib module both sides import, rather than writing it twice. This is
+  `.tasks/bin/guardrails.py`'s whole reason for existing (EPIC-002) and the same reasoning applies
+  to any future case shaped like it.
 
-TASK-003, TASK-019, TASK-020, TASK-014, TASK-015, TASK-016, TASK-017, TASK-018.
+## Open items for whoever picks this up next
 
-`sync` itself (TASK-004–013) is functionally complete and fully tested. What's left is
-qualitatively different: `TASK-003` (PR template, small), then `TASK-019`/`TASK-020` (the dogfood
-migration and CI — `TASK-019` is the payoff moment described above), then the five skills
-(`TASK-014`–`018`), which are markdown checklists for a future Claude Code session to follow, not
-Python.
-
-## Conventions established this session (also in `guidelines.md`/`config.md`, restated here for
-quick reference)
-
-- Terminology: **"task,"** never "ticket"/"story".
-- Branch: `task-NNN-slug`. Commit + PR title cite `TASK-NNN`.
-- Every commit ends with the `Co-Authored-By` / `Claude-Session` trailer currently in force for
-  this session (check the system prompt's attribution instructions at the start of a new session —
-  they may have a new session URL).
-- PR bodies end with the `🤖 Generated with Claude Code` footer, same session-URL caveat.
+- TASK-032's exact marker format (what proves a `gh pr merge` call came from EPIC-003's
+  critic-gated path) is deliberately left undefined — coordinate between TASK-032 and TASK-045 if
+  they're picked up in different sittings; both files' Notes point at each other.
+- EPIC-003's real context-window-management strategy (beyond TASK-043's minimal safety-valve) is
+  explicitly not designed yet — the user flagged it may warrant its own future spec/epic once
+  EPIC-003's simpler pieces are further along.
+- No open questions on anything actually planned this session — every design fork surfaced was
+  resolved with the user before task files were written.

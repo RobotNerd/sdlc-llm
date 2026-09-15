@@ -9,7 +9,7 @@ branch: task-025-refine-backlog-script-split
 pr: null
 merge_commit: null
 blocked_by: []
-blocks: []
+blocks: [TASK-027]
 ---
 
 # TASK-025: refine-backlog: move mechanical steps to a stdlib script; activity-aware stale detection

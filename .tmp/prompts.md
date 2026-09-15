@@ -69,23 +69,77 @@ Include one additional work item as part of the new task. For step 3 with the st
 
 <!-- I merged it. Just like in previous steps, do the git clean up steps. Once you're done with the cleanup, use the add-task skill to create another task in EPIC-001 to automate the mechanical parts of the `plan-feature` skill. Place the new task at the bottom of the TODO list on the board. -->
 
---
+<!-- /add-task Remove references to details that are relevant only to this project, which can be found throughout many of the files in this project. One example: in the init-project skill, there is a reference to a task `(TASK-021)` included in the skill definition as well as comments in the associated scaffold script. This will be confusing to the agent when the skill is used in a different project, since it should have no reference to the inner workings of this repo, leading to a likely collision on task names. Focus only on the content that will be used in other projects, which is copied to the new project by the init-project skill @.claude/skills/init-project/. This goes at the bottom of the TODO list on the board. -->
 
-TODO: EPIC: Use the plan-feature skill to create a new epic to convert as much as possible to hooks.
+<!-- /add-task New task in EPIC-001 at bottom of the TODO list. Modify the `init-project` skill so that it can be used to do an idempotent upgrade to an existing project where init-project has already been run. Like the current script implementation, behaviors should be implemented in the scaffold script where possible. Ensure that no existing spec/epic/task data is lost. The goal is to upgrade the skills and related process docs to keep them up-to-date with the latest changes in this repo. -->
+
+<!-- /add-task Create a new task in EPIC-001 at the bottom of the TODO list. Add a new optional feature that includes an automatic code formatting tool if supported. Add an entry for it in @.tasks/config.md with null as the default value; it should be part of the interview questions to populate the value during the init-project skill. Update the implement-task to use the code formatter. Add a hook that ensure that the code formatter is run before creating a PR. -->
+
+<!-- /plan-feature Create a new epic to move behavior to hooks. These hooks are included at the per-project level, so they are copied to a new repo as part of the init-project skill. I want you to identify what behaviors from the existing skills make sense to be turned into hooks. The goal is to ensure that the hook behaviors always occur and aren't left to probabilistic decisions. In addition to the existing skills and items I mention below, are there any new behaviors you would recommend adding as hooks?
+
+My current ideas for hooks:
+- Everything described in the `Guardrails` section of @.tasks/specs/SPEC-001-llm-sdlc-workflow.md.
+- A script that checks for references to SPEC-NNN and TASK-NNN in the artifacts that will be copied to other repositories using the init-project skill (see TASK-027). Causes the agent to clean up these references before a PR can be opened for a task. This hook would only exist in the current repository and would be excluded from the list of artifacts copied by the init-project skill.
+- The test_command is run before creating a PR and must pass.
+- The lint_command is run before creating a PR and must pass.
+- The code formatting tool is run before creating a PR (see TASK-031).
+- Ensure that re-running init-project to upgrade a project doesn't modify the excluded files. -->
+
+<!-- /plan-feature Create a new epic to refactor the `implement-task` skill to make it more automated. The tasks in this epic are placed at the bottom of the TODO list, and for now are planned to be implemented after all of the tasks in EPIC-002.
+
+- The user can provide an epic, a task range, task list, or a stopping task and LLM works through all tasks autonomously:
+  - epic provided: LLM attempts to implement all tasks in the epic
+  - task range: implement all tasks from start to end in the range
+  - task list: a list of individual tasks to work, which might not be in the same order as the TODO list on the board
+  - stopping task: LLM starts with the first task at the top of the TODO section on the board and works all tasks in order from the TODO list until completing the stopping task
+- before working, LLM must verify that the set of tasks provided by the user is valid; implement this as a script (or hook if that makes sense) to offload the decision making to be deterministic
+- determine conditions when LLM should interrupt work and notify the user; these are my rough ideas, and I need suggestions/best practices from you
+  - running into an issue the requires clarification from the user
+  - running out of context; note that I need strategies to avoid this, which may need to be a separate epic itself
+  - running into an unexpected blocker
+  - using too many tokens; need strategies to keep token usage low, especially if we decide to start spawning additional worker agents
+- creating follow up tasks: user can choose if they want the LLM to create additional tasks automatically or if the user needs to be notified; e.g. the LLM determines that a task is too big and needs to be split up; default to allowing new task creation, but add a configurable limiter to prevent task explosion
+- switch to TDD: LLM should write test cases first, verify they fail, then implement and re-test until test cases pass -->
+
+> TODO: Come back to planning this later
+
+/plan-feature Context/session management and multiple agents. Goes on board after all current epics, blocked by all current epics. The goal is to add the option to this workflow to run multiple agents.
+
+- Session hand-off when context gets too full (configurable percentage threshold). Write a short hand-off doc, clear the session, and have LLM continue from the hand-off doc. (see TASK-043)
+- Option to run multiple simultaneous "longish-lived" instances of claude code:
+  - the orchestrator (e.g. opus, high effort)
+  - the worker (e.g. sonnet, high effort)
+  - the critic (haiku, ? effort, see TASK-045)
+- model/effort for each is configurable
+- configation options: disabled, only orchestrator and worker, all three
+- each instance would stay live until hitting the threshold mentioned earlier (e.g. context too full, TASK-043), at which point it would do a session hand-off to a new instance of itself
+- orchestrator focuses on planning tasks (e.g. creating tasks)
+- the worker focus on implementation of each task
+- if worker thinks planning is necessary, likes splitting up the current task, it passes that work back to the orchestrator
+- at its discretion, the orchestrator can task the critic with reviewing PRs implemented by the worker agent, although this wouldn't necessarily happen for every task
+
+These are my rough ideas, but I don't know the latest best practices for how to handle this type of multi-agent workflow. Keep in mind that I'm currently on the $20/month plan of claude code. I may ugrade to a more expensive plan later, but even when I do, I want to be smart about conserving tokens and context to support better scaling.
+
+NOTE: Claude's initial analysis:
+
+```
+ On session hand-off: Claude Code already has native machinery for most of this — /compact (with custom preservation instructions, settable in CLAUDE.md), automatic compaction at a configurable context threshold, and — on Pro/Max
+  specifically — an offer to "resume from a summary" when reopening a large session after a break. This is strikingly close to what .tmp/session-handoff.md already does by hand in this very repo. TASK-043 (EPIC-003) was explicitly built
+  as a stopgap deferring "the real strategy" to a future epic — this is that epic, and it should upgrade TASK-043 rather than duplicate it, and it benefits every implement-task run, not just multi-instance ones.
+
+  On multi-instance architecture — this is the important finding. Claude Code has two different primitives, and they're not equally suited to what you described:                                                                                                             No changes this session
+
+  - Agent teams (experimental, opt-in via an env var): teammates share one session's lifetime — they're cleaned up when the lead session ends, can't be resumed after /resume, and Anthropic's own docs measure them at ~7x the token cost of
+    a standard session when teammates plan first. Built for bounded parallel exploration (research, competing hypotheses), not standing, long-lived roles.
+  - Cross-session messaging: lets genuinely independent, separately-launched Claude Code processes (interactive or headless -p) message each other by name, each with its own normal lifecycle — resumable, can /compact//clear on its own,
+    can run indefinitely as a background worker.
+
+  Your description — "each instance stays live until hitting the threshold, then hands off to a new instance of itself" — is exactly what cross-session messaging between independent processes supports, and exactly what agent teams don't
+  (an in-process teammate can't survive a hand-off). So I'd steer this design away from agent teams entirely.
+
+  On cost, plainly: a Pro plan's usage limit is one account-wide pool on a rolling 5-hour/weekly window, shared across everything you run. Three simultaneous long-lived instances don't triple your budget — they draw on the same pool
+  three times as fast, so you'd hit the weekly ceiling sooner in wall-clock time for the same total spend. Worth designing the defaults around that reality rather than around "more instances = more capacity."
+```
 
 ---
 
-TODO: EPIC: Refactor implement-task skill to be more automated:
-- user provides an epic, a task range, task list, or a stopping task and LLM works through all tasks autonomously
-  - epic provided: LLM attempts to implement all tasks in the epic
-  - task range: implement all tasks from start to end in range
-  - task list: a list of individual tasks to work, which might not be in the same order as the board
-  - stopping task: LLM starts with the first task at the top of the TODO section on the board and works all tasks in order from the TODO list until completing the stopping task
-- before working, LLM must verify that the set of tasks provided by the user is valid
-- determine conditions when LLM should interrupt work and notify the user
-  - running into an issue the requires clarification from the user
-  - running out of context; need strategies to avoid this
-  - running into an unexpected blocker
-  - using too many tokens; need strategies to keep token usage low, especially if spawning additional worker agents
-- creating follow up tasks: user can choose if they want the LLM to create additional tasks automatically or if the user needs to be notified; e.g. the LLM determines that a task is too big and needs to be split up
-- switch to TDD: LLM should write test cases first, verify they fail, then implement and re-test until test cases pass
