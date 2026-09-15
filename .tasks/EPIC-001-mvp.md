@@ -71,7 +71,7 @@ by this repo managing its own `.tasks/` end to end.
 | TASK-030 | todo | Migrate config.md to the current schema during upgrade |
 | TASK-031 | todo | Add optional format_command config key; run it in implement-task before opening a PR |
 | TASK-046 | done | implement-task: wrap-up should commit and push its own pr/status bookkeeping |
-| TASK-047 | in-progress | review-docs skill: periodic pass to catch stale docs and dangling references |
+| TASK-047 | in-review | review-docs skill: periodic pass to catch stale docs and dangling references |
 
 Progress: 27/33 done
 <!-- END:children -->
