@@ -52,8 +52,8 @@ saying what that is), **ASK** a follow-up rather than picking for them.
 | `ci_checks` | Names of any CI checks that already exist to gate merge on | `[]` (empty — nothing to gate on yet) |
 | `archive_done` | Move `done`/`wont-do` tasks out to `.tasks/archive/`? | `true` |
 
-`workflow_version` is always `1` and `allow_auto_merge` is always `false` — don't ask about
-either; they're fixed by the template.
+`workflow_version` is always `1`, `allow_auto_merge` is always `false`, and `ignored_paths` always
+starts `[]` — don't ask about any of them; they're fixed by the template.
 
 Once every value is answered, **restate the full `config.md` you're about to write and STOP** for
 the human's go-ahead before creating any files.

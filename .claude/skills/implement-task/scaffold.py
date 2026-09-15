@@ -26,7 +26,6 @@ from importlib.machinery import SourceFileLoader
 from pathlib import Path
 from types import ModuleType
 
-_IGNORED_DIRTY_PATHS = (".tmp/prompts.md",)
 _DONE_STATUSES = ("done", "wont-do")
 _IN_FLIGHT_STATUSES = ("in-progress", "in-review")
 
@@ -72,12 +71,19 @@ def _run_sync(sync_path: Path, *extra_args: str) -> subprocess.CompletedProcess:
 # ---------------------------------------------------------------------------
 
 
-def dirty_files(cwd: Path, ignore: tuple[str, ...] = _IGNORED_DIRTY_PATHS) -> list[str]:
-    """Paths `git status --porcelain` reports as dirty, excluding `ignore`
-    (a carve-out for the human's own prompt scratchpad).
+def dirty_files(cwd: Path, ignore: tuple[str, ...] = ()) -> list[str]:
+    """Paths `git status --porcelain` reports as dirty, excluding `ignore` -- the project's own
+    `ignored_paths` (`.tasks/config.md`), a carve-out for paths like a personal prompt scratchpad
+    that aren't part of any task's actual work.
+
+    `--untracked-files=all` matters here: without it, git collapses a brand-new, entirely
+    untracked directory into one `?? dirname/` line instead of listing the file inside it --
+    an `ignored_paths` entry naming that file (its first time ever existing, not yet committed)
+    would then never match and the tree would wrongly read as dirty.
     """
     result = subprocess.run(
-        ["git", "status", "--porcelain"], cwd=cwd, capture_output=True, text=True, check=True
+        ["git", "status", "--porcelain", "--untracked-files=all"],
+        cwd=cwd, capture_output=True, text=True, check=True,
     )
     files = []
     for line in result.stdout.splitlines():
@@ -248,6 +254,7 @@ def cmd_resume_state(args: argparse.Namespace) -> int:
     sync_mod = load_sync_module(tasks_root)
     config = sync_mod.load_config(tasks_root)
     remote = config.get("remote", "origin")
+    ignored_paths = tuple(config.get("ignored_paths") or [])
 
     artifacts = sync_mod.discover(tasks_root)
     in_flight_tasks = [
@@ -275,7 +282,7 @@ def cmd_resume_state(args: argparse.Namespace) -> int:
             "branch_exists": exists,
         }
 
-    working_dirty = bool(dirty_files(root))
+    working_dirty = bool(dirty_files(root, ignore=ignored_paths))
 
     gh_pr_state = None
     if in_flight and in_flight["status"] == "in-review" and in_flight["pr"]:
@@ -304,15 +311,16 @@ def cmd_start(args: argparse.Namespace) -> int:
     answers = json.loads(Path(args.answers).read_text())
     task_id = answers.get("task_id")
 
-    dirty = dirty_files(root)
-    if dirty:
-        print(f"implement-task: working tree is dirty: {', '.join(dirty)}", file=sys.stderr)
-        return 2
-
     config = sync_mod.load_config(tasks_root)
     remote = config.get("remote", "origin")
     default_branch = config.get("default_branch", "main")
     branch_prefix = config.get("branch_prefix", "task-")
+    ignored_paths = tuple(config.get("ignored_paths") or [])
+
+    dirty = dirty_files(root, ignore=ignored_paths)
+    if dirty:
+        print(f"implement-task: working tree is dirty: {', '.join(dirty)}", file=sys.stderr)
+        return 2
 
     skipped: list[dict] = []
     if task_id is None:
@@ -404,6 +412,7 @@ def cmd_wrap_up(args: argparse.Namespace) -> int:
     remote = config.get("remote", "origin")
     default_branch = config.get("default_branch", "main")
     rebase_before_pr = config.get("rebase_before_pr", True)
+    ignored_paths = tuple(config.get("ignored_paths") or [])
 
     add_result = subprocess.run(["git", "add", "-A", "--", *paths], cwd=root, capture_output=True, text=True)
     if add_result.returncode != 0:
@@ -421,11 +430,14 @@ def cmd_wrap_up(args: argparse.Namespace) -> int:
     remote_existed_before_rebase = remote_branch_exists(root, remote, branch)
 
     if rebase_before_pr:
-        prompts_path = root / ".tmp" / "prompts.md"
+        all_dirty = dirty_files(root, ignore=())
+        dirty_ignored_paths = [p for p in ignored_paths if p in all_dirty]
         stashed = False
-        if prompts_path.exists() and str(prompts_path.relative_to(root)) in dirty_files(root, ignore=()):
+        if dirty_ignored_paths:
+            # `-u`: an ignored path may never have been committed yet (git otherwise refuses to
+            # stash a pathspec matching only untracked files).
             stash_result = subprocess.run(
-                ["git", "stash", "push", "-m", "user prompts.md wip", str(prompts_path)],
+                ["git", "stash", "push", "-u", "-m", "ignored-paths wip", "--", *dirty_ignored_paths],
                 cwd=root, capture_output=True, text=True,
             )
             if stash_result.returncode != 0:

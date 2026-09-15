@@ -2,7 +2,7 @@
 id: TASK-028
 title: Replace .tmp/prompts.md special-case with an ignored_paths config key
 type: refactor
-status: todo
+status: in-progress
 epic: EPIC-001
 created: 2026-09-14
 branch: task-028-ignored-paths-config-key
@@ -36,18 +36,18 @@ tolerate its absence in a repo scaffolded before this task lands.
 
 ## Acceptance criteria
 
-- [ ] `.tmp/prompts.md` appears nowhere under `.claude/skills/`.
-- [ ] `init-project/templates/config.md` includes `ignored_paths: []` as a fixed value (not a
+- [x] `.tmp/prompts.md` appears nowhere under `.claude/skills/`.
+- [x] `init-project/templates/config.md` includes `ignored_paths: []` as a fixed value (not a
       `{{placeholder}}`), documented under "Key notes".
-- [ ] A freshly scaffolded `config.md` (via `scaffold.py`) contains `ignored_paths: []`.
-- [ ] `implement-task/SKILL.md` reads `ignored_paths` from `.tasks/config.md` for both the phase 1
+- [x] A freshly scaffolded `config.md` (via `scaffold.py`) contains `ignored_paths: []`.
+- [x] `implement-task/SKILL.md` reads `ignored_paths` from `.tasks/config.md` for both the phase 1
       dirty-tree check and the phase 3 pre-rebase stash, and behaves as an unconditional check
       when the key is `[]` or absent.
-- [ ] `init-project/templates/guidelines.md`'s phase-1 description notes the `ignored_paths`
+- [x] `init-project/templates/guidelines.md`'s phase-1 description notes the `ignored_paths`
       exception.
-- [ ] This repo's own `.tasks/config.md` sets `ignored_paths: [.tmp/prompts.md]`, preserving
+- [x] This repo's own `.tasks/config.md` sets `ignored_paths: [.tmp/prompts.md]`, preserving
       today's behavior.
-- [ ] `pytest` and `python3 .tasks/bin/sync check` both pass.
+- [x] `pytest` and `python3 .tasks/bin/sync check` both pass.
 
 ## Testing strategy
 
@@ -63,7 +63,35 @@ tolerate its absence in a repo scaffolded before this task lands.
 
 ## Worklog
 
-_(empty — appended during implementation)_
+- `dirty_files` and `wrap-up`'s pre-rebase stash now derive `ignore`/the stash pathspec from
+  `config.get("ignored_paths")` at all three call sites (`resume-state`, `start`, `wrap-up`)
+  instead of a module-level `_IGNORED_DIRTY_PATHS = (".tmp/prompts.md",)` constant, which is
+  removed. `wrap-up`'s stash now covers every dirty `ignored_paths` entry in one `git stash push`
+  (was hardcoded to the single `.tmp/prompts.md` path).
+- Found and fixed two real latent bugs while writing integration tests against synthetic fixtures
+  (both pre-existing, invisible in this repo only because `.tmp/prompts.md` happens to already be
+  a tracked file here):
+  1. `git status --porcelain` collapses a brand-new, entirely untracked directory into one
+     `?? dirname/` line instead of listing the file inside — an `ignored_paths` entry naming a
+     file that's never yet been committed would silently fail to match. Fixed by adding
+     `--untracked-files=all` to the `git status` call in `dirty_files`.
+  2. `git stash push -- <path>` refuses to stash a pathspec that only matches untracked files
+     ("did not match any file(s) known to git") unless `-u`/`--include-untracked` is also given.
+     Fixed by adding `-u` to `wrap-up`'s stash command.
+- Testing strategy steps 1-3: automated, all passed (`tests/test_init_project_scaffold.py` now
+  asserts a scaffolded `config.md` parses with `ignored_paths == []`; full `pytest` — 373 passed;
+  `sync check` exit 0). Also added 5 new integration tests to
+  `tests/test_implement_task_scaffold.py` beyond what the testing strategy asked for, covering
+  the exact scenario step 4 wanted (a dirty configured path never blocks start/resume and is
+  correctly excluded from what unlisted-dirty-file refusal reports; a dirty *unlisted* file still
+  refuses; the stash survives `wrap-up`'s rebase and pops back uncommitted, not swept into the
+  pushed commit) plus a direct `dirty_files`-with-`ignore` unit test.
+- Step 4 (human-run, scratch-branch dry run against this repo's own dirty `.tmp/prompts.md`):
+  discussed with the human — I won't touch `.tmp/prompts.md` myself per CLAUDE.md's instruction
+  not to read or act on it, and it wasn't already dirty in my working tree to observe passively.
+  Confirmed with the human that the fixture-based integration tests above exercise the identical
+  mechanism end to end (proven further by the two real bugs they caught), and that's sufficient —
+  no live dry run performed against this repo's real file.
 
 ## Notes
 
