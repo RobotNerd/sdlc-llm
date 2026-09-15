@@ -2,7 +2,7 @@
 id: TASK-025
 title: "refine-backlog: move mechanical steps to a stdlib script; activity-aware stale detection"
 type: refactor
-status: todo
+status: in-progress
 epic: EPIC-001
 created: 2026-09-14
 branch: task-025-refine-backlog-script-split
@@ -41,25 +41,25 @@ but a less intuitive knob to tune than a day-count, given commit granularity var
 
 ## Acceptance criteria
 
-- [ ] A stdlib-only Python script under `.claude/skills/refine-backlog/` performs: the resync
+- [x] A stdlib-only Python script under `.claude/skills/refine-backlog/` performs: the resync
       step (`sync` then `sync check`), the blocked-chain report (reading `BOARD.md`'s `⛔`
       markers and the tasks they name), the under-specified scan (flagging any `todo`/`blocked`
       task whose Acceptance criteria or Testing strategy section is empty or still carries
       template placeholder text), and applying a confirmed TODO reorder (moving the exact
       rendered line, then confirming `sync check` stays clean).
-- [ ] The stale-`todo` scan is reimplemented as **active-days-elapsed**: for each `todo` task,
+- [x] The stale-`todo` scan is reimplemented as **active-days-elapsed**: for each `todo` task,
       count distinct calendar days with ≥1 commit to `default_branch` strictly between its
       `created` date and today (via `git log`), and flag it only if that count exceeds a
       threshold (default 30, kept as a constant in the script — not a `config.md` field, same as
       today). A repo dormant for months and just resumed must not flag every pre-existing task.
-- [ ] `SKILL.md` is rewritten so its own prose covers only the human-facing proposals and
+- [x] `SKILL.md` is rewritten so its own prose covers only the human-facing proposals and
       decisions (which `wont-do`/re-interview/reorder suggestions to act on) — each backed by one
       script invocation for the mechanical computation and reporting.
-- [ ] Unit tests (`pytest`) cover: active-days-elapsed against a fixture git history with a
+- [x] Unit tests (`pytest`) cover: active-days-elapsed against a fixture git history with a
       deliberate multi-week gap (must not flag a task created right before the gap once resumed),
       the under-specified scan's placeholder/empty detection, and the blocked-chain report against
       a mixed-status fixture.
-- [ ] Every guardrail already in `SKILL.md` (propose, don't act unilaterally on `wont-do` or
+- [x] Every guardrail already in `SKILL.md` (propose, don't act unilaterally on `wont-do` or
       reordering) still holds — the script reports and computes; only the human's confirmed
       choice is applied.
 
@@ -79,7 +79,59 @@ but a less intuitive knob to tune than a day-count, given commit granularity var
 
 ## Worklog
 
-_(empty — appended during implementation)_
+- 2026-09-14: Built `.claude/skills/refine-backlog/scaffold.py` (stdlib only), four subcommands:
+  `resync` (bare `sync` then `sync check`), `report` (blocked-chain + stale-`todo` +
+  under-specified, one call), `mark-wont-do`, `reorder`. Imports the repo's own `.tasks/bin/sync`
+  by file path (same technique TASK-022/024 used) and reuses `discover`/`load_config`/
+  `Artifact.write()`/`render_todo_line`/`_TODO_HEADING`/`_TODO_LINE_RE` rather than
+  re-implementing any of it — `reorder` in particular reuses `sync`'s own `render_todo_line` so
+  every rewritten line is byte-identical to what `sync` itself would render.
+- **Active-days-elapsed** (`active_days_elapsed`): `git log <default_branch> --since=<created>
+  --date=short --pretty=%ad`, collected into a set of distinct calendar days, discarding the
+  `created` day itself ("strictly after"). Tested against a real backdated git history (not
+  mocked, since the whole point is real commit dates): a task `created` right before a ~200-day
+  dormant gap, with only 2 active days before the gap and 2 after resuming (3 total after
+  `created`), stays well under the 30-day threshold — proving the fix's actual point, that a
+  project resumed after a long break doesn't get every pre-existing task flagged. A second
+  fixture with 35 consecutive real active days after `created` correctly exceeds the threshold.
+- **Real bug caught by testing against the live board** (testing-strategy step "run against the
+  real board first", same precedent TASK-017 itself set): the first `underspecified_scan`
+  implementation flagged TASK-028 as having placeholder Acceptance criteria — false positive.
+  TASK-028's actual criteria are fully concrete; one bullet just *mentions* `{{placeholder}}`
+  syntax in prose ("not a `{{placeholder}}`, documented under..."), and the naive check
+  (`"{{" in line`) matched that substring anywhere in a line regardless of context. Fixed by
+  requiring the *entire* line, after stripping list/checkbox/number markup, to be nothing but the
+  placeholder token itself (`^\{\{\w+\}\}$`) — a real unfilled placeholder from `task.md`'s
+  template is always alone on its line (e.g. `- [ ] {{criterion}}`), so this stays precise while
+  no longer matching prose that merely references the syntax. Added a regression test
+  (`test_underspecified_scan_does_not_flag_prose_that_mentions_placeholder_syntax`) using
+  TASK-028's actual bullet text as the fixture. Confirmed fixed: `report` run again against the
+  real board now returns `underspecified: []`.
+- Blocked-chain report (`blocked_chain_report`): reuses `sync`'s own `_TODO_LINE_RE` to find `⛔`
+  markers and each named blocker's current status, so a transitive chain (a blocker that's
+  itself still blocked, or in-progress) is visible in the report without recursing — `SKILL.md`
+  narrates it. Run against the real board: correctly reported the real EPIC-002/003 dependency
+  chains (e.g. TASK-039 blocked by seven still-`todo` EPIC-002 tasks), with TASK-025 itself
+  (this task) correctly shown as the `in-progress` blocker for TASK-027 — proves the report
+  reflects live state, not a fixture.
+- `reorder`: takes the complete new TODO ordering, refuses (nothing written) unless it's exactly a
+  permutation of the current `todo` set (missing/unexpected/duplicate ids all named in the error),
+  otherwise rewrites the TODO section and confirms `sync check`.
+- **Tests** (`tests/test_refine_backlog_scaffold.py`, 20 new — 19 first pass + 1 regression):
+  `active_days_elapsed` (dormant-gap-not-flagged, sustained-activity-flagged) against real
+  backdated git history; `stale_todo_scan` (uses the threshold, skips non-`todo`);
+  `underspecified_scan` (placeholder/filled/vague/mentions-syntax/skips-done-and-in-progress);
+  `blocked_chain_report` (mixed-status fixture, empty case); `apply_reorder` (applies order,
+  refuses missing/unexpected/duplicate) as pure function tests; `resync`/`report`/`mark-wont-do`/
+  `reorder` subcommands exercised as real subprocesses against a scratch repo built via
+  `init-project`'s and `add-task`'s own scaffold scripts.
+- Full suite: `pytest` 300 passed (280 prior + 20 new); `python3 .tasks/bin/sync check` exit 0 on
+  the real repo throughout, including after the live `report`/`reorder` runs against it.
+- Re-read `SKILL.md` (testing strategy step 5): every remaining step is either a human-facing
+  proposal/decision (narrate the blocked chain, ask about `wont-do`/re-interview/reorder) or
+  exactly one `scaffold.py` call for the mechanical part.
+
+## Notes
 
 ## Notes
 
