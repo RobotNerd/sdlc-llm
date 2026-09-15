@@ -2,11 +2,11 @@
 id: TASK-048
 title: "Add strip-project-references skill: detect and fix portable-surface reference leaks"
 type: feature
-status: in-progress
+status: in-review
 epic: EPIC-001
 created: 2026-09-15
 branch: task-048-strip-project-references-skill
-pr: null
+pr: "https://github.com/RobotNerd/sdlc-llm/pull/45"
 merge_commit: null
 blocked_by: []
 blocks: []
