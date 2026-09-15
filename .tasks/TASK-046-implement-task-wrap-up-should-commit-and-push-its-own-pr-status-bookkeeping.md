@@ -2,11 +2,11 @@
 id: TASK-046
 title: "implement-task: wrap-up should commit and push its own pr/status bookkeeping"
 type: bug
-status: in-progress
+status: in-review
 epic: EPIC-001
 created: 2026-09-14
 branch: task-046-implement-task-wrap-up-should-commit-and-push-its-own-pr-status-bookkeeping
-pr: null
+pr: "https://github.com/RobotNerd/sdlc-llm/pull/39"
 merge_commit: null
 blocked_by: []
 blocks: []
