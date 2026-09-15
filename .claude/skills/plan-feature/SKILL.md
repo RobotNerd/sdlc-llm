@@ -10,9 +10,8 @@ means don't guess. This is how work beyond the existing backlog enters the syste
 
 Every deterministic step — allocating spec/epic ids, writing `SPEC-*.md`/`EPIC-*.md` from their
 templates, the cycle check over a proposed slice graph, and the closing `sync`/`sync check` +
-board confirmation — lives in `scaffold.py` next to this `SKILL.md` (TASK-026). This skill's own
-prose covers only the interview, the vertical-slice decomposition judgment, and both STOP
-checkpoints.
+board confirmation — lives in `scaffold.py` next to this `SKILL.md`. This skill's own prose covers
+only the interview, the vertical-slice decomposition judgment, and both STOP checkpoints.
 
 ## 1. Interview for the "why"
 
@@ -83,8 +82,8 @@ proceed anyway.
 
 For each slice, in dependency order (a slice's blockers before the slice itself), invoke
 `add-task` with the slice's description/acceptance-criteria material from step 3 and its epic
-already named (e.g. "... attach to EPIC-<id> ..."; `add-task`'s own `epic` parameter, TASK-022,
-means this skips straight past its epic-prompt interview step instead of showing a blind menu).
+already named (e.g. "... attach to EPIC-<id> ..."; `add-task`'s own `epic` parameter means this
+skips straight past its epic-prompt interview step instead of showing a blind menu).
 Carry the `blocked_by` ids decided in step 3 into each slice's `blocked_by` answer.
 
 ## 7. Finish

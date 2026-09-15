@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Deterministic scripting for the `implement-task` skill (TASK-024).
+"""Deterministic scripting for the `implement-task` skill.
 
-Same shape as `init-project`/`add-task`'s `scaffold.py` (TASK-021/022): `SKILL.md` owns everything
+Same shape as `init-project`/`add-task`'s `scaffold.py`: `SKILL.md` owns everything
 genuinely judgment-driven -- restating the plan, writing code/tests, deciding what's automatable,
 composing commit/PR content, the bail-out call -- and every STOP. Each such step is paired with
 exactly one call into this script for the mechanical git/gh/frontmatter/`sync` action that follows
@@ -74,7 +74,7 @@ def _run_sync(sync_path: Path, *extra_args: str) -> subprocess.CompletedProcess:
 
 def dirty_files(cwd: Path, ignore: tuple[str, ...] = _IGNORED_DIRTY_PATHS) -> list[str]:
     """Paths `git status --porcelain` reports as dirty, excluding `ignore`
-    (SPEC-001's `.tmp/prompts.md` carve-out -- the human's own prompt scratchpad).
+    (a carve-out for the human's own prompt scratchpad).
     """
     result = subprocess.run(
         ["git", "status", "--porcelain"], cwd=cwd, capture_output=True, text=True, check=True
@@ -127,12 +127,12 @@ def slugify(title: str) -> str:
 
 
 def compute_branch_name(branch_prefix: str, task_id: str, slug: str) -> str:
-    """`<branch_prefix><id-number>-<slug>` (SPEC-001's branch-naming convention).
+    """`<branch_prefix><id-number>-<slug>` (the workflow's branch-naming convention).
 
-    `slug` is not re-derived from the task's full title here -- real task slugs in
-    this repo are short, hand-chosen summaries (e.g. TASK-016's title "implement-task
-    skill: four phases, STOP markers, resumable, bail-out" got the branch
-    `task-016-skill-implement-task"), not a mechanical `slugify(title)`. This
+    `slug` is not re-derived from the task's full title here -- real task slugs are
+    short, hand-chosen summaries (e.g. a title like "implement-task skill: four
+    phases, STOP markers, resumable, bail-out" might get the branch
+    `task-NNN-skill-implement-task`), not a mechanical `slugify(title)`. This
     function only does the formatting; callers supply the slug -- from an existing
     task's `branch:` field when one's already set (the normal case, since `add-task`
     always sets it at creation), or `slugify(title)` as a last-resort fallback.
@@ -142,7 +142,7 @@ def compute_branch_name(branch_prefix: str, task_id: str, slug: str) -> str:
 
 
 def pick_top_unblocked(board_text: str, sync_mod: ModuleType) -> dict:
-    """SPEC-001's TODO-picking rule: read `BOARD.md`'s TODO list top to bottom,
+    """The TODO-picking rule: read `BOARD.md`'s TODO list top to bottom,
     skip any line carrying `⛔ blocked_by ...`, take the first one that doesn't.
     Returns `{"task_id": id-or-None, "skipped": [{"id", "reason"}, ...]}` -- `None`
     if every TODO task is blocked (or the list is empty).
@@ -166,7 +166,7 @@ def pick_top_unblocked(board_text: str, sync_mod: ModuleType) -> dict:
 
 
 def resume_phase(*, in_flight: dict | None, working_tree_dirty: bool, gh_pr_state: str | None) -> dict:
-    """SPEC-001 §0's resume-detection table, as a pure function of already-gathered
+    """The resume-detection table, as a pure function of already-gathered
     state (no git/gh calls in here -- see `cmd_resume_state` for the real gathering).
 
     `in_flight` is `None` (no in-progress/in-review task at all) or
@@ -177,7 +177,7 @@ def resume_phase(*, in_flight: dict | None, working_tree_dirty: bool, gh_pr_stat
     Returns `{"phase": ..., "task_id": ..., "detail": ...}` -- `phase` is one of
     `phase1` | `phase2` | `phase3` | `phase4_open` | `phase4_merged` |
     `phase4_closed_not_merged` | `ambiguous` (with `detail` explaining why on the
-    last one; SPEC-001 says to surface this to the human rather than guess).
+    last one; surface this to the human rather than guess).
     """
     if in_flight is None or not in_flight.get("branch_exists"):
         return {"phase": "phase1"}
@@ -219,9 +219,9 @@ def decide_push_args(
     """The `git push` argument list for phase 3's push -- plain, or
     `--force-with-lease` when `force` (a rebase actually rewrote already-pushed
     history). Raises `ValueError` -- refusing to build the command at all -- if
-    `current_branch` isn't `task_branch` (SPEC-001 guardrail: force-with-lease, and
-    this push in general, only on the task's own branch) or if that branch is the
-    default branch (never push task work to `default_branch`).
+    `current_branch` isn't `task_branch` (guardrail: force-with-lease, and this push
+    in general, only on the task's own branch) or if that branch is the default
+    branch (never push task work to `default_branch`).
     """
     if current_branch != task_branch:
         raise ValueError(
@@ -496,8 +496,8 @@ def cmd_wrap_up(args: argparse.Namespace) -> int:
 
     # Commit+push the pr:/status: in-review update and sync's regenerated board/epic --
     # otherwise this sits as uncommitted local drift and the PR's own diff never reflects
-    # it (found for real on TASK-025/026: `wrap-up` reported success both times, but
-    # `git status` immediately after showed this exact change uncommitted).
+    # it (found for real: `wrap-up` reported success, but `git status` immediately
+    # after showed this exact change uncommitted).
     bookkeeping_add = subprocess.run(["git", "add", "--", ".tasks"], cwd=root, capture_output=True, text=True)
     if bookkeeping_add.returncode != 0:
         print(bookkeeping_add.stderr, file=sys.stderr)
@@ -682,7 +682,7 @@ def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(prog="scaffold.py")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    subparsers.add_parser("resume-state", help="determine which phase to resume at (SPEC-001 §0)")
+    subparsers.add_parser("resume-state", help="determine which phase to resume at")
     subparsers.add_parser("gh-auth-status", help="wrap `gh auth status`")
 
     for name, help_text in (

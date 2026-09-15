@@ -1,6 +1,6 @@
 ---
 name: init-project
-description: Scaffold the "kanban in markdown" workflow (SPEC-001) into this repo — .tasks/ with BOARD.md, config.md, guidelines.md, templates, a vendored sync script, and .github/pull_request_template.md. Refuses if .tasks/ already exists. Named init-project (not init) so it doesn't collide with a generic CLAUDE.md-authoring init skill.
+description: Scaffold the "kanban in markdown" workflow into this repo — .tasks/ with BOARD.md, config.md, guidelines.md, templates, a vendored sync script, and .github/pull_request_template.md. Refuses if .tasks/ already exists. Named init-project (not init) so it doesn't collide with a generic project-instructions-authoring init skill.
 ---
 
 # init-project
@@ -9,9 +9,9 @@ A numbered checklist, not prose. Each step says exactly what to do; **STOP** mea
 human before continuing; **ASK** means don't guess — ask a follow-up question instead.
 
 Everything mechanical — creating directories, writing/copying files, vendoring `sync`, running
-`sync`/`sync check` — lives in `scaffold.py` next to this `SKILL.md` (TASK-021), not in this
-prose. This skill's own job is the interview and the two STOPs; the script writes only what's
-already been confirmed.
+`sync`/`sync check` — lives in `scaffold.py` next to this `SKILL.md`, not in this prose. This
+skill's own job is the interview and the two STOPs; the script writes only what's already been
+confirmed.
 
 ## 0. Refuse if already initialized
 

@@ -39,8 +39,8 @@ archive_done: {{archive_done}}
 
 # Workflow config
 
-Per-project settings every skill and `.tasks/bin/sync` read. This is the seam SPEC-001 describes:
-skill logic stays identical across projects, only this file changes.
+Per-project settings every skill and `.tasks/bin/sync` read. This is the seam that keeps the
+skills' logic identical across projects — only this file changes.
 
 ## Key notes
 

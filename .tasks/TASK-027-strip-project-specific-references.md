@@ -2,7 +2,7 @@
 id: TASK-027
 title: Strip project-specific references from the portable surface
 type: chore
-status: todo
+status: in-progress
 epic: EPIC-001
 created: 2026-09-14
 branch: task-027-strip-project-specific-references
@@ -49,17 +49,17 @@ diverge, and reconciling the dogfooded copies (if wanted) is left to TASK-023.
 
 ## Acceptance criteria
 
-- [ ] No `TASK-`/`EPIC-`/`SPEC-` id followed by three digits appears anywhere under
+- [x] No `TASK-`/`EPIC-`/`SPEC-` id followed by three digits appears anywhere under
       `.claude/skills/` (placeholders like `TASK-NNN` are fine).
-- [ ] No reference to `CLAUDE.md`, `.tmp/workflow-plan.md`, or "this repo's own …" remains in
+- [x] No reference to `CLAUDE.md`, `.tmp/workflow-plan.md`, or "this repo's own …" remains in
       shipped content under `.claude/skills/`.
-- [ ] Every sentence that lost a `SPEC-001 §"…"` citation still states the rule it referenced, on
+- [x] Every sentence that lost a `SPEC-001 §"…"` citation still states the rule it referenced, on
       its own, without the citation.
-- [ ] `init-project/vendored-sync` and `.tasks/bin/sync` are byte-identical.
-- [ ] A new `tests/test_portable_surface.py` mechanically enforces the id-absence and
+- [x] `init-project/vendored-sync` and `.tasks/bin/sync` are byte-identical.
+- [x] A new `tests/test_portable_surface.py` mechanically enforces the id-absence and
       vendored/`.tasks/bin/sync` parity checks above.
-- [ ] `pytest` and `python3 .tasks/bin/sync check` both pass.
-- [ ] No behavior change: `sync`'s output on this repo is unchanged (`sync check` stays clean,
+- [x] `pytest` and `python3 .tasks/bin/sync check` both pass.
+- [x] No behavior change: `sync`'s output on this repo is unchanged (`sync check` stays clean,
       no generated region diffs).
 
 ## Testing strategy
@@ -78,7 +78,25 @@ diverge, and reconciling the dogfooded copies (if wanted) is left to TASK-023.
 
 ## Worklog
 
-_(empty — appended during implementation)_
+- Scope grew beyond the Notes' file list: `add-task`, `plan-feature`, and `review-docs` (plus
+  `implement-task/scaffold.py`) weren't listed there since they postdated this task's authoring
+  (`TASK-047`/review-docs merged after), but the acceptance criteria's grep is repo-wide under
+  `.claude/skills/` and caught the same class of reference in all of them. Confirmed with the
+  human before starting: acceptance criteria treated as authoritative, all 17 files with matches
+  cleaned (not just the 10 in Notes).
+- `templates/config.md`'s `docs_review_paths: [CLAUDE.md, README.md, .tasks/guidelines.md]`
+  default and `review-docs/scaffold.py`'s `_ROOT_DOC_NAMES = ("README.md", "CLAUDE.md")` constant
+  were kept as-is: `CLAUDE.md` there is a generic Claude Code convention filename (like
+  `README.md`), not a citation pointing at *this* repo's own doc — the new test
+  (`tests/test_portable_surface.py`) has an explicit, narrow exemption for exactly these two
+  spots so a *new* stray `CLAUDE.md` reference elsewhere still trips the check.
+- Testing strategy steps 1–5: all automated, all passed (`pytest` — 346 passed, including the new
+  `tests/test_portable_surface.py` and the extended `tests/test_init_project_scaffold.py`
+  id-grep-over-scaffolded-output coverage; `sync check` exit 0 with no generated-region diff;
+  `vendored-sync`/`.tasks/bin/sync` confirmed byte-identical).
+- Step 6 (human read-through, non-automatable): presented the full diff of every edited file to
+  the human for review. Confirmed — no docstring lost its stated meaning when its citation was
+  dropped; approved proceeding to wrap-up.
 
 ## Notes
 

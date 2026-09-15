@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Deterministic scaffolding for the `init-project` skill (TASK-021).
+"""Deterministic scaffolding for the `init-project` skill.
 
 Everything here is mechanical -- no judgement, no interviewing. `SKILL.md` owns the interview
 (asking for `.tasks/config.md`'s values, warning about a missing `gh`) and the human confirmation
@@ -50,7 +50,7 @@ def _strip_leading_comment(text: str) -> str:
 
 def _yaml_scalar(value) -> str:
     """Render a Python value the way it should appear in config.md's YAML frontmatter --
-    bare (unquoted) strings and flow-style lists, matching this repo's own `config.md`.
+    bare (unquoted) strings and flow-style lists.
     """
     if value is None:
         return "null"

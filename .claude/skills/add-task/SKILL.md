@@ -11,8 +11,8 @@ means don't guess — ask a follow-up instead. Requires `.tasks/` to already exi
 
 Everything mechanical — listing open epics, writing the task file's frontmatter, placing it on the
 TODO list at the requested rank, running `sync`/`sync check` — lives in `scaffold.py` next to this
-`SKILL.md` (TASK-022), not in this prose. This skill's own job is the interview and the STOPs; the
-script writes only what's already been confirmed.
+`SKILL.md`, not in this prose. This skill's own job is the interview and the STOPs; the script
+writes only what's already been confirmed.
 
 ## 0. Parameters
 

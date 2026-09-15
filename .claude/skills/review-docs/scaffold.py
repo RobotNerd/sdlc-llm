@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Deterministic scripting for the `review-docs` skill (TASK-047).
+"""Deterministic scripting for the `review-docs` skill.
 
-Same shape as the other skills' `scaffold.py` (TASK-021/022/024/025/026): judging whether a doc's
+Same shape as the other skills' `scaffold.py`: judging whether a doc's
 prose is still accurate, redundant, or should be relocated is judgment -- that stays in
 `SKILL.md`. What's mechanical -- and lives here -- is finding *candidates* for the human/LLM to
 judge: a diff between the two guidelines.md mirrors, a reference to a repo path that no longer
@@ -61,7 +61,7 @@ def load_sync_module(tasks_root: Path) -> ModuleType:
 
 def mirror_diff(path_a: Path, path_b: Path) -> list[str]:
     """Unified diff lines between two files -- empty if identical. Reports the raw diff only;
-    judging whether a difference is expected (e.g. this repo's own SPEC-001 pointers that the
+    judging whether a difference is expected (e.g. this project's own extra specificity that the
     portable template correctly omits) is `SKILL.md`'s job, not this function's.
     """
     a_lines = path_a.read_text().splitlines(keepends=True)
@@ -123,7 +123,7 @@ _SKILL_BULLET_RE = re.compile(r"^- \*\*`([a-z][a-z0-9-]*)`\*\*", re.MULTILINE)
 
 
 def claimed_skill_names(text: str) -> set[str]:
-    """Skill names a doc enumerates, in this repo's own convention: a top-level bullet whose
+    """Skill names a doc enumerates, in the project's own convention: a top-level bullet whose
     first token is a bold backtick-quoted name (`- **`init-project`** — ...`). A doc using a
     different format simply yields an empty set -- nothing to check against it.
     """
