@@ -77,8 +77,10 @@ refine-backlog → periodic: reprioritize, recompute blocked status, flag stale/
 The skill never merges — it opens the PR and stops; phase 4 only observes the human's merge and
 records it.
 
-- **`init-project`** — scaffold `.tasks/` in a new repo. (Named `init-project`, not `init`, so it
-  doesn't collide with a generic `init` skill.)
+- **`init-project`** — scaffold `.tasks/` in a new repo, or (if already initialized) upgrade an
+  existing one: refresh every portable skill plus `guidelines.md`/templates/vendored `sync`/PR
+  template from a source clone, without ever touching project-owned data. (Named `init-project`,
+  not `init`, so it doesn't collide with a generic `init` skill.)
 - **`add-task`** — interview a request into real acceptance criteria, allocate an ID, place it in
   TODO.
 - **`implement-task`** — the four-phase loop above.

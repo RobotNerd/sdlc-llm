@@ -1,6 +1,6 @@
 ---
 name: init-project
-description: Scaffold the "kanban in markdown" workflow into this repo — .tasks/ with BOARD.md, config.md, guidelines.md, templates, a vendored sync script, and .github/pull_request_template.md. Refuses if .tasks/ already exists. Named init-project (not init) so it doesn't collide with a generic project-instructions-authoring init skill.
+description: Scaffold the "kanban in markdown" workflow into this repo — .tasks/ with BOARD.md, config.md, guidelines.md, templates, a vendored sync script, and .github/pull_request_template.md — or, if already initialized, upgrade it: refresh every portable skill plus those same toolkit files from a source clone, never touching project-owned data (BOARD.md, config.md, spec/epic/task files, archive). Named init-project (not init) so it doesn't collide with a generic project-instructions-authoring init skill.
 ---
 
 # init-project
@@ -13,13 +13,12 @@ Everything mechanical — creating directories, writing/copying files, vendoring
 skill's own job is the interview and the two STOPs; the script writes only what's already been
 confirmed.
 
-## 0. Refuse if already initialized
+## 0. Already initialized? Route to Upgrade instead
 
-Quick check: does `.tasks/` already exist at the repo root? If so, **STOP** before running any
-interview — tell the human this repo is already using the workflow, and that `init-project`
-doesn't support migrating or re-initializing an existing `.tasks/` (a future `upgrade` skill's
-job). Change nothing and end here. (`scaffold.py` also refuses on its own if this is somehow
-skipped — this step exists so the interview below isn't wasted on a doomed run.)
+Quick check: does `.tasks/` already exist at the repo root? If so, this isn't a fresh scaffold —
+skip the interview entirely and go straight to **## 4. Upgrade** below. (`scaffold.py run` also
+refuses on its own if this is somehow skipped — this step exists so the interview below isn't
+wasted on a doomed run.)
 
 ## 1. Preflight
 
@@ -75,3 +74,33 @@ message if `.tasks/` already exists, this isn't a git repo, or an answer is miss
 If it exits non-zero for any other reason: **STOP**, show the human the error — that's a bug in
 this script or in the vendored `sync`, not something to paper over by hand-editing a generated
 region. If it exits `0`, show the human the resulting `.tasks/BOARD.md`.
+
+## 4. Upgrade (an already-initialized project)
+
+Reached from step 0 when `.tasks/` already exists. No interview — just run:
+
+```
+python3 .claude/skills/init-project/scaffold.py upgrade [--source <git-url-or-path>] [--ref <ref>]
+```
+
+(`--source`/`--ref` default to the toolkit repo's own URL and `main` — only pass them to pull from
+somewhere else, e.g. a fork or a specific tag.) This refreshes every portable skill under
+`.claude/skills/` plus `guidelines.md`, `.tasks/templates/*`, `.tasks/bin/sync`, and
+`.github/pull_request_template.md` from a fresh clone of the source. It never touches `BOARD.md`,
+`config.md`, any `SPEC-*`/`EPIC-*`/`TASK-*` file, or `.tasks/archive/` — those are project-owned.
+
+- Exit `0` with no locally-modified files reported: done, show the human the JSON summary
+  (`new`/`updated`/`up_to_date` counts).
+- Exit non-zero listing locally-modified files: it wrote nothing. Show the human the printed diffs
+  — each one is a managed file edited by hand since the last `run`/`upgrade`, which a plain
+  overwrite would silently destroy. **STOP** and ask whether to keep the local edit (leave that
+  file alone, rerun `upgrade` some other time), resolve it by hand first, or accept the incoming
+  version. Only after the human explicitly accepts overwriting **all** the listed files, re-run
+  with `--force` — it re-clones and reapplies the exact same classification, this time writing the
+  previously-conflicting files too.
+- Exit non-zero for any other reason (clone failure, `sync`/`sync check` failing after a write):
+  **STOP**, show the human the error — same posture as `run`, not something to paper over.
+
+Use `--dry-run` first if the human wants to preview the classification without committing to
+either path — it prints the same JSON and writes nothing, `locally_modified` included, regardless
+of `--force`.
