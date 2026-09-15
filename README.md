@@ -26,7 +26,7 @@ epic's roll-up only ever *display* it. Text between `<!-- BEGIN:name -->` / `<!-
 markers is owned by `sync` — never hand-edited.
 
 `.tasks/specs/SPEC-001-llm-sdlc-workflow.md` is the authoritative design doc for all of this —
-data model, the seven epic-status derivation rules, `sync`'s full contract, and the five skills
+data model, the seven epic-status derivation rules, `sync`'s full contract, and the skills
 below.
 
 ## `sync`
@@ -53,9 +53,9 @@ pytest
 
 ## Skills
 
-Six Claude Code skills drive the workflow end to end. Each pairs a `SKILL.md` checklist
-(interviews, judgment calls, STOP markers) with a `scaffold.py` (stdlib-only, the mechanical
-file/`git`/`gh`/`sync` work behind each step):
+Seven Claude Code skills drive the workflow end to end (one of them repo-only — see below). Each
+pairs a `SKILL.md` checklist (interviews, judgment calls, STOP markers) with a `scaffold.py`
+(stdlib-only, the mechanical file/`git`/`gh`/`sync` work behind each step):
 
 **Feeding the backlog**
 
@@ -87,6 +87,9 @@ records it.
 - **`plan-feature`** — spec → epics → vertical-slice tasks.
 - **`review-docs`** — a periodic pass: audit `docs_review_paths` for staleness, dangling
   cross-references, and drift, and propose fixes.
+- **`strip-project-references`** — repo-only, not part of what gets vendored elsewhere: a
+  periodic pass that keeps this repo's own shipped `.claude/skills/**` surface free of
+  project-specific references, auto-fixing what's mechanically safe and proposing the rest.
 
 ## Example usage
 

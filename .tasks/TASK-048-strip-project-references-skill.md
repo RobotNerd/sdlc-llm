@@ -2,7 +2,7 @@
 id: TASK-048
 title: "Add strip-project-references skill: detect and fix portable-surface reference leaks"
 type: feature
-status: todo
+status: in-progress
 epic: EPIC-001
 created: 2026-09-15
 branch: task-048-strip-project-references-skill
@@ -88,20 +88,20 @@ seven, same as it should have when `review-docs` (TASK-047) landed — note it e
 
 ## Acceptance criteria
 
-- [ ] `.claude/skills/strip-project-references/SKILL.md` exists: numbered checklist, STOP before
+- [x] `.claude/skills/strip-project-references/SKILL.md` exists: numbered checklist, STOP before
       editing anything, same shape as `review-docs`.
-- [ ] `.claude/skills/strip-project-references/scaffold.py` exists, stdlib only, exposing at least
+- [x] `.claude/skills/strip-project-references/scaffold.py` exists, stdlib only, exposing at least
       `scan` (reports both the mechanically-fixable and judgment-needing offenders, each with
       file/line) and `apply-mechanical` (fixes only the mechanically-safe bucket).
-- [ ] `apply-mechanical` never modifies a `§`-citation sentence or a banned-phrase occurrence —
+- [x] `apply-mechanical` never modifies a `§`-citation sentence or a banned-phrase occurrence —
       only the two mechanical patterns described above.
-- [ ] `tests/test_portable_surface.py` imports its scan logic from the new skill's `scaffold.py`
+- [x] `tests/test_portable_surface.py` imports its scan logic from the new skill's `scaffold.py`
       instead of keeping its own copy of the regex/exemption list.
-- [ ] Running `scan` against the current (post-TASK-027, clean) tree reports zero offenders of
+- [x] Running `scan` against the current (post-TASK-027, clean) tree reports zero offenders of
       either kind.
-- [ ] `CLAUDE.md`'s skill list/count is updated to include `strip-project-references`, marked
+- [x] `CLAUDE.md`'s skill list/count is updated to include `strip-project-references`, marked
       repo-only.
-- [ ] `pytest` and `python3 .tasks/bin/sync check` both pass.
+- [x] `pytest` and `python3 .tasks/bin/sync check` both pass.
 
 ## Testing strategy
 
@@ -125,7 +125,36 @@ seven, same as it should have when `review-docs` (TASK-047) landed — note it e
 
 ## Worklog
 
-_(empty — appended during implementation)_
+- Detection design settled on **paragraph-level classification** (blank-line-delimited blocks of
+  the raw file text): a paragraph containing `§` or a (non-exempt) banned phrase routes every id
+  in it to the judgment bucket, even across a line break — this was necessary because the real
+  `SPEC-001\n    §'ID allocation'` citation in `.tasks/bin/sync` has the id and `§` mark on
+  *different* lines; a same-line-only check would have misclassified it as mechanically safe.
+  Verified against 7 hand-built fixtures reproducing TASK-027's real diff categories before
+  writing the formal test suite — all classified correctly.
+- Discovered mid-implementation: this skill's own `scaffold.py`/`SKILL.md` necessarily document
+  real ids and the banned phrases themselves as examples of what they detect, which tripped the
+  scanner against its own files. Resolved by excluding the skill's own directory
+  (`_EXCLUDED_SKILL_DIRS`) from `iter_skill_surface_files` — sound because "repo-only, never
+  vendored" (this skill's own premise) means it has nothing to be portable *for*. Same reasoning
+  will apply to any future repo-only skill.
+- Refactoring `tests/test_portable_surface.py` to import `scan_surface` surfaced no behavior
+  change (3/3 tests still pass) — confirms the extracted scanner matches the original inline
+  regex exactly.
+- Adding the skill made `review-docs`'s own `skill_list_check` fail against README.md (real
+  regression caught by existing tooling, not a bug in this task) — README.md's `## Skills` bullet
+  list was missing `strip-project-references`. Added it, marked repo-only. Also fixed two
+  pre-existing stale skill-count mentions in README.md ("Six" skills, "the five skills below")
+  while touching the same doc, unrelated to this task's own change but trivial and directly
+  adjacent.
+- Testing strategy steps 1-6: all automated, all passed (22 new unit tests in
+  `tests/test_strip_project_references_scaffold.py`; full suite 368 passed; `sync check` exit 0).
+- Step 7 (human-run, flagged non-automatable in the task's own Testing strategy): turned out to
+  be self-runnable — invoking a skill costs nothing and needs no credentials, so I invoked
+  `/strip-project-references` directly via the Skill tool against this repo's real tree. It ran
+  scan, got `{"mechanical": [], "judgment": []}`, correctly skipped straight to the summary step
+  per its own step 1 instruction ("If both are empty, skip to step 5"), and reported nothing to
+  do. Reads sensibly end-to-end.
 
 ## Notes
 

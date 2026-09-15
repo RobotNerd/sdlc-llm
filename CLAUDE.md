@@ -8,11 +8,13 @@ A **self-hosting toolkit** for a solo, LLM-driven SDLC workflow — "kanban in m
 uses its own workflow to build itself: `.tasks/` holds the specs, epics, and tasks for the
 toolkit, and the tooling manages that same `.tasks/` directory (dogfooded since TASK-019).
 
-All six skills exist: `init-project`, `add-task`, `implement-task`, `refine-backlog`,
-`plan-feature`, `review-docs` (`.claude/skills/`). Each pairs a `SKILL.md` checklist (judgment, interviews, STOP
-markers) with a `scaffold.py` (stdlib-only, mechanical work — file writes, `git`/`gh`, `sync`
-calls). `.tasks/bin/sync` owns every generated region in `BOARD.md`, `EPIC-*.md`, and `SPEC-*.md`
-— **run it, don't hand-edit**.
+All seven skills exist: `init-project`, `add-task`, `implement-task`, `refine-backlog`,
+`plan-feature`, `review-docs`, `strip-project-references` (`.claude/skills/`). Each pairs a
+`SKILL.md` checklist (judgment, interviews, STOP markers) with a `scaffold.py` (stdlib-only,
+mechanical work — file writes, `git`/`gh`, `sync` calls). `strip-project-references` is
+**repo-only** — it keeps this repo's own shipped surface portable, and is excluded from whatever
+copies skills into other projects. `.tasks/bin/sync` owns every generated region in `BOARD.md`,
+`EPIC-*.md`, and `SPEC-*.md` — **run it, don't hand-edit**.
 
 ## The workflow model
 
