@@ -1,6 +1,6 @@
 ---
 name: add-task
-description: Turn a rough description into a well-formed .tasks/TASK-*.md — interview for concrete acceptance criteria and a testing strategy, prompt for epic assignment, size-check against one-PR, ask for TODO rank, allocate the ID via sync next-id, then run sync.
+description: Turn a rough description into a well-formed .tasks/TASK-*.md — interview for concrete acceptance criteria and a testing strategy, prompt for epic assignment, size-check against one-PR, ask for TODO rank, then hand off to scaffold.py to allocate the ID, write the file, place it, and run sync.
 ---
 
 # add-task
@@ -8,6 +8,31 @@ description: Turn a rough description into a well-formed .tasks/TASK-*.md — in
 A numbered checklist, not prose. **STOP** means pause for the human before continuing; **ASK**
 means don't guess — ask a follow-up instead. Requires `.tasks/` to already exist (run
 `init-project` first if it doesn't) and `.tasks/bin/sync` to be runnable.
+
+Everything mechanical — listing open epics, writing the task file's frontmatter, placing it on the
+TODO list at the requested rank, running `sync`/`sync check` — lives in `scaffold.py` next to this
+`SKILL.md` (TASK-022), not in this prose. This skill's own job is the interview and the STOPs; the
+script writes only what's already been confirmed.
+
+## 0. Parameters
+
+A caller (a human, or a future skill fanning out per-slice, e.g. `plan-feature`) may pre-supply any
+of these. A supplied parameter skips its corresponding interview step below instead of asking
+anyway; anything omitted still gets the normal interview.
+
+| Parameter | Required? | Default if omitted | Skips |
+|---|---|---|---|
+| `description` | required (no default — always interview if missing) | — | Step 1's interview |
+| `type` | required (no default) | — | Step 1's type question |
+| `epic` | optional | interview (step 3) | Step 3 |
+| `blocked_by` | optional | `[]` | Step 4 |
+| `priority_mode` | optional | interview (step 5) | Step 5 |
+| `priority_after` | required alongside `priority_mode: "after"`; otherwise unused | — | (part of step 5) |
+
+`priority_mode` is `"top"`, `"end"`, or `"after"` (with `priority_after` naming the task to follow)
+— see step 5. These are exactly the keys `scaffold.py run` expects (step 6), so a fully-supplied
+call passes straight through with no translation. A supplied `epic` still gets validated (must
+exist) by `scaffold.py`, same as one chosen interactively.
 
 ## 1. Interview — don't transcribe
 
@@ -37,8 +62,10 @@ the change spans unrelated systems/files, or the testing strategy needs several 
 
 ## 3. Epic prompt
 
-Read every `.tasks/EPIC-*.md` (and `.tasks/archive/EPIC-*.md`). List the ones whose `status` is
-not `done` or `wont-do` (the same "open" definition `sync`'s board panel uses) as candidates.
+Skip this step if `epic` was pre-supplied (see step 0). Otherwise run
+`python3 .claude/skills/add-task/scaffold.py list-open-epics` — a JSON array of
+`{"id": ..., "title": ...}` for every epic whose `status` is not `done` or `wont-do` (the same
+"open" definition `sync`'s board panel uses).
 
 **ASK** the human to choose one of:
 
@@ -46,40 +73,58 @@ not `done` or `wont-do` (the same "open" definition `sync`'s board panel uses) a
 2. **Create a new epic now** — run a short interview (title, goal, in-scope, out-of-scope, at
    least one success criterion), allocate its ID with `sync next-id epic`, and write it from
    `.tasks/templates/epic.md` (drop the template's leading `<!-- ... -->` comment first). Use the
-   new epic's ID for this task's `epic:` field.
+   new epic's ID for this task's `epic:` field. (Creating a *new* epic is judgement-driven — the
+   script only handles listing *existing* ones.)
 3. **Leave unassigned** — `epic: null`.
 
 **STOP** after this choice is made, before writing the task file.
 
 ## 4. blocked_by (optional)
 
-**ASK** whether this task depends on any existing, not-yet-`done`/`wont-do` task. If so, record
-those ids in `blocked_by`. Leave `[]` if none. Don't touch any other task's `blocks` field by
-hand — `sync` reconciles `blocks` from every task's `blocked_by` automatically on the next run.
+Skip this step if `blocked_by` was pre-supplied. Otherwise **ASK** whether this task depends on
+any existing, not-yet-`done`/`wont-do` task. If so, record those ids in `blocked_by`. Leave `[]`
+if none. Don't touch any other task's `blocks` field by hand — `sync` reconciles `blocks` from
+every task's `blocked_by` automatically on the next run.
 
 ## 5. Priority placement
 
-**ASK** where this task ranks in `.tasks/BOARD.md`'s TODO list — top, bottom, or relative to a
-named existing task — rather than defaulting to "append it." `sync next-id task` only allocates
-the id; it never touches TODO order, and bare `sync` only ever *appends* a newly-`todo` task at
-the end (TODO order is hand-maintained, by design — see `guidelines.md`).
+Skip this step if `priority_mode` was pre-supplied. Otherwise **ASK** where this task ranks in
+`.tasks/BOARD.md`'s TODO list — top, bottom (end), or relative to a named existing task (after) —
+rather than defaulting to "append it." Record the answer as `priority_mode` (`"top"` | `"end"` |
+`"after"`) plus `priority_after` (the task id) when the mode is `"after"`.
 
 ## 6. Write and place
 
-1. Allocate the id: `python3 .tasks/bin/sync next-id task`.
-2. Write `.tasks/TASK-<id>-<slug>.md` from `.tasks/templates/task.md`, filling every
-   `{{placeholder}}` (including `branch: <branch_prefix><id>-<slug>` from `.tasks/config.md`) —
-   drop the template's leading `<!-- ... -->` comment first. `status: todo`, `pr: null`,
-   `merge_commit: null`, `blocks: []` — don't fill these in, the template already fixes them.
-   **The title appears twice** — once quoted in frontmatter (`title: "{{title}}"`) and again
-   unquoted in the `# {{id}}: {{title}}` heading right after it — fill in both; a plain
-   find-and-replace on `{{title}}` catches both occurrences in one pass.
-3. Run `python3 .tasks/bin/sync` (bare). This appends the new task's TODO line, correctly
-   rendered, at the *end* of the list, and (if it was assigned to an epic) regenerates that
-   epic's `children` region.
-4. If the requested rank (step 5) wasn't "at the end": in `.tasks/BOARD.md`, cut that exact
-   rendered TODO line from the end of the list and paste it back in at the requested position —
-   move the literal line `sync` just rendered, don't hand-compose a new one. TODO order is the one
-   thing `sync` never touches, so this is a plain, safe hand-edit.
-5. Run `python3 .tasks/bin/sync check` and confirm it exits `0`. Show the human the new task file
-   and its `BOARD.md` line.
+Once every answer above is settled, write them to a scratch JSON file (your scratchpad directory,
+or any temp path) with these keys:
+
+| Key | Value |
+|---|---|
+| `title` | the task's title |
+| `type` | `feature` \| `bug` \| `chore` \| `refactor` \| `docs` |
+| `epic` | `EPIC-NNN` or `null` |
+| `blocked_by` | list of task ids, `[]` if none |
+| `priority_mode` | `"top"` \| `"end"` \| `"after"` |
+| `priority_after` | task id (only when `priority_mode` is `"after"`) |
+| `slug` | optional — omit to derive one from the title |
+
+Then run:
+
+```
+python3 .claude/skills/add-task/scaffold.py run <path-to-answers.json>
+```
+
+This allocates the id, writes `.tasks/TASK-<id>-<slug>.md` from the template (frontmatter and both
+`id`/`title` occurrences filled — the body's Description/Acceptance criteria/Testing
+strategy/Notes sections are left as `{{placeholder}}`s), runs `sync`, places the new TODO line at
+the requested rank, and runs `sync check` — exiting non-zero with a clear message if anything was
+invalid (unknown `epic`/`blocked_by` id, bad `type`/`priority_mode`, a missing required key) or if
+`sync`/`sync check` didn't come back clean.
+
+If it exits non-zero for a reason other than bad input: **STOP**, show the human the error — that's
+a bug in this script or in `sync`, not something to paper over by hand-editing a generated region.
+
+If it exits `0`: fill in the new task file's body (Description, Acceptance criteria, Testing
+strategy, Notes) from what the interview in steps 1–2 produced — this is the one part of "write
+and place" that still needs the LLM, since the script deliberately leaves those sections as
+placeholders. Show the human the finished task file and its `BOARD.md` line.
