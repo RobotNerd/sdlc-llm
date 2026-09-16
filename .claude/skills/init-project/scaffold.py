@@ -10,12 +10,16 @@ Nothing here prompts interactively.
 `run` and `upgrade` share `managed_files()` -- the one table of everything the toolkit manages in
 a target project (every portable skill under `.claude/skills/`, plus `guidelines.md`,
 `.tasks/templates/*`, the vendored `sync`, and the PR template) -- so the two commands' copy lists
-can't drift apart. `run`'s own source is wherever this script's own repo lives (no clone needed,
-skills are assumed already present there); it only ever applies the four non-skill entries,
-leaving the skill entries as harmless no-ops (`apply_managed_files`'s self-copy guard) since
-source and target are the same file in that case. `upgrade` clones a real source and applies the
-full table, hash-classified against `.tasks/.toolkit-manifest.json` so a local edit is never
-silently overwritten.
+can't drift apart. `run`'s own source is always wherever this script's own repo lives (no clone
+needed, skills are assumed already present there); with no `--target`, it keeps its original
+behavior of applying only the four non-skill entries (the skill tree it's itself running from is
+assumed to already be the target project's own -- installing skills is `upgrade`'s job). Passing
+`--target <path>` points `run` at a separate project instead, and applies the full table -- skills
+included -- since that's the only way to actually bring them into a project you haven't started a
+session inside. `upgrade` clones a real source (also `--target`-aware) and always applies the full
+table, hash-classified against `.tasks/.toolkit-manifest.json` so a local edit is never silently
+overwritten -- `run --target` reuses that same classification against an empty manifest so a
+pre-existing file in a fresh target is never silently overwritten either, `--force` required.
 
 Standard library only -- no third-party dependencies, consistent with `.tasks/bin/sync` itself.
 """
@@ -122,6 +126,23 @@ def _repo_root_of(path: Path) -> Path | None:
         ["git", "-C", str(path), "rev-parse", "--show-toplevel"], capture_output=True, text=True
     )
     return Path(result.stdout.strip()) if result.returncode == 0 else None
+
+
+def _resolve_target(target: str | None) -> Path:
+    """The project root to scaffold/upgrade: `repo_root()` (the current working directory's git
+    root) when `target` is `None`, or the git root containing `target` otherwise -- letting `run`
+    and `upgrade` be invoked from this toolkit's own repo against a separate project by path.
+    Raises `SystemExit` naming `target` if it doesn't exist or isn't inside a git repository.
+    """
+    if target is None:
+        return repo_root()
+    path = Path(target).expanduser()
+    if not path.exists():
+        raise SystemExit(f"init-project: --target {target} does not exist")
+    resolved = _repo_root_of(path)
+    if resolved is None:
+        raise SystemExit(f"init-project: --target {target} is not inside a git repository")
+    return resolved
 
 
 def _git_remote_url(cwd: Path) -> str | None:
@@ -238,6 +259,31 @@ def classify_managed_files(
     return result
 
 
+def _report_conflicts(files: dict[Path, Path], root: Path, locally_modified: list[Path]) -> None:
+    """Print a diff for each conflicting managed file to stderr -- shared by `run` and `upgrade`
+    so their refusal behavior (and its wording) can't drift apart.
+    """
+    print(
+        "init-project: pre-existing managed files in the target conflict with the incoming "
+        "source -- refusing to overwrite:\n",
+        file=sys.stderr,
+    )
+    by_target = {t: s for s, t in files.items()}
+    for rel_target in locally_modified:
+        target = root / rel_target
+        diff = difflib.unified_diff(
+            target.read_text(errors="replace").splitlines(keepends=True),
+            by_target[rel_target].read_text(errors="replace").splitlines(keepends=True),
+            fromfile=str(rel_target),
+            tofile=f"{rel_target} (incoming)",
+        )
+        print("".join(diff), file=sys.stderr)
+    print(
+        "init-project: re-run with --force to overwrite these, or resolve by hand",
+        file=sys.stderr,
+    )
+
+
 def load_manifest(root: Path) -> dict:
     path = root / ".tasks" / MANIFEST_NAME
     if not path.is_file():
@@ -259,7 +305,7 @@ def write_manifest(
 
 
 def cmd_run(args: argparse.Namespace) -> int:
-    root = repo_root()
+    root = _resolve_target(args.target)
     tasks_dir = root / ".tasks"
     if tasks_dir.is_dir():
         print(
@@ -278,6 +324,30 @@ def cmd_run(args: argparse.Namespace) -> int:
         )
         return 2
 
+    # No clone: `run`'s source is always wherever this script's own repo lives. With no
+    # `--target`, `run` keeps its original behavior -- only the four non-skill entries, on the
+    # assumption the skill tree it's itself running from is already the target project's own
+    # (installing skills is `upgrade`'s job, not a fresh `run`'s). `--target` is the one thing
+    # that changes that: pointing `run` at a separate project only makes sense if it actually
+    # brings the skills along, so the full table (skills included) applies in that case.
+    own_repo_root = _repo_root_of(SKILL_DIR) or SKILL_DIR.parent.parent.parent
+    if args.target is None:
+        files = {s: t for s, t in managed_files(own_repo_root).items() if t.parts[0] != ".claude"}
+    else:
+        files = managed_files(own_repo_root)
+
+    # `.tasks/` doesn't exist yet (checked above), so there's never a prior manifest to consult --
+    # any pre-existing managed file in the target that disagrees with the incoming source is a
+    # conflict, exactly like `upgrade`'s own `locally_modified` classification.
+    classification = classify_managed_files(files, root, {})
+    if classification["locally_modified"] and not args.force:
+        _report_conflicts(files, root, classification["locally_modified"])
+        return 2
+
+    to_write = set(classification["new"]) | set(classification["up_to_date"]) | set(classification["clean_update"])
+    if args.force:
+        to_write |= set(classification["locally_modified"])
+
     (tasks_dir / "bin").mkdir(parents=True, exist_ok=True)
     (tasks_dir / "templates").mkdir(parents=True, exist_ok=True)
     (root / ".github").mkdir(parents=True, exist_ok=True)
@@ -285,12 +355,7 @@ def cmd_run(args: argparse.Namespace) -> int:
     (tasks_dir / "config.md").write_text(render_config(answers))
     (tasks_dir / "BOARD.md").write_text((TEMPLATES_DIR / "board.md").read_text())
 
-    # No clone: `run` assumes the skill tree it's itself running from is already the target
-    # project's own -- only the four non-skill entries actually get written (`apply_managed_files`
-    # no-ops the skill entries, source and target being the same file).
-    own_repo_root = _repo_root_of(SKILL_DIR) or SKILL_DIR.parent.parent.parent
-    files = {s: t for s, t in managed_files(own_repo_root).items() if t.parts[0] != ".claude"}
-    apply_managed_files(files, root)
+    apply_managed_files({s: t for s, t in files.items() if t in to_write}, root)
 
     sync_dst = tasks_dir / "bin" / "sync"
     sync_result = subprocess.run([sys.executable, str(sync_dst)], cwd=root)
@@ -320,7 +385,7 @@ def cmd_run(args: argparse.Namespace) -> int:
 
 
 def cmd_upgrade(args: argparse.Namespace) -> int:
-    root = repo_root()
+    root = _resolve_target(args.target)
     tasks_dir = root / ".tasks"
     if not tasks_dir.is_dir():
         print(
@@ -353,24 +418,7 @@ def cmd_upgrade(args: argparse.Namespace) -> int:
             return 0
 
         if classification["locally_modified"] and not args.force:
-            print(
-                "init-project: locally-modified managed files -- refusing to overwrite:\n",
-                file=sys.stderr,
-            )
-            by_target = {t: s for s, t in files.items()}
-            for rel_target in classification["locally_modified"]:
-                target = root / rel_target
-                diff = difflib.unified_diff(
-                    target.read_text(errors="replace").splitlines(keepends=True),
-                    by_target[rel_target].read_text(errors="replace").splitlines(keepends=True),
-                    fromfile=str(rel_target),
-                    tofile=f"{rel_target} (incoming)",
-                )
-                print("".join(diff), file=sys.stderr)
-            print(
-                "init-project: re-run with --force to overwrite these, or resolve by hand",
-                file=sys.stderr,
-            )
+            _report_conflicts(files, root, classification["locally_modified"])
             return 2
 
         to_write = set(classification["new"]) | set(classification["clean_update"])
@@ -416,12 +464,21 @@ def main(argv: list[str]) -> int:
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     run_parser = subparsers.add_parser(
-        "run", help="scaffold .tasks/ into the current repo from a confirmed answers file"
+        "run", help="scaffold .tasks/ into the current repo (or --target) from a confirmed answers file"
     )
     run_parser.add_argument("answers", help="path to a JSON file with the interview answers")
+    run_parser.add_argument(
+        "--target", help="path to the project to scaffold (default: the current repo)"
+    )
+    run_parser.add_argument(
+        "--force", action="store_true", help="overwrite pre-existing managed files that conflict"
+    )
 
     upgrade_parser = subparsers.add_parser(
         "upgrade", help="refresh an already-initialized project's toolkit files from a source clone"
+    )
+    upgrade_parser.add_argument(
+        "--target", help="path to the project to refresh (default: the current repo)"
     )
     upgrade_parser.add_argument("--source", help=f"git URL or local path (default: {DEFAULT_SOURCE})")
     upgrade_parser.add_argument("--ref", help=f"branch or tag to clone (default: {DEFAULT_REF})")
