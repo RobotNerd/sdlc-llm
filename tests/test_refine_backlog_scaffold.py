@@ -280,6 +280,7 @@ def test_apply_reorder_refuses_duplicate():
 INIT_PROJECT_ANSWERS = {
     "test_command": "pytest",
     "lint_command": None,
+    "format_command": None,
     "docs_paths": ["README.md"],
     "default_branch": "main",
     "branch_prefix": "task-",

@@ -2,7 +2,7 @@
 id: TASK-031
 title: Add optional format_command config key; run it in implement-task before opening a PR
 type: feature
-status: todo
+status: in-progress
 epic: EPIC-001
 created: 2026-09-14
 branch: task-031-format-command-config-key
@@ -75,19 +75,19 @@ phase 2 — only the pre-PR point, per the decision made when this task was crea
 
 ## Acceptance criteria
 
-- [ ] `init-project/templates/config.md` (and this repo's `.tasks/config.md`) include
+- [x] `init-project/templates/config.md` (and this repo's `.tasks/config.md`) include
       `format_command: null`, documented under "Key notes" like `lint_command`.
-- [ ] `scaffold.py`'s `REQUIRED_KEYS` includes `format_command`; a freshly scaffolded project is
+- [x] `scaffold.py`'s `REQUIRED_KEYS` includes `format_command`; a freshly scaffolded project is
       asked for it and writes whatever value (including `null`) is given.
-- [ ] `init-project/SKILL.md`'s interview table has a `format_command` row.
-- [ ] `implement-task` runs `format_command` (when not `null`) after the phase-3 rebase and before
+- [x] `init-project/SKILL.md`'s interview table has a `format_command` row.
+- [x] `implement-task` runs `format_command` (when not `null`) after the phase-3 rebase and before
       the push; if it modifies files, those changes are folded into the existing commit
       (`--amend`), not a separate one.
-- [ ] A `format_command` that exits non-zero itself (not just reformatting files) is a STOP,
+- [x] A `format_command` that exits non-zero itself (not just reformatting files) is a STOP,
       surfaced to the human, same treatment as `lint_command`'s failures.
-- [ ] `format_command: null` (the default) makes `implement-task` skip the step entirely — no
+- [x] `format_command: null` (the default) makes `implement-task` skip the step entirely — no
       behavior change for a project that hasn't configured one, including this repo today.
-- [ ] `pytest` and `python3 .tasks/bin/sync check` both pass.
+- [x] `pytest` and `python3 .tasks/bin/sync check` both pass.
 
 ## Testing strategy
 
@@ -107,7 +107,30 @@ phase 2 — only the pre-PR point, per the decision made when this task was crea
 
 ## Worklog
 
-_(empty — appended during implementation)_
+- Added `format_command` (default `null`) to `init-project/templates/config.md`,
+  `init-project/scaffold.py`'s `REQUIRED_KEYS`, `init-project/SKILL.md`'s interview table, and
+  this repo's own `.tasks/config.md` — mirrors `lint_command` exactly, positioned right after it.
+- `implement-task/scaffold.py`'s `cmd_wrap_up` now runs `format_command` (via `shell=True`) after
+  the phase-3 rebase (and any `ignored_paths` stash-pop) and before the push. A non-zero exit is
+  treated exactly like a rebase conflict: printed and returned as a STOP, nothing pushed, nothing
+  amended. On success, any files the formatter changed (excluding `ignored_paths`, consistent with
+  how the rest of phase 3 already protects them) are folded into the existing commit via
+  `git commit --amend --no-edit`. Whether an amend happened is now OR'd into the existing
+  force-push decision alongside `rebase_before_pr`, since an amend rewrites history the same way a
+  rebase does — matters if `wrap-up` is resumed after a formatter failure on a branch that was
+  already pushed by an earlier run.
+- Updated `implement-task/SKILL.md` phase 3 with the new step and its STOP condition.
+- Tests: added `format_command` to the 6 test fixtures that hardcode a full `init-project`
+  answers dict. Added 3 new `implement-task` integration tests against the real scratch-repo
+  fixture: a formatter that rewrites a file gets amended into the existing commit (not a separate
+  one, confirmed on both the local and pushed remote branch); `format_command: null` is a true
+  no-op; a formatter that exits non-zero stops everything after it (nothing pushed, no PR, task
+  stays `in-progress`).
+- Testing strategy step 5 (a human-run scratch-branch dry run against a real repo with real `gh`)
+  was explicitly skipped per the human's decision — the 3 automated integration tests above
+  exercise the same logic (rewrite-and-amend, no-op, and failure-stops-everything) against a real
+  git repo, just with a fake `gh` and a synthetic formatter rather than a real PR.
+- Full suite: `pytest` 420 passed; `python3 .tasks/bin/sync check` exits 0.
 
 ## Notes
 
