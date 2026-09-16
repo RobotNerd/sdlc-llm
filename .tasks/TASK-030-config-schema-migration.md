@@ -2,11 +2,11 @@
 id: TASK-030
 title: Migrate config.md to the current schema during upgrade
 type: feature
-status: in-progress
+status: in-review
 epic: EPIC-001
 created: 2026-09-14
 branch: task-030-config-schema-migration
-pr: null
+pr: "https://github.com/RobotNerd/sdlc-llm/pull/50"
 merge_commit: null
 blocked_by: [TASK-029]
 blocks: [TASK-038]
