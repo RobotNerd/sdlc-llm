@@ -2,11 +2,11 @@
 id: TASK-031
 title: Add optional format_command config key; run it in implement-task before opening a PR
 type: feature
-status: in-progress
+status: in-review
 epic: EPIC-001
 created: 2026-09-14
 branch: task-031-format-command-config-key
-pr: null
+pr: "https://github.com/RobotNerd/sdlc-llm/pull/51"
 merge_commit: null
 blocked_by: [TASK-024]
 blocks: [TASK-035]
