@@ -2,6 +2,7 @@
 workflow_version: 1
 test_command: pytest
 lint_command: null
+format_command: null
 docs_paths: [README.md, CLAUDE.md]
 docs_review_paths: [CLAUDE.md, README.md, .tasks/guidelines.md, .claude/skills/init-project/templates/guidelines.md]
 docs_ignore_paths: [.tmp/prompts.md]
@@ -31,6 +32,10 @@ describes: the skills' logic stays identical across projects, only this file cha
   stdlib-only plus `pytest` (TASK-004's sole dev dependency); adding a linter (e.g. `ruff`) is a
   separate decision, not bundled into this bootstrap. `null` means skills skip the lint step
   rather than fail on a command that doesn't exist. Update this once a linter is chosen.
+- **`format_command: null`** — no formatter is configured yet. `null` means `implement-task`
+  skips the formatting step entirely. Once set, `implement-task` runs it after phase 3's rebase
+  and before the push, amending any resulting changes into the existing commit rather than adding
+  a second one.
 - **`docs_paths`** — files `implement-task` phase 3 considers touching as part of "update docs".
 - **`docs_review_paths`** / **`docs_ignore_paths`** — `review-docs`'s own lists: which docs it
   always audits for staleness, and which paths it never scans into or flags. Deliberately

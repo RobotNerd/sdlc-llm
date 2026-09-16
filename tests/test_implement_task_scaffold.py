@@ -40,6 +40,7 @@ _loader.exec_module(implement_task_scaffold)
 INIT_PROJECT_ANSWERS = {
     "test_command": "pytest",
     "lint_command": None,
+    "format_command": None,
     "docs_paths": ["README.md"],
     "default_branch": "main",
     "branch_prefix": "task-",
@@ -470,6 +471,118 @@ def test_wrap_up_skips_empty_bookkeeping_commit(repo, fake_gh):
     assert len(after_log.splitlines()) == len(before_log.splitlines()) + 1
     assert "record PR" not in after_log
     assert implement_task_scaffold.dirty_files(repo) == []
+
+
+def _set_format_command(cwd, command):
+    """Rewrite the scaffolded `format_command: null` line in `.tasks/config.md` -- same
+    hand-edit-frontmatter technique as `_set_ignored_paths`.
+    """
+    config_path = cwd / ".tasks" / "config.md"
+    text = config_path.read_text().replace("format_command: null", f"format_command: {command}")
+    config_path.write_text(text)
+
+
+def test_wrap_up_amends_format_command_changes_into_the_existing_commit(repo, fake_gh):
+    _set_format_command(repo, "echo formatted >> feature.txt")
+    _git(["add", "-A"], cwd=repo)
+    _git(["commit", "-q", "-m", "configure format_command"], cwd=repo)
+    _git(["push"], cwd=repo)
+
+    _add_task(repo, "First task")
+    _push_tasks(repo)
+    started = _run_start(repo, task_id="TASK-001")
+    assert started.returncode == 0, started.stderr
+    _git(["add", "-A"], cwd=repo)
+    _git(["commit", "-q", "-m", "wip"], cwd=repo)
+    before_log = _git(["log", "--oneline"], cwd=repo).stdout
+
+    (repo / "feature.txt").write_text("the change\n")
+    result = _run_wrap_up(repo, {
+        "task_id": "TASK-001",
+        "paths": ["feature.txt"],
+        "commit_message": "feat(TASK-001): add the feature",
+        "pr_title": "feat(TASK-001): add the feature",
+        "pr_body": "body",
+        "bookkeeping_commit_message": "chore(TASK-001): record PR, set status in-review",
+    }, fake_gh)
+
+    assert result.returncode == 0, result.stderr
+    assert (repo / "feature.txt").read_text() == "the change\nformatted\n"
+    assert implement_task_scaffold.dirty_files(repo) == []
+
+    # the formatter's change was folded into the existing commit, not added as a new one
+    after_log = _git(["log", "--oneline"], cwd=repo).stdout
+    assert len(after_log.splitlines()) == len(before_log.splitlines()) + 2  # paths commit + bookkeeping
+
+    _git(["fetch", "origin"], cwd=repo)
+    remote_feature_text = subprocess.run(
+        ["git", "show", "origin/task-001-first-task:feature.txt"],
+        cwd=repo, capture_output=True, text=True, check=True,
+    ).stdout
+    assert remote_feature_text == "the change\nformatted\n"
+    assert _sync_check(repo).returncode == 0
+
+
+def test_wrap_up_skips_format_step_when_null(repo, fake_gh):
+    # `format_command: null` is the default -- confirm the step is a true no-op, not just
+    # "happens to do nothing" (no new commit for it, working tree stays exactly as committed).
+    _add_task(repo, "First task")
+    _push_tasks(repo)
+    started = _run_start(repo, task_id="TASK-001")
+    assert started.returncode == 0, started.stderr
+    _git(["add", "-A"], cwd=repo)
+    _git(["commit", "-q", "-m", "wip"], cwd=repo)
+    before_log = _git(["log", "--oneline"], cwd=repo).stdout
+
+    (repo / "feature.txt").write_text("the change\n")
+    result = _run_wrap_up(repo, {
+        "task_id": "TASK-001",
+        "paths": ["feature.txt"],
+        "commit_message": "feat(TASK-001): add the feature",
+        "pr_title": "feat(TASK-001): add the feature",
+        "pr_body": "body",
+        "bookkeeping_commit_message": "chore(TASK-001): record PR, set status in-review",
+    }, fake_gh)
+
+    assert result.returncode == 0, result.stderr
+    assert (repo / "feature.txt").read_text() == "the change\n"
+    after_log = _git(["log", "--oneline"], cwd=repo).stdout
+    assert len(after_log.splitlines()) == len(before_log.splitlines()) + 2  # paths commit + bookkeeping
+
+
+def test_wrap_up_stops_on_format_command_failure(repo, fake_gh):
+    _set_format_command(repo, "exit 1")
+    _git(["add", "-A"], cwd=repo)
+    _git(["commit", "-q", "-m", "configure format_command"], cwd=repo)
+    _git(["push"], cwd=repo)
+
+    _add_task(repo, "First task")
+    _push_tasks(repo)
+    started = _run_start(repo, task_id="TASK-001")
+    assert started.returncode == 0, started.stderr
+    _git(["add", "-A"], cwd=repo)
+    _git(["commit", "-q", "-m", "wip"], cwd=repo)
+
+    (repo / "feature.txt").write_text("the change\n")
+    result = _run_wrap_up(repo, {
+        "task_id": "TASK-001",
+        "paths": ["feature.txt"],
+        "commit_message": "feat(TASK-001): add the feature",
+        "pr_title": "feat(TASK-001): add the feature",
+        "pr_body": "body",
+        "bookkeeping_commit_message": "chore(TASK-001): record PR, set status in-review",
+    }, fake_gh)
+
+    assert result.returncode != 0
+    assert "format_command" in result.stderr
+
+    # the paths commit happened (it precedes the format step), but nothing was pushed and no
+    # PR was created -- the formatter failure stopped everything after it
+    assert implement_task_scaffold.local_branch_exists(repo, "task-001-first-task")
+    assert not implement_task_scaffold.remote_branch_exists(repo, "origin", "task-001-first-task")
+    task_text = (repo / ".tasks" / "TASK-001-first-task.md").read_text()
+    assert "status: in-progress" in task_text
+    assert "pr: null" in task_text
 
 
 def test_start_refuses_on_dirty_tree(repo):

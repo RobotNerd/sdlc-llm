@@ -9,6 +9,7 @@
   Placeholders:
     {{test_command}}               e.g. `pytest`, `npm test`, or `null`
     {{lint_command}}                 e.g. `ruff check .`, or `null`
+    {{format_command}}               e.g. `ruff format .`, `black .`, or `null`
     {{docs_paths}}                    e.g. `[README.md]`
     {{default_branch}}               e.g. `main`
     {{branch_prefix}}                e.g. `task-`
@@ -23,6 +24,7 @@
 workflow_version: 1
 test_command: {{test_command}}
 lint_command: {{lint_command}}
+format_command: {{format_command}}
 docs_paths: {{docs_paths}}
 docs_review_paths: [CLAUDE.md, README.md, .tasks/guidelines.md]
 docs_ignore_paths: []
@@ -49,6 +51,10 @@ skills' logic identical across projects — only this file changes.
   schema change. Bump it whenever a breaking change lands in the data model or `sync`'s contract.
 - **`lint_command`** — `null` means skills skip the lint step rather than fail on a command that
   doesn't exist. Set it once a linter is configured.
+- **`format_command`** — `null` means `implement-task` skips the formatting step. Set it once a
+  formatter is chosen (e.g. `ruff format .`, `black .`, `prettier --write .`); `implement-task`
+  runs it after phase 3's rebase and before the push, amending any resulting changes into the
+  existing commit.
 - **`docs_paths`** — files `implement-task` phase 3 considers touching as part of "update docs".
 - **`docs_review_paths`** / **`docs_ignore_paths`** — `review-docs`'s own lists: which docs it
   always audits for staleness, and which paths it never scans into or flags. Not something

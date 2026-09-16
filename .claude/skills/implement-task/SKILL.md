@@ -91,14 +91,19 @@ any code.**
    `{"task_id", "paths" (the in-scope file list from step 2.4 above), "commit_message", "pr_title",
    "pr_body", "bookkeeping_commit_message"}`. It adds+commits those paths, rebases onto
    `<remote>/<default_branch>` if `rebase_before_pr` (stashing/popping any dirty `ignored_paths`
-   around it), pushes (plain, or `--force-with-lease` only when the rebase actually rewrote
-   already-pushed history), runs `gh pr create`, records `pr:` + `status: in-review`, runs `sync`,
-   then commits+pushes that resulting change too (using `bookkeeping_commit_message`) — no separate
-   manual follow-up commit needed — and reports `gh pr checks`, returning `{"pr_url",
-   "checks_output", "checks_exit"}`.
+   around it), pushes (plain, or `--force-with-lease` only when the rebase — or the formatting
+   step below — actually rewrote already-pushed history), runs `gh pr create`, records `pr:` +
+   `status: in-review`, runs `sync`, then commits+pushes that resulting change too (using
+   `bookkeeping_commit_message`) — no separate manual follow-up commit needed — and reports
+   `gh pr checks`, returning `{"pr_url", "checks_output", "checks_exit"}`. After the rebase and
+   before the push, if `format_command` is set it's run once; any files it changes are folded into
+   the existing commit via `--amend` rather than a new one, and a non-zero exit from the formatter
+   itself is treated exactly like the rebase-conflict case below.
 4. On a rebase conflict it leaves the repo mid-rebase and exits non-zero with `git status`'s
    output — **STOP**, resolve it by hand (`git rebase --continue`, `git stash pop` if it mentions
-   one), then re-run `wrap-up`. Don't guess a resolution.
+   one), then re-run `wrap-up`. Don't guess a resolution. A `format_command` that itself exits
+   non-zero (a real tool error, not just "it reformatted files") gets the same treatment: **STOP**,
+   show the human the output, resolve by hand, then re-run `wrap-up`.
 5. Otherwise: show the human `checks_output` — a red or pending check gets surfaced, never worked
    around. **STOP here — the human reviews and merges. Never run `gh pr merge`.**
 

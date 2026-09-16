@@ -413,6 +413,7 @@ def cmd_wrap_up(args: argparse.Namespace) -> int:
     default_branch = config.get("default_branch", "main")
     rebase_before_pr = config.get("rebase_before_pr", True)
     ignored_paths = tuple(config.get("ignored_paths") or [])
+    format_command = config.get("format_command")
 
     add_result = subprocess.run(["git", "add", "-A", "--", *paths], cwd=root, capture_output=True, text=True)
     if add_result.returncode != 0:
@@ -469,12 +470,45 @@ def cmd_wrap_up(args: argparse.Namespace) -> int:
                 print(pop_result.stderr, file=sys.stderr)
                 return pop_result.returncode
 
+    amended = False
+    if format_command:
+        format_result = subprocess.run(
+            format_command, shell=True, cwd=root, capture_output=True, text=True
+        )
+        if format_result.returncode != 0:
+            print(format_result.stdout)
+            print(format_result.stderr, file=sys.stderr)
+            print(
+                f"implement-task: format_command {format_command!r} exited "
+                f"{format_result.returncode} -- STOP, resolve by hand and re-run wrap-up",
+                file=sys.stderr,
+            )
+            return format_result.returncode
+
+        formatted = dirty_files(root, ignore=ignored_paths)
+        if formatted:
+            format_add = subprocess.run(
+                ["git", "add", "-A", "--", *formatted], cwd=root, capture_output=True, text=True
+            )
+            if format_add.returncode != 0:
+                print(format_add.stderr, file=sys.stderr)
+                return format_add.returncode
+            amend_result = subprocess.run(
+                ["git", "commit", "--amend", "--no-edit"], cwd=root, capture_output=True, text=True
+            )
+            if amend_result.returncode != 0:
+                print(amend_result.stderr, file=sys.stderr)
+                return amend_result.returncode
+            amended = True
+
     push_args = decide_push_args(
         current_branch=current_branch(root),
         task_branch=branch,
         default_branch=default_branch,
         remote=remote,
-        force=rebase_before_pr and remote_existed_before_rebase,
+        # An amend rewrites history exactly like a rebase would -- if this branch was already
+        # pushed by an earlier, interrupted `wrap-up` run, a plain push would now be rejected.
+        force=(rebase_before_pr or amended) and remote_existed_before_rebase,
     )
     push_result = subprocess.run(["git", *push_args], cwd=root, capture_output=True, text=True)
     if push_result.returncode != 0:

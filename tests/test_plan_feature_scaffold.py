@@ -180,6 +180,7 @@ def test_render_epic_file_raises_on_missing_placeholder():
 INIT_PROJECT_ANSWERS = {
     "test_command": "pytest",
     "lint_command": None,
+    "format_command": None,
     "docs_paths": ["README.md"],
     "default_branch": "main",
     "branch_prefix": "task-",

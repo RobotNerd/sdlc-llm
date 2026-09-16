@@ -61,6 +61,7 @@ MANIFEST_NAME = ".toolkit-manifest.json"
 REQUIRED_KEYS = (
     "test_command",
     "lint_command",
+    "format_command",
     "docs_paths",
     "default_branch",
     "branch_prefix",
