@@ -73,7 +73,7 @@ by this repo managing its own `.tasks/` end to end.
 | TASK-046 | done | implement-task: wrap-up should commit and push its own pr/status bookkeeping |
 | TASK-047 | done | review-docs skill: periodic pass to catch stale docs and dangling references |
 | TASK-048 | done | Add strip-project-references skill: detect and fix portable-surface reference leaks |
-| TASK-049 | in-progress | init-project: scaffold and upgrade a separate target repo via --target |
+| TASK-049 | in-review | init-project: scaffold and upgrade a separate target repo via --target |
 
 Progress: 32/35 done
 <!-- END:children -->

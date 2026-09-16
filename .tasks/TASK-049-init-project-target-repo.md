@@ -2,11 +2,11 @@
 id: TASK-049
 title: "init-project: scaffold and upgrade a separate target repo via --target"
 type: bug
-status: in-progress
+status: in-review
 epic: EPIC-001
 created: 2026-09-15
 branch: task-049-init-project-target-repo
-pr: null
+pr: "https://github.com/RobotNerd/sdlc-llm/pull/49"
 merge_commit: null
 blocked_by: []
 blocks: []
