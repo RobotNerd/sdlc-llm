@@ -62,7 +62,7 @@ for them.
 |---|---|---|
 | `test_command` | How are tests run? | none — leave `null` if the human doesn't have one yet |
 | `lint_command` | How is linting run, if at all? | `null` |
-| `docs_paths` | Which files should `implement-task` phase 3 consider "the docs" to keep current? | `["README.md"]` |
+| `docs_paths` | Which documents should be automatically updated in this repository when working on tasks? | `["README.md"]` |
 | `default_branch` | Default branch name? | `main` |
 | `branch_prefix` | Prefix for task branches? | `task-` |
 | `remote` | Git remote name? | `origin` |
