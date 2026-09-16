@@ -79,8 +79,11 @@ records it.
 
 - **`init-project`** — scaffold `.tasks/` in a new repo, or (if already initialized) upgrade an
   existing one: refresh every portable skill plus `guidelines.md`/templates/vendored `sync`/PR
-  template from a source clone, without ever touching project-owned data. (Named `init-project`,
-  not `init`, so it doesn't collide with a generic `init` skill.)
+  template from a source clone, without ever touching project-owned data. Pass `--target <path>`
+  to `run`/`upgrade` to scaffold or refresh a separate project by path — clone this toolkit repo
+  and the target side by side, start a session in the toolkit clone, and point `--target` at the
+  other one. (Named `init-project`, not `init`, so it doesn't collide with a generic `init`
+  skill.)
 - **`add-task`** — interview a request into real acceptance criteria, allocate an ID, place it in
   TODO.
 - **`implement-task`** — the four-phase loop above.

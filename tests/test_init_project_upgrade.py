@@ -461,3 +461,82 @@ def test_upgrade_never_touches_non_managed_tasks_or_github_files(target, toolkit
         if rel in managed_targets:
             continue
         assert after.get(rel) == digest, f"non-managed file changed: {rel}"
+
+
+# ---------------------------------------------------------------------------
+# `--target` on both `run` and `upgrade` (TASK-049) -- scaffolding/refreshing a project by path
+# from an unrelated cwd, exercised against the same local `toolkit_source` fixture as above so
+# hashes are stable and independent of this actual working tree's uncommitted state.
+# ---------------------------------------------------------------------------
+
+
+def test_run_target_installs_skills_from_an_unrelated_cwd(tmp_path, toolkit_source):
+    cwd = tmp_path / "unrelated-cwd"
+    cwd.mkdir()
+    target = tmp_path / "target-repo"
+    target.mkdir()
+    _git(["init", "-q"], cwd=target)
+    _git(["config", "user.email", "t@example.com"], cwd=target)
+    _git(["config", "user.name", "Test"], cwd=target)
+    (target / "README.md").write_text("# scratch\n")
+    _git(["add", "-A"], cwd=target)
+    _git(["commit", "-q", "-m", "init"], cwd=target)
+
+    answers_path = tmp_path / "answers.json"
+    answers_path.write_text(json.dumps(RUN_ANSWERS))
+    result = subprocess.run(
+        [sys.executable, str(_upgrade_script(toolkit_source)), "run", str(answers_path),
+         "--target", str(target)],
+        cwd=cwd, capture_output=True, text=True,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert (target / ".claude" / "skills" / "add-task" / "SKILL.md").exists()
+    assert not (target / ".claude" / "skills" / "strip-project-references").exists()
+    assert not (cwd / ".tasks").exists()
+
+
+def test_run_target_then_upgrade_target_dry_run_sees_skills_up_to_date(tmp_path, toolkit_source):
+    target = tmp_path / "target-repo"
+    target.mkdir()
+    _git(["init", "-q"], cwd=target)
+    _git(["config", "user.email", "t@example.com"], cwd=target)
+    _git(["config", "user.name", "Test"], cwd=target)
+    (target / "README.md").write_text("# scratch\n")
+    _git(["add", "-A"], cwd=target)
+    _git(["commit", "-q", "-m", "init"], cwd=target)
+
+    answers_path = tmp_path / "answers.json"
+    answers_path.write_text(json.dumps(RUN_ANSWERS))
+    run_result = subprocess.run(
+        [sys.executable, str(_upgrade_script(toolkit_source)), "run", str(answers_path),
+         "--target", str(target)],
+        cwd=tmp_path, capture_output=True, text=True,
+    )
+    assert run_result.returncode == 0, run_result.stderr
+
+    dry = subprocess.run(
+        [sys.executable, str(_upgrade_script(toolkit_source)), "upgrade",
+         "--target", str(target), "--source", str(toolkit_source), "--ref", "main", "--dry-run"],
+        cwd=tmp_path, capture_output=True, text=True,
+    )
+
+    assert dry.returncode == 0, dry.stderr
+    classification = json.loads(dry.stdout)
+    assert classification["locally_modified"] == []
+    assert any("add-task/SKILL.md" in p for p in classification["up_to_date"])
+
+
+def test_upgrade_target_refreshes_a_separate_project(target, toolkit_source, tmp_path):
+    cwd = tmp_path / "unrelated-cwd"
+    cwd.mkdir()
+
+    result = subprocess.run(
+        [sys.executable, str(_upgrade_script(toolkit_source)), "upgrade",
+         "--target", str(target), "--source", str(toolkit_source), "--ref", "main"],
+        cwd=cwd, capture_output=True, text=True,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert (target / ".claude" / "skills" / "add-task" / "SKILL.md").exists()
+    assert not (cwd / ".tasks").exists()

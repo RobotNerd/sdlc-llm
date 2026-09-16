@@ -197,3 +197,124 @@ def test_run_refuses_second_time_in_same_repo(tmp_path):
     second = _run_scaffold(tmp_path, answers_path)
     assert second.returncode != 0
     assert "already exists" in second.stderr
+
+
+# ---------------------------------------------------------------------------
+# `run --target` (TASK-049) -- scaffolding a separate project by path, from an unrelated cwd
+# ---------------------------------------------------------------------------
+
+
+def _run_scaffold_target(cwd, answers_path, target, *extra_args):
+    return subprocess.run(
+        [sys.executable, str(SCRIPT_PATH), "run", str(answers_path), "--target", str(target), *extra_args],
+        cwd=cwd,
+        capture_output=True,
+        text=True,
+    )
+
+
+def test_run_with_target_scaffolds_full_skill_table_into_a_separate_repo(tmp_path):
+    cwd = tmp_path / "unrelated-cwd"
+    cwd.mkdir()
+    target = tmp_path / "target-repo"
+    target.mkdir()
+    _init_git_repo(target)
+    answers_path = tmp_path / "answers.json"
+    answers_path.write_text(json.dumps(SAMPLE_ANSWERS))
+
+    result = _run_scaffold_target(cwd, answers_path, target)
+    assert result.returncode == 0, result.stderr
+
+    for rel in (
+        ".tasks/BOARD.md",
+        ".tasks/config.md",
+        ".tasks/bin/sync",
+        ".github/pull_request_template.md",
+        ".claude/skills/add-task/SKILL.md",
+        ".claude/skills/init-project/SKILL.md",
+    ):
+        assert (target / rel).exists(), rel
+    assert (target / ".tasks" / "bin" / "sync").stat().st_mode & 0o777 == 0o755
+    assert not (target / ".claude" / "skills" / "strip-project-references").exists()
+    # nothing was written to the unrelated cwd
+    assert not (cwd / ".tasks").exists()
+
+    check = subprocess.run(
+        [sys.executable, str(target / ".tasks" / "bin" / "sync"), "check"],
+        cwd=target, capture_output=True, text=True,
+    )
+    assert check.returncode == 0, check.stdout + check.stderr
+
+
+def test_run_with_target_manifest_covers_skill_files(tmp_path):
+    target = tmp_path / "target-repo"
+    target.mkdir()
+    _init_git_repo(target)
+    answers_path = tmp_path / "answers.json"
+    answers_path.write_text(json.dumps(SAMPLE_ANSWERS))
+
+    result = _run_scaffold_target(tmp_path, answers_path, target)
+    assert result.returncode == 0, result.stderr
+
+    manifest = scaffold.load_manifest(target)
+    assert ".claude/skills/add-task/SKILL.md" in manifest["files"]
+
+
+def test_run_target_nonexistent_path_exits_nonzero(tmp_path):
+    answers_path = tmp_path / "answers.json"
+    answers_path.write_text(json.dumps(SAMPLE_ANSWERS))
+    missing = tmp_path / "does-not-exist"
+
+    result = _run_scaffold_target(tmp_path, answers_path, missing)
+
+    assert result.returncode != 0
+    assert str(missing) in result.stderr
+
+
+def test_run_target_not_a_git_repo_exits_nonzero(tmp_path):
+    answers_path = tmp_path / "answers.json"
+    answers_path.write_text(json.dumps(SAMPLE_ANSWERS))
+    plain_dir = tmp_path / "plain"
+    plain_dir.mkdir()
+
+    result = _run_scaffold_target(tmp_path, answers_path, plain_dir)
+
+    assert result.returncode != 0
+    assert str(plain_dir) in result.stderr
+
+
+def test_run_target_already_has_tasks_dir_exits_2(tmp_path):
+    target = tmp_path / "target-repo"
+    target.mkdir()
+    _init_git_repo(target)
+    (target / ".tasks").mkdir()
+    answers_path = tmp_path / "answers.json"
+    answers_path.write_text(json.dumps(SAMPLE_ANSWERS))
+
+    result = _run_scaffold_target(tmp_path, answers_path, target)
+
+    assert result.returncode == 2
+    assert "already exists" in result.stderr
+
+
+def test_run_target_conflict_refuses_then_force_overwrites(tmp_path):
+    target = tmp_path / "target-repo"
+    target.mkdir()
+    _init_git_repo(target)
+    conflicting = target / ".claude" / "skills" / "add-task" / "SKILL.md"
+    conflicting.parent.mkdir(parents=True)
+    conflicting.write_text("# a pre-existing, unrelated add-task doc\n")
+    answers_path = tmp_path / "answers.json"
+    answers_path.write_text(json.dumps(SAMPLE_ANSWERS))
+
+    refused = _run_scaffold_target(tmp_path, answers_path, target)
+    assert refused.returncode != 0
+    assert "add-task/SKILL.md" in refused.stderr
+    assert "--force" in refused.stderr
+    assert conflicting.read_text() == "# a pre-existing, unrelated add-task doc\n"
+    assert not (target / ".tasks").exists()
+
+    forced = _run_scaffold_target(tmp_path, answers_path, target, "--force")
+    assert forced.returncode == 0, forced.stderr
+    assert conflicting.read_text() != "# a pre-existing, unrelated add-task doc\n"
+    assert (target / ".tasks" / "BOARD.md").exists()

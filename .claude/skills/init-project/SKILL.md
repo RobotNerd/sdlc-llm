@@ -1,6 +1,6 @@
 ---
 name: init-project
-description: Scaffold the "kanban in markdown" workflow into this repo — .tasks/ with BOARD.md, config.md, guidelines.md, templates, a vendored sync script, and .github/pull_request_template.md — or, if already initialized, upgrade it by refreshing every portable skill plus those same toolkit files from a source clone, never touching project-owned data (BOARD.md, config.md, spec/epic/task files, archive). Named init-project (not init) so it doesn't collide with a generic project-instructions-authoring init skill.
+description: Scaffold the "kanban in markdown" workflow into a repo — .tasks/ with BOARD.md, config.md, guidelines.md, templates, a vendored sync script, and .github/pull_request_template.md — or, if already initialized, upgrade it by refreshing every portable skill plus those same toolkit files from a source clone, never touching project-owned data (BOARD.md, config.md, spec/epic/task files, archive). Named init-project (not init) so it doesn't collide with a generic project-instructions-authoring init skill.
 ---
 
 # init-project
@@ -13,29 +13,50 @@ Everything mechanical — creating directories, writing/copying files, vendoring
 skill's own job is the interview and the two STOPs; the script writes only what's already been
 confirmed.
 
-## 0. Already initialized? Route to Upgrade instead
+## 0. Parameters
 
-Quick check: does `.tasks/` already exist at the repo root? If so, this isn't a fresh scaffold —
-skip the interview entirely and go straight to **## 4. Upgrade** below. (`scaffold.py run` also
-refuses on its own if this is somehow skipped — this step exists so the interview below isn't
-wasted on a doomed run.)
+A caller (a human, or a future skill) may supply:
 
-## 1. Preflight
+| Parameter | Required? | Default if omitted |
+|---|---|---|
+| `target` | optional | the current repo (cwd) |
 
-1. Quick check: is the current directory inside a git repository (`git rev-parse
-   --show-toplevel`)? If not, **STOP** and tell the human `init-project` needs to run inside a
-   git repo. (Same reasoning as step 0 — `scaffold.py` verifies this independently too.)
+`target` is a path to the project to scaffold or upgrade — a separate local clone, not the repo
+this skill itself is running from. When it's given, every step below (the `.tasks/`-exists check,
+the git-repo preflight, the config-hint scan, and both `scaffold.py` command lines) acts on
+`target` instead of the current directory; the session stays running from wherever this skill's
+own files live the whole time, since that's where `scaffold.py`/the templates actually are. To
+bring this workflow into another project: clone it alongside this toolkit repo, start a session in
+the toolkit clone, and pass its path as `target`. Once scaffolding or upgrading finishes, tell the
+human to start a **new** Claude Code session inside `target` — that's the session that will
+actually use the copied skills.
+
+## 1. Already initialized? Route to Upgrade instead
+
+Quick check: does `.tasks/` already exist at `target`'s root (or the current repo's root, if no
+`target` was given)? If so, this isn't a fresh scaffold — skip the interview entirely and go
+straight to **## 5. Upgrade** below. (`scaffold.py run` also refuses on its own if this is somehow
+skipped — this step exists so the interview below isn't wasted on a doomed run.)
+
+## 2. Preflight
+
+1. Quick check: is `target` (or the current directory, if no `target` was given) inside a git
+   repository (`git rev-parse --show-toplevel`, run against that path)? If not, **STOP** and tell
+   the human `init-project` needs a git repo to scaffold into. (Same reasoning as step 1 —
+   `scaffold.py` verifies this independently too, for whichever path it's given.)
 2. Run `gh auth status`. If `gh` isn't installed, or isn't authenticated, **warn** the human that
-   `implement-task` needs `gh` for PR automation and won't work until it's set up — a warning,
-   not a blocker. **ASK** whether to continue anyway or stop to install/authenticate `gh` first.
+   `implement-task` needs `gh` for PR automation and won't work — in whichever repo it's later
+   run in — until it's set up. A warning, not a blocker. **ASK** whether to continue anyway or
+   stop to install/authenticate `gh` first.
 
-## 2. Interview for `.tasks/config.md`
+## 3. Interview for `.tasks/config.md`
 
-Ask for every value below — never fill one in without an answer. Look at the repo first for
-hints (a `package.json` `scripts.test`, a `Makefile` target, an existing CI config, a
-`pyproject.toml`) to propose a sensible default, but always **ASK** the human to confirm or
-override rather than writing a guessed value. If an answer is ambiguous (e.g. "the usual" without
-saying what that is), **ASK** a follow-up rather than picking for them.
+Ask for every value below — never fill one in without an answer. Look at `target` (or the current
+repo, if no `target` was given) first for hints (a `package.json` `scripts.test`, a `Makefile`
+target, an existing CI config, a `pyproject.toml`) to propose a sensible default, but always
+**ASK** the human to confirm or override rather than writing a guessed value. If an answer is
+ambiguous (e.g. "the usual" without saying what that is), **ASK** a follow-up rather than picking
+for them.
 
 | Key | What to ask | A reasonable default if the repo gives no better hint |
 |---|---|---|
@@ -57,35 +78,52 @@ starts `[]` — don't ask about any of them; they're fixed by the template.
 Once every value is answered, **restate the full `config.md` you're about to write and STOP** for
 the human's go-ahead before creating any files.
 
-## 3. Scaffold and finish
+## 4. Scaffold and finish
 
 Once confirmed: write the answers as a JSON object to a scratch file (your scratchpad directory,
 or any temp path — object keys are exactly the table above's, JSON `true`/`false`/`null`/lists as
 appropriate), then run:
 
 ```
-python3 .claude/skills/init-project/scaffold.py run <path-to-answers.json>
+python3 .claude/skills/init-project/scaffold.py run <path-to-answers.json> [--target <path>]
 ```
 
+Omit `--target` to scaffold the current repo (the original behavior — only `.tasks/`, `.github/`,
+and the toolkit's core files are written; the skills already sitting in this repo aren't
+recopied). Pass `--target <path>` to scaffold a separate project instead — in that case the full
+`.claude/skills/**` table (every portable skill, `strip-project-references` excluded) is copied
+into `target` too, since that's the only way a project you haven't started a session inside
+actually ends up with the skills.
+
 This performs every mechanical step (directory creation, `config.md` rendering, the verbatim
-file copies, vendoring `sync`, running `sync` then `sync check`) and exits non-zero with a clear
-message if `.tasks/` already exists, this isn't a git repo, or an answer is missing.
+file copies, vendoring `sync`, running `sync` then `sync check` — all against `target` when given)
+and exits non-zero with a clear message if `.tasks/` already exists there, `target` doesn't exist
+or isn't a git repo, or an answer is missing.
+
+If `target` already has a managed file that conflicts with the incoming source (e.g. it already
+has its own `.claude/skills/add-task/SKILL.md`), it exits non-zero and prints a diff for each
+conflicting file, writing nothing — **STOP**, show the human the diffs, and only re-run with
+`--force` once they've explicitly accepted overwriting all of them.
 
 If it exits non-zero for any other reason: **STOP**, show the human the error — that's a bug in
 this script or in the vendored `sync`, not something to paper over by hand-editing a generated
-region. If it exits `0`, show the human the resulting `.tasks/BOARD.md`.
+region. If it exits `0`, show the human the resulting `.tasks/BOARD.md`, and — if `target` was
+given — tell them to start a new Claude Code session inside `target` to actually use the skills
+just copied there.
 
-## 4. Upgrade (an already-initialized project)
+## 5. Upgrade (an already-initialized project)
 
-Reached from step 0 when `.tasks/` already exists. No interview — just run:
+Reached from step 1 when `.tasks/` already exists. No interview — just run:
 
 ```
-python3 .claude/skills/init-project/scaffold.py upgrade [--source <git-url-or-path>] [--ref <ref>]
+python3 .claude/skills/init-project/scaffold.py upgrade [--target <path>] [--source <git-url-or-path>] [--ref <ref>]
 ```
 
-(`--source`/`--ref` default to the toolkit repo's own URL and `main` — only pass them to pull from
-somewhere else, e.g. a fork or a specific tag.) This refreshes every portable skill under
-`.claude/skills/` plus `guidelines.md`, `.tasks/templates/*`, `.tasks/bin/sync`, and
+Omit `--target` to refresh the current repo; pass it to refresh a separate project by path instead
+(the human still starts a fresh session inside `target` afterward to pick up any changed skill
+prose). (`--source`/`--ref` default to the toolkit repo's own URL and `main` — only pass them to
+pull from somewhere else, e.g. a fork or a specific tag.) This refreshes every portable skill
+under `.claude/skills/` plus `guidelines.md`, `.tasks/templates/*`, `.tasks/bin/sync`, and
 `.github/pull_request_template.md` from a fresh clone of the source. It never touches `BOARD.md`,
 `config.md`, any `SPEC-*`/`EPIC-*`/`TASK-*` file, or `.tasks/archive/` — those are project-owned.
 
