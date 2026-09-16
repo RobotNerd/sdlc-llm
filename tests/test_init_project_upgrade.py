@@ -20,6 +20,8 @@ from pathlib import Path
 
 import pytest
 
+import sync as installed_sync
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SKILL_DIR = REPO_ROOT / ".claude" / "skills" / "init-project"
 SCRIPT_PATH = SKILL_DIR / "scaffold.py"
@@ -540,3 +542,206 @@ def test_upgrade_target_refreshes_a_separate_project(target, toolkit_source, tmp
     assert result.returncode == 0, result.stderr
     assert (target / ".claude" / "skills" / "add-task" / "SKILL.md").exists()
     assert not (cwd / ".tasks").exists()
+
+
+# ---------------------------------------------------------------------------
+# `merge_config_schema` (TASK-030) -- pure function, hand-built fixtures
+# ---------------------------------------------------------------------------
+
+
+_CURRENT_CONFIG = """---
+workflow_version: 1
+test_command: pytest
+lint_command: null
+docs_paths: [README.md]
+docs_review_paths: [README.md]
+docs_ignore_paths: []
+default_branch: main
+branch_prefix: task-
+remote: origin
+rebase_before_pr: true
+merge_strategy: squash
+delete_branch_after_merge: true
+allow_auto_merge: false
+ci_checks: []
+archive_done: true
+ignored_paths: []
+---
+
+# Workflow config
+"""
+
+
+def _drop_keys(text: str, *keys: str) -> str:
+    lines = text.splitlines(keepends=True)
+    return "".join(line for line in lines if not any(line.startswith(f"{k}:") for k in keys))
+
+
+def test_merge_config_schema_is_noop_on_an_already_current_file():
+    merged, added, bumped = scaffold.merge_config_schema(_CURRENT_CONFIG, installed_sync)
+    assert merged == _CURRENT_CONFIG
+    assert added == []
+    assert bumped is None
+
+
+def test_merge_config_schema_adds_a_single_missing_key_at_template_position():
+    old = _drop_keys(_CURRENT_CONFIG, "ignored_paths")
+    merged, added, bumped = scaffold.merge_config_schema(old, installed_sync)
+    assert added == ["ignored_paths"]
+    assert bumped is None
+    lines = merged.splitlines()
+    assert lines[lines.index("archive_done: true") + 1] == "ignored_paths: []"
+
+
+def test_merge_config_schema_adds_multiple_missing_keys_at_their_own_positions():
+    old = _drop_keys(_CURRENT_CONFIG, "docs_review_paths", "docs_ignore_paths", "ignored_paths")
+    merged, added, bumped = scaffold.merge_config_schema(old, installed_sync)
+    assert added == ["docs_review_paths", "docs_ignore_paths", "ignored_paths"]
+    lines = merged.splitlines()
+    assert lines[lines.index("docs_paths: [README.md]") + 1] == "docs_review_paths: [CLAUDE.md, README.md, .tasks/guidelines.md]"
+    assert lines[lines.index("docs_review_paths: [CLAUDE.md, README.md, .tasks/guidelines.md]") + 1] == "docs_ignore_paths: []"
+    assert lines[lines.index("archive_done: true") + 1] == "ignored_paths: []"
+
+
+def test_merge_config_schema_preserves_existing_values_and_project_added_key():
+    # `project_extra_key` sits between two template keys neither of which is missing here, so
+    # it's untouched by the one insertion (`ignored_paths`, at the very end) -- a clean check
+    # that an existing project-added key's position and value survive the merge unmoved.
+    old = _CURRENT_CONFIG.replace(
+        "docs_paths: [README.md]\n", "docs_paths: [README.md]\nproject_extra_key: keep-me\n"
+    )
+    old = _drop_keys(old, "ignored_paths")
+    merged, added, bumped = scaffold.merge_config_schema(old, installed_sync)
+    assert added == ["ignored_paths"]
+    assert "project_extra_key: keep-me" in merged
+    fields, _, order = installed_sync.parse_frontmatter(merged)
+    assert order.index("docs_paths") < order.index("project_extra_key") < order.index("docs_review_paths")
+    assert fields["test_command"] == "pytest"
+    assert fields["archive_done"] is True
+
+
+def test_merge_config_schema_preserves_body_byte_identical_including_dashes_lookalike():
+    body = "\n# Workflow config\n\nSome prose with a --- lookalike line.\n---\nmore prose\n"
+    old = _drop_keys(_CURRENT_CONFIG, "ignored_paths").split("---\n\n", 1)[0] + "---\n" + body
+    merged, added, _ = scaffold.merge_config_schema(old, installed_sync)
+    assert added == ["ignored_paths"]
+    _, merged_body, _ = installed_sync.parse_frontmatter(merged)
+    assert merged_body == body
+
+
+def test_merge_config_schema_round_trips_through_installed_parser():
+    old = _drop_keys(_CURRENT_CONFIG, "docs_review_paths", "docs_ignore_paths", "ignored_paths")
+    merged, added, _ = scaffold.merge_config_schema(old, installed_sync)
+    fields, _, order = installed_sync.parse_frontmatter(merged)
+    assert set(order) == set(fields.keys())
+    for key in added:
+        assert key in fields
+
+
+def test_merge_config_schema_is_idempotent():
+    old = _drop_keys(_CURRENT_CONFIG, "docs_review_paths", "docs_ignore_paths", "ignored_paths")
+    once, _, _ = scaffold.merge_config_schema(old, installed_sync)
+    twice, added_again, bumped_again = scaffold.merge_config_schema(once, installed_sync)
+    assert twice == once
+    assert added_again == []
+    assert bumped_again is None
+
+
+def test_merge_config_schema_bumps_workflow_version_when_template_is_higher(monkeypatch):
+    real_pairs = scaffold._template_frontmatter_pairs()
+
+    def bumped_pairs():
+        return [(k, "2") if k == "workflow_version" else (k, v) for k, v in real_pairs]
+
+    monkeypatch.setattr(scaffold, "_template_frontmatter_pairs", bumped_pairs)
+    merged, added, bumped = scaffold.merge_config_schema(_CURRENT_CONFIG, installed_sync)
+    assert bumped == 2
+    assert "workflow_version: 2" in merged
+
+
+def test_merge_config_schema_never_touches_a_required_interview_key():
+    old = _drop_keys(_CURRENT_CONFIG, "test_command")
+    merged, added, _ = scaffold.merge_config_schema(old, installed_sync)
+    assert "test_command" not in added
+    assert "test_command:" not in merged
+
+
+# ---------------------------------------------------------------------------
+# `migrate-config` subcommand -- real subprocess against a scaffolded target
+# ---------------------------------------------------------------------------
+
+
+def _run_migrate_config(toolkit_source, cwd, *extra_args):
+    return subprocess.run(
+        [sys.executable, str(_upgrade_script(toolkit_source)), "migrate-config", *extra_args],
+        cwd=cwd, capture_output=True, text=True,
+    )
+
+
+def test_migrate_config_preview_reports_added_keys_and_writes_nothing(target, toolkit_source):
+    config_path = target / ".tasks" / "config.md"
+    config_path.write_text(_drop_keys(config_path.read_text(), "ignored_paths"))
+    before = config_path.read_text()
+
+    result = _run_migrate_config(toolkit_source, target)
+
+    assert result.returncode == 0, result.stderr
+    output = json.loads(result.stdout)
+    assert output["added"] == ["ignored_paths"]
+    assert output["applied"] is False
+    assert "ignored_paths" in output["diff"]
+    assert config_path.read_text() == before
+
+
+def test_migrate_config_apply_writes_and_reruns_sync_check(target, toolkit_source):
+    config_path = target / ".tasks" / "config.md"
+    config_path.write_text(_drop_keys(config_path.read_text(), "ignored_paths"))
+
+    result = _run_migrate_config(toolkit_source, target, "--apply")
+
+    assert result.returncode == 0, result.stderr
+    output = json.loads(result.stdout)
+    assert output["added"] == ["ignored_paths"]
+    assert output["applied"] is True
+    assert "ignored_paths: []" in config_path.read_text()
+
+    check = subprocess.run(
+        [sys.executable, str(target / ".tasks" / "bin" / "sync"), "check"],
+        cwd=target, capture_output=True, text=True,
+    )
+    assert check.returncode == 0, check.stderr
+
+
+def test_migrate_config_noop_when_schema_already_current(target, toolkit_source):
+    result = _run_migrate_config(toolkit_source, target)
+    assert result.returncode == 0, result.stderr
+    output = json.loads(result.stdout)
+    assert output == {"added": [], "workflow_version_bumped_to": None, "applied": False}
+
+
+def test_migrate_config_integration_end_to_end_via_upgrade(target, toolkit_source):
+    """Full flow (TASK-030's testing strategy step 4): a project scaffolded at an older schema
+    (missing template-fixed keys `run` itself never wrote), `upgrade` refreshes the toolkit
+    files/sync, then `migrate-config --apply` brings `config.md` up to date -- exactly the
+    missing keys appear and nothing else in `config.md` changes.
+    """
+    config_path = target / ".tasks" / "config.md"
+    original = _drop_keys(config_path.read_text(), "docs_review_paths", "docs_ignore_paths", "ignored_paths")
+    config_path.write_text(original)
+
+    upgrade_result = _run_upgrade(toolkit_source, target)
+    assert upgrade_result.returncode == 0, upgrade_result.stderr
+    assert config_path.read_text() == original  # `upgrade` itself never touches config.md
+
+    migrate_result = _run_migrate_config(toolkit_source, target, "--apply")
+    assert migrate_result.returncode == 0, migrate_result.stderr
+    output = json.loads(migrate_result.stdout)
+    assert set(output["added"]) == {"docs_review_paths", "docs_ignore_paths", "ignored_paths"}
+
+    fields, _, _ = installed_sync.parse_frontmatter(config_path.read_text())
+    original_fields, _, _ = installed_sync.parse_frontmatter(original)
+    for key, value in original_fields.items():
+        assert fields[key] == value
+    assert fields["docs_review_paths"] == ["CLAUDE.md", "README.md", ".tasks/guidelines.md"]
+    assert fields["docs_ignore_paths"] == []
+    assert fields["ignored_paths"] == []
