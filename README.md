@@ -83,7 +83,9 @@ records it.
   to `run`/`upgrade` to scaffold or refresh a separate project by path — clone this toolkit repo
   and the target side by side, start a session in the toolkit clone, and point `--target` at the
   other one. (Named `init-project`, not `init`, so it doesn't collide with a generic `init`
-  skill.)
+  skill.) A separate `migrate-config` step additively brings an older project's `config.md` up
+  to the current schema — new keys only, at a human-approved STOP, never overwriting a value the
+  project already set.
 - **`add-task`** — interview a request into real acceptance criteria, allocate an ID, place it in
   TODO.
 - **`implement-task`** — the four-phase loop above.

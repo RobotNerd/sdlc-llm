@@ -127,8 +127,8 @@ under `.claude/skills/` plus `guidelines.md`, `.tasks/templates/*`, `.tasks/bin/
 `.github/pull_request_template.md` from a fresh clone of the source. It never touches `BOARD.md`,
 `config.md`, any `SPEC-*`/`EPIC-*`/`TASK-*` file, or `.tasks/archive/` — those are project-owned.
 
-- Exit `0` with no locally-modified files reported: done, show the human the JSON summary
-  (`new`/`updated`/`up_to_date` counts).
+- Exit `0` with no locally-modified files reported: show the human the JSON summary
+  (`new`/`updated`/`up_to_date` counts), then continue to **config.md migration** below.
 - Exit non-zero listing locally-modified files: it wrote nothing. Show the human the printed diffs
   — each one is a managed file edited by hand since the last `run`/`upgrade`, which a plain
   overwrite would silently destroy. **STOP** and ask whether to keep the local edit (leave that
@@ -142,3 +142,28 @@ under `.claude/skills/` plus `guidelines.md`, `.tasks/templates/*`, `.tasks/bin/
 Use `--dry-run` first if the human wants to preview the classification without committing to
 either path — it prints the same JSON and writes nothing, `locally_modified` included, regardless
 of `--force`.
+
+### config.md migration
+
+`config.md` is project-owned, so it's never part of `upgrade`'s own manifest/hash-classified
+table above — it's only ever additively merged, and always gets its own STOP, run once `upgrade`
+itself has succeeded (so `.tasks/bin/sync` is the refreshed one doing the parsing):
+
+```
+python3 .claude/skills/init-project/scaffold.py migrate-config [--target <path>]
+```
+
+This previews only — it reports `{"added": [...], "workflow_version_bumped_to": ..., "applied":
+false, "diff": "..."}` and writes nothing. If `added` is empty and `workflow_version_bumped_to` is
+`null`, the schema is already current — nothing further to do. Otherwise, restate the reported
+`diff` to the human and **STOP** for explicit approval before writing anything. Once approved, run:
+
+```
+python3 .claude/skills/init-project/scaffold.py migrate-config --apply [--target <path>]
+```
+
+which writes the merged `config.md`, re-runs `sync` + `sync check`, and reports
+`{"added": [...], "workflow_version_bumped_to": ..., "applied": true}` — show this to the human as
+the final summary alongside step 5's own JSON. A non-zero exit here (parse failure, `sync`/`sync
+check` failing after the write) is the same posture as everywhere else: **STOP**, show the error,
+don't paper over it by hand-editing `config.md`.

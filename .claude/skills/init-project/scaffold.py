@@ -4,8 +4,9 @@
 Everything here is mechanical -- no judgement, no interviewing. `SKILL.md` owns the interview
 (asking for `.tasks/config.md`'s values, warning about a missing `gh`) and the human confirmation
 STOPs; once the human has approved, the skill writes the confirmed answers to a JSON file and
-invokes this script's `run` (fresh project) or `upgrade` (refresh an existing one) subcommand.
-Nothing here prompts interactively.
+invokes this script's `run` (fresh project), `upgrade` (refresh an existing one), or
+`migrate-config` (additively bring `config.md` up to the current schema) subcommand. Nothing
+here prompts interactively.
 
 `run` and `upgrade` share `managed_files()` -- the one table of everything the toolkit manages in
 a target project (every portable skill under `.claude/skills/`, plus `guidelines.md`,
@@ -29,6 +30,7 @@ from __future__ import annotations
 import argparse
 import difflib
 import hashlib
+import importlib.util
 import json
 import re
 import shutil
@@ -36,7 +38,9 @@ import subprocess
 import sys
 import tempfile
 from datetime import date
+from importlib.machinery import SourceFileLoader
 from pathlib import Path
+from types import ModuleType
 
 SKILL_DIR = Path(__file__).resolve().parent
 TEMPLATES_DIR = SKILL_DIR / "templates"
@@ -101,6 +105,98 @@ def render_config(answers: dict) -> str:
 
 def missing_keys(answers: dict) -> list[str]:
     return [key for key in REQUIRED_KEYS if key not in answers]
+
+
+def load_sync_module(sync_path: Path) -> ModuleType:
+    """Import a `sync` script by file path -- it has no `.py` suffix so a normal `import`
+    can't find it. Same technique `add-task`/`plan-feature`/`implement-task`/`refine-backlog`/
+    `review-docs`'s own `scaffold.py` already use. Raises `SystemExit` if `sync_path` doesn't
+    exist.
+    """
+    if not sync_path.is_file():
+        raise SystemExit(f"init-project: {sync_path} not found")
+    loader = SourceFileLoader("sync", str(sync_path))
+    spec = importlib.util.spec_from_loader("sync", loader)
+    module = importlib.util.module_from_spec(spec)
+    # `sync` defines `@dataclass class Artifact`, which looks itself up via
+    # `sys.modules[cls.__module__]` -- it must already be registered before
+    # `exec_module` runs, or that lookup returns `None` and crashes.
+    sys.modules["sync"] = module
+    loader.exec_module(module)
+    return module
+
+
+def _template_frontmatter_pairs() -> list[tuple[str, str]]:
+    """Ordered (key, raw_value) pairs from `templates/config.md`'s frontmatter block, as
+    literal text -- not run through `parse_frontmatter`, since a `{{placeholder}}` token
+    (an interview-answered `REQUIRED_KEYS` entry) isn't valid YAML on its own.
+    """
+    text = _strip_leading_comment((TEMPLATES_DIR / "config.md").read_text())
+    end = text.index("\n---\n", 4)
+    block = text[4:end]
+    pairs = []
+    for line in block.split("\n"):
+        if not line.strip():
+            continue
+        key, _, value = line.partition(":")
+        pairs.append((key.strip(), value.strip()))
+    return pairs
+
+
+def merge_config_schema(project_text: str, sync_module: ModuleType) -> tuple[str, list[str], object]:
+    """Additively migrate an existing project's `config.md` to the current template's schema.
+
+    Only ever *adds* keys the project's file lacks -- among the template's fixed keys (every
+    template key outside `REQUIRED_KEYS`, since those are interview answers `upgrade` has no
+    value for and never invents one for) -- at the template's relative position, with the
+    template's own literal default, parsed via `sync_module.parse_frontmatter` itself (a tiny
+    synthetic `"---\\nkey: value\\n---\\n"` snippet) rather than a second hand-rolled scalar
+    parser -- one parser, used both ways. `workflow_version` is bumped to the template's value
+    when the template's is higher. Existing keys, their values, their order, project-added
+    extra keys, and the body are left byte-for-byte alone.
+
+    Returns `(merged_text, added_keys, bumped_to)` -- `bumped_to` is `None` unless
+    `workflow_version` was bumped. When there is nothing to add or bump, `merged_text` is
+    `project_text` itself, untouched -- guarantees true idempotency regardless of any cosmetic
+    formatting a full parse/render round-trip might otherwise normalize away.
+
+    Raises `sync_module.FrontmatterError` if `project_text` doesn't parse.
+    """
+    fields, body, order = sync_module.parse_frontmatter(project_text)
+    template_pairs = _template_frontmatter_pairs()
+    template_index = {key: i for i, (key, _) in enumerate(template_pairs)}
+
+    new_fields = dict(fields)
+    new_order = list(order)
+    added: list[str] = []
+
+    for key, raw_value in template_pairs:
+        if key in REQUIRED_KEYS or key in new_fields:
+            continue
+        default_fields, _, _ = sync_module.parse_frontmatter(f"---\n{key}: {raw_value}\n---\n")
+        insert_at = 0
+        for prev_key, _ in reversed(template_pairs[: template_index[key]]):
+            if prev_key in new_order:
+                insert_at = new_order.index(prev_key) + 1
+                break
+        new_order.insert(insert_at, key)
+        new_fields[key] = default_fields[key]
+        added.append(key)
+
+    bumped_to = None
+    template_version_raw = dict(template_pairs)["workflow_version"]
+    template_version = sync_module.parse_frontmatter(
+        f"---\nworkflow_version: {template_version_raw}\n---\n"
+    )[0]["workflow_version"]
+    if "workflow_version" in new_fields and template_version > new_fields["workflow_version"]:
+        new_fields["workflow_version"] = template_version
+        bumped_to = template_version
+
+    if not added and bumped_to is None:
+        return project_text, [], None
+
+    merged = sync_module.render_frontmatter(new_fields, new_order) + body
+    return merged, added, bumped_to
 
 
 def repo_root() -> Path:
@@ -459,6 +555,79 @@ def cmd_upgrade(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_migrate_config(args: argparse.Namespace) -> int:
+    """Additively migrate `.tasks/config.md` to the current template's schema.
+
+    Deliberately separate from `upgrade` itself: `config.md` is project-owned and never
+    hash-classified against the toolkit manifest the way skills/templates/sync are, so it gets
+    its own preview-then-`--apply` gate instead -- a bare call only reports what it *would* add
+    and writes nothing, so `SKILL.md` can show the human the diff and STOP before anything is
+    written for real. Parses/renders via the project's own already-installed
+    `.tasks/bin/sync` -- run this after `upgrade` has refreshed it, so the merge is guaranteed
+    to write something that same parser accepts.
+    """
+    root = _resolve_target(args.target)
+    tasks_dir = root / ".tasks"
+    if not tasks_dir.is_dir():
+        print(f"init-project: {tasks_dir} not found -- run `scaffold.py run` first", file=sys.stderr)
+        return 2
+
+    sync_module = load_sync_module(tasks_dir / "bin" / "sync")
+    config_path = tasks_dir / "config.md"
+    project_text = config_path.read_text()
+
+    try:
+        merged, added, bumped_to = merge_config_schema(project_text, sync_module)
+    except sync_module.FrontmatterError as exc:
+        print(f"init-project: {config_path} does not parse: {exc}", file=sys.stderr)
+        return 2
+
+    if not added and bumped_to is None:
+        print(json.dumps({"added": [], "workflow_version_bumped_to": None, "applied": False}))
+        return 0
+
+    if not args.apply:
+        diff = "".join(difflib.unified_diff(
+            project_text.splitlines(keepends=True),
+            merged.splitlines(keepends=True),
+            fromfile=str(config_path),
+            tofile=f"{config_path} (proposed)",
+        ))
+        print(json.dumps({
+            "added": added,
+            "workflow_version_bumped_to": bumped_to,
+            "applied": False,
+            "diff": diff,
+        }))
+        return 0
+
+    config_path.write_text(merged)
+
+    sync_dst = tasks_dir / "bin" / "sync"
+    sync_result = subprocess.run([sys.executable, str(sync_dst)], cwd=root, capture_output=True, text=True)
+    if sync_result.returncode != 0:
+        print("init-project: `sync` failed after config migration", file=sys.stderr)
+        print(sync_result.stdout, file=sys.stderr)
+        print(sync_result.stderr, file=sys.stderr)
+        return sync_result.returncode
+
+    check_result = subprocess.run(
+        [sys.executable, str(sync_dst), "check"], cwd=root, capture_output=True, text=True
+    )
+    if check_result.returncode != 0:
+        print(
+            "init-project: `sync check` is not clean immediately after config migration -- "
+            "this is a bug in this script or in the vendored sync, not something to paper over",
+            file=sys.stderr,
+        )
+        print(check_result.stdout, file=sys.stderr)
+        print(check_result.stderr, file=sys.stderr)
+        return check_result.returncode
+
+    print(json.dumps({"added": added, "workflow_version_bumped_to": bumped_to, "applied": True}))
+    return 0
+
+
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(prog="scaffold.py")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -489,8 +658,19 @@ def main(argv: list[str]) -> int:
         "--force", action="store_true", help="overwrite locally-modified managed files too"
     )
 
+    migrate_config_parser = subparsers.add_parser(
+        "migrate-config",
+        help="additively migrate .tasks/config.md to the current template's schema",
+    )
+    migrate_config_parser.add_argument(
+        "--target", help="path to the project whose config.md to migrate (default: the current repo)"
+    )
+    migrate_config_parser.add_argument(
+        "--apply", action="store_true", help="write the migration (default: preview only)"
+    )
+
     args = parser.parse_args(argv)
-    dispatch = {"run": cmd_run, "upgrade": cmd_upgrade}
+    dispatch = {"run": cmd_run, "upgrade": cmd_upgrade, "migrate-config": cmd_migrate_config}
     if args.command in dispatch:
         return dispatch[args.command](args)
     parser.error(f"unknown command {args.command!r}")
