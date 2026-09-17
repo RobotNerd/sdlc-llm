@@ -11,7 +11,7 @@ between `<!-- BEGIN -->` / `<!-- END -->` markers — change the task/epic file 
 |---|---|---|
 | EPIC-002 | in-progress | 4/9 done |
 | EPIC-003 | todo | 0/7 done |
-| EPIC-004 | todo | 0/10 done |
+| EPIC-004 | todo | 0/11 done |
 <!-- END:epics -->
 
 ## TODO
@@ -37,7 +37,8 @@ between `<!-- BEGIN -->` / `<!-- END -->` markers — change the task/epic file 
 - TASK-060 — Rework state: 3-strike cap, stale-report guard, second-opinion cap  `EPIC-004` ⛔ blocked_by TASK-059
 - TASK-061 — Dynamic worker effort/model tiering by task difficulty  `EPIC-004` ⛔ blocked_by TASK-054
 - TASK-062 — Worker scope fence: SubagentStop hook denying out-of-scope diffs  `EPIC-004` ⛔ blocked_by TASK-054
-- TASK-063 — orchestrate-batch skill: wire orchestrator/worker/critic into implement-task's loop  `EPIC-004` ⛔ blocked_by TASK-056, TASK-057, TASK-058, TASK-059, TASK-060, TASK-061, TASK-062
+- TASK-063 — orchestrate-batch skill: wire orchestrator/worker/critic into implement-task's loop  `EPIC-004` ⛔ blocked_by TASK-056, TASK-057, TASK-058, TASK-059, TASK-060, TASK-061, TASK-062, TASK-064
+- TASK-064 — Context compaction/reset: proactive orchestrator checkpoint-clear + worker mid-task guard  `EPIC-004` ⛔ blocked_by TASK-043, TASK-054, TASK-060
 
 ## In Progress
 

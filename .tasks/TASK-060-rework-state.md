@@ -9,7 +9,7 @@ branch: task-060-rework-state
 pr: null
 merge_commit: null
 blocked_by: [TASK-059]
-blocks: [TASK-063]
+blocks: [TASK-063, TASK-064]
 ---
 
 # TASK-060: Rework state: 3-strike cap, stale-report guard, second-opinion cap

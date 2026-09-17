@@ -233,9 +233,9 @@ Read @.tasks/guidelines.md to gain context.
 
 ---
 
-/add-task New task in EPIC-004 at the bottom of the TODO list. I want a mechanism to automatically compact (or clear if that make more sense) the context for orchestrator and worker agents. Since these will be long-running agents, then I expect their context to eventually fill up and degrade performance.
+<!-- /add-task New task in EPIC-004 at the bottom of the TODO list. I want a mechanism to automatically compact (or clear if that make more sense) the context for orchestrator and worker agents. Since these will be long-running agents, then I expect their context to eventually fill up and degrade performance.
 
-One call out--I assume that the worker will be a long-running agent, but I need to verify that with you. The other possible workflow I can imagine is that the orchestrator would create a new instance of the worker for every task (sequentially). I'll defer to you to tell me which workflow is a more performant.
+One call out--I assume that the worker will be a long-running agent, but I need to verify that with you. The other possible workflow I can imagine is that the orchestrator would create a new instance of the worker for every task (sequentially). I'll defer to you to tell me which workflow is a more performant. -->
 
 ---
 

@@ -9,7 +9,7 @@ branch: task-054-agent-roster-config-and-generation
 pr: null
 merge_commit: null
 blocked_by: [TASK-040, TASK-042, TASK-043, TASK-044, TASK-045]
-blocks: [TASK-056, TASK-061, TASK-062]
+blocks: [TASK-056, TASK-061, TASK-062, TASK-064]
 ---
 
 # TASK-054: Agent roster: per-role config keys and generated .claude/agents/*.md

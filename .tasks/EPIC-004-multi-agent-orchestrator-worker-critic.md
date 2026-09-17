@@ -57,6 +57,7 @@ implement-task's loop runs as three roles with independently configurable model 
 | TASK-061 | todo | Dynamic worker effort/model tiering by task difficulty |
 | TASK-062 | todo | Worker scope fence: SubagentStop hook denying out-of-scope diffs |
 | TASK-063 | todo | orchestrate-batch skill: wire orchestrator/worker/critic into implement-task's loop |
+| TASK-064 | todo | Context compaction/reset: proactive orchestrator checkpoint-clear + worker mid-task guard |
 
-Progress: 0/10 done
+Progress: 0/11 done
 <!-- END:children -->
