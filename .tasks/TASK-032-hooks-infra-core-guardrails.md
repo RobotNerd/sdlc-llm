@@ -2,11 +2,11 @@
 id: TASK-032
 title: Hooks infrastructure + shared guardrails module + core git/gh guardrail hooks
 type: feature
-status: todo
+status: in-review
 epic: EPIC-002
 created: 2026-09-14
 branch: task-032-hooks-infra-core-guardrails
-pr: null
+pr: "https://github.com/RobotNerd/sdlc-llm/pull/59"
 merge_commit: null
 blocked_by: []
 blocks: [TASK-033, TASK-034, TASK-035, TASK-036, TASK-037, TASK-038, TASK-039, TASK-040, TASK-045]
@@ -82,7 +82,52 @@ SPEC-002's Alternatives for why.
 
 ## Worklog
 
-_(empty — appended during implementation)_
+Implemented the full hooks-infra slice:
+
+- `.tasks/bin/guardrails.py` (canonical) — `GuardrailResult(allow, reason)` plus three checks:
+  `check_gh_pr_merge` (deny unless a `marker_present` flag is set -- nothing can set it yet, so
+  it denies unconditionally today without being a bare unconditional check in shape),
+  `check_push_to_default_branch` (fetches `<remote>/<default_branch>`, diffs `...HEAD`, and
+  denies unless every changed path is `BOARD.md`, `EPIC-*.md`, `.tasks/archive/**`, or a task
+  file whose only changed frontmatter fields -- via `sync.parse_frontmatter` -- are
+  `status`/`merge_commit`/`pr`), and `check_force_push` (bare `--force` always denied;
+  `--force-with-lease` denied unless its target branch matches an `in-progress` task's own
+  `branch:`). `evaluate_bash_command` runs all three and loads `.tasks/config.md` itself.
+- `.claude/hooks/pretooluse_bash.py` (canonical) — reads the `PreToolUse` stdin JSON, calls
+  `evaluate_bash_command` for a `Bash` tool call, exits `2` + stderr reason to deny, `0` with no
+  output to allow (or on anything it can't make sense of).
+- `.claude/settings.json` (canonical) — registers that hook on `PreToolUse`/`Bash`, invoked as
+  `python3 $CLAUDE_PROJECT_DIR/.claude/hooks/pretooluse_bash.py` (no reliance on the exec bit).
+- Vendored, portable copies (byte-identical, enforced by new tests):
+  `.claude/skills/init-project/vendored-guardrails`,
+  `.claude/skills/init-project/vendored-hooks/pretooluse_bash.py`,
+  `.claude/skills/init-project/templates/settings.json`. Both the module and the hook script
+  had their docstrings written id/citation-free from the start (portable surface).
+- `managed_files()` in `init-project/scaffold.py` gained the three new entries (settings.json,
+  vendored-guardrails -> `.tasks/bin/guardrails.py`, every file under `vendored-hooks/` ->
+  `.claude/hooks/<name>`); `apply_managed_files` chmods the new executables 0o755 alongside
+  `sync`. `SKILL.md`'s two managed-file descriptions updated to match.
+- Extended `test_run_with_target_scaffolds_full_skill_table_into_a_separate_repo` to assert the
+  three new files exist (and are executable where relevant) in a fresh scaffold.
+
+Testing strategy:
+1. Unit tests per guardrail function (`tests/test_guardrails.py`) against crafted `tmp_path`
+   git fixtures (bare origin + clone, matching `test_implement_task_scaffold.py`'s
+   conventions) -- covering both allow and deny cases for all three, including an
+   archive-move edge case (delete + re-add under `.tasks/archive/`, allowed) and a sneaky
+   task-title change hiding among an allowed field set (denied). **Pass.**
+2. Hook-script tests: real subprocess invocation of `.claude/hooks/pretooluse_bash.py` with the
+   documented `PreToolUse` stdin JSON shape, for `gh pr merge`, a `git push` to `main` with a
+   non-board change, a bare `--force` push, and `--force-with-lease` on the wrong branch --
+   all confirmed denied (exit 2, reason on stderr); an ordinary command and a non-`Bash` tool
+   call confirmed to pass through with exit 0 and no output. **Pass.**
+3. `python3 -m pytest -q` -- 438 passed (410 + 28 new), no regressions. **Pass.**
+4. `python3 .tasks/bin/sync check` -- exit 0. **Pass.**
+5. Scratch-branch dry run (human-run): a throwaway branch/PR off `origin/main` in this repo,
+   fresh Claude Code session so `.claude/settings.json` was actually loaded, `gh pr merge`
+   attempted for real -- **blocked as expected**, confirming Claude Code wires the hook up
+   correctly end to end, not just that the script works in isolation. PR closed unmerged,
+   scratch branch deleted locally and on `origin`. Confirmed by the human running it.
 
 ## Notes
 

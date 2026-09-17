@@ -52,8 +52,10 @@ the mechanics.
 
 ## Guardrails
 
-- Never push to `main`. Never `gh pr merge` — the human merges.
-- Force-push only as `--force-with-lease`, only on the current task's branch, only after a rebase.
+- Never push to `main`. Never `gh pr merge` — the human merges. **Hook-enforced**
+  (`.claude/settings.json`'s `PreToolUse`/`Bash` hook, `.tasks/bin/guardrails.py`).
+- Force-push only as `--force-with-lease`, only on the current task's branch, only after a
+  rebase. **Hook-enforced.**
 - Never touch files outside the current task's scope.
 - Never hand-edit inside `BEGIN:`/`END:` regions, or an epic's `status` (except `wont-do`).
 - Board regeneration, ID allocation, archiving, blocked-status are `sync`'s job, not judgement.
