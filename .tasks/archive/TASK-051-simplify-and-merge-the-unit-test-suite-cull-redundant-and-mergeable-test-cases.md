@@ -2,12 +2,12 @@
 id: TASK-051
 title: "Simplify and merge the unit test suite: cull redundant and mergeable test cases"
 type: refactor
-status: in-review
+status: done
 epic: EPIC-001
 created: 2026-09-16
 branch: task-051-simplify-and-merge-the-unit-test-suite-cull-redundant-and-mergeable-test-cases
 pr: "https://github.com/RobotNerd/sdlc-llm/pull/56"
-merge_commit: null
+merge_commit: 71a14a19e6f8578537395aad788a54f55de94c7b
 blocked_by: []
 blocks: []
 ---

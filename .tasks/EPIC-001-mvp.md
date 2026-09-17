@@ -2,7 +2,7 @@
 id: EPIC-001
 title: MVP
 spec: SPEC-001
-status: in-progress
+status: done
 created: 2026-09-10
 ---
 
@@ -75,7 +75,7 @@ by this repo managing its own `.tasks/` end to end.
 | TASK-048 | done | Add strip-project-references skill: detect and fix portable-surface reference leaks |
 | TASK-049 | done | init-project: scaffold and upgrade a separate target repo via --target |
 | TASK-050 | done | implement-task asks which task to work instead of auto-picking the top of TODO |
-| TASK-051 | in-review | Simplify and merge the unit test suite: cull redundant and mergeable test cases |
+| TASK-051 | done | Simplify and merge the unit test suite: cull redundant and mergeable test cases |
 
-Progress: 36/37 done
+Progress: 37/37 done
 <!-- END:children -->
