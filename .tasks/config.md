@@ -1,6 +1,6 @@
 ---
 workflow_version: 1
-test_command: pytest
+test_command: .venv/bin/pytest
 lint_command: null
 format_command: null
 docs_paths: [README.md, CLAUDE.md]
