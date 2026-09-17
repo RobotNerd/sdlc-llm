@@ -2,11 +2,11 @@
 id: TASK-033
 title: "Structural edit guardrails hook: generated regions and epic status"
 type: feature
-status: in-progress
+status: in-review
 epic: EPIC-002
 created: 2026-09-14
 branch: task-033-structural-edit-guardrails-hook
-pr: null
+pr: "https://github.com/RobotNerd/sdlc-llm/pull/60"
 merge_commit: null
 blocked_by: [TASK-032]
 blocks: [TASK-039, TASK-040]
