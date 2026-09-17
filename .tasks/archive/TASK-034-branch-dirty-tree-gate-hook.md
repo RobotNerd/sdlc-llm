@@ -2,12 +2,12 @@
 id: TASK-034
 title: Branch-name + dirty-tree gate hook
 type: feature
-status: in-review
+status: done
 epic: EPIC-002
 created: 2026-09-14
 branch: task-034-branch-dirty-tree-gate-hook
 pr: "https://github.com/RobotNerd/sdlc-llm/pull/61"
-merge_commit: null
+merge_commit: bcdc215982736fe19bf9af817ba24d35c019deed
 blocked_by: [TASK-032, TASK-028]
 blocks: [TASK-039, TASK-040]
 ---
