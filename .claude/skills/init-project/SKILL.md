@@ -1,6 +1,6 @@
 ---
 name: init-project
-description: Scaffold the "kanban in markdown" workflow into a repo — .tasks/ with BOARD.md, config.md, guidelines.md, templates, a vendored sync script, and .github/pull_request_template.md — or, if already initialized, upgrade it by refreshing every portable skill plus those same toolkit files from a source clone, never touching project-owned data (BOARD.md, config.md, spec/epic/task files, archive). Named init-project (not init) so it doesn't collide with a generic project-instructions-authoring init skill.
+description: Scaffold the "kanban in markdown" workflow into a repo — .tasks/ with BOARD.md, config.md, guidelines.md, templates, a vendored sync script, guardrail hooks (.claude/settings.json, .claude/hooks/), and .github/pull_request_template.md — or, if already initialized, upgrade it by refreshing every portable skill plus those same toolkit files from a source clone, never touching project-owned data (BOARD.md, config.md, spec/epic/task files, archive). Named init-project (not init) so it doesn't collide with a generic project-instructions-authoring init skill.
 ---
 
 # init-project
@@ -124,7 +124,8 @@ Omit `--target` to refresh the current repo; pass it to refresh a separate proje
 (the human still starts a fresh session inside `target` afterward to pick up any changed skill
 prose). (`--source`/`--ref` default to the toolkit repo's own URL and `main` — only pass them to
 pull from somewhere else, e.g. a fork or a specific tag.) This refreshes every portable skill
-under `.claude/skills/` plus `guidelines.md`, `.tasks/templates/*`, `.tasks/bin/sync`, and
+under `.claude/skills/` plus `guidelines.md`, `.tasks/templates/*`, `.tasks/bin/sync`,
+`.tasks/bin/guardrails.py`, `.claude/hooks/*`, `.claude/settings.json`, and
 `.github/pull_request_template.md` from a fresh clone of the source. It never touches `BOARD.md`,
 `config.md`, any `SPEC-*`/`EPIC-*`/`TASK-*` file, or `.tasks/archive/` — those are project-owned.
 

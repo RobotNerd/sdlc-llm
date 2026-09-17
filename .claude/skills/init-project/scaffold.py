@@ -274,10 +274,12 @@ def managed_files(source_dir: Path) -> dict[Path, Path]:
     `source_dir`) -> target path relative to the target repo's root.
 
     Every file under `source_dir/.claude/skills/<name>/**` for every skill not in
-    `_REPO_ONLY_SKILLS` (`__pycache__` excluded), plus the four single-file items `run` has
-    always copied: `guidelines.md`, the three task/epic/spec templates, `vendored-sync` (->
-    `.tasks/bin/sync`), and `pull_request_template.md`. `config.md` and `BOARD.md` are
-    deliberately absent -- project-owned, never touched by either command.
+    `_REPO_ONLY_SKILLS` (`__pycache__` excluded), plus the single-file items `run` has always
+    copied: `guidelines.md`, the three task/epic/spec templates, `vendored-sync` (->
+    `.tasks/bin/sync`), `vendored-guardrails` (-> `.tasks/bin/guardrails.py`), every file under
+    `vendored-hooks/` (-> `.claude/hooks/<name>`), `settings.json` (-> `.claude/settings.json`),
+    and `pull_request_template.md`. `config.md` and `BOARD.md` are deliberately absent --
+    project-owned, never touched by either command.
     """
     files: dict[Path, Path] = {}
 
@@ -291,11 +293,19 @@ def managed_files(source_dir: Path) -> dict[Path, Path]:
                     continue
                 files[path] = path.relative_to(source_dir)
 
-    init_templates = skills_src / "init-project" / "templates"
+    init_project = skills_src / "init-project"
+    init_templates = init_project / "templates"
     files[init_templates / "guidelines.md"] = Path(".tasks/guidelines.md")
     for name in ("spec.md", "epic.md", "task.md"):
         files[init_templates / name] = Path(f".tasks/templates/{name}")
-    files[skills_src / "init-project" / "vendored-sync"] = Path(".tasks/bin/sync")
+    files[init_project / "vendored-sync"] = Path(".tasks/bin/sync")
+    files[init_project / "vendored-guardrails"] = Path(".tasks/bin/guardrails.py")
+    vendored_hooks = init_project / "vendored-hooks"
+    if vendored_hooks.is_dir():
+        for path in sorted(vendored_hooks.iterdir()):
+            if path.is_file():
+                files[path] = Path(".claude/hooks") / path.name
+    files[init_templates / "settings.json"] = Path(".claude/settings.json")
     files[init_templates / "pull_request_template.md"] = Path(".github/pull_request_template.md")
 
     return files
@@ -314,7 +324,7 @@ def apply_managed_files(files: dict[Path, Path], root: Path) -> list[Path]:
             continue
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy(source, target)
-        if rel_target == Path(".tasks/bin/sync"):
+        if rel_target == Path(".tasks/bin/sync") or rel_target == Path(".tasks/bin/guardrails.py") or rel_target.parts[:2] == (".claude", "hooks"):
             target.chmod(0o755)
         written.append(rel_target)
     return written
