@@ -11,6 +11,7 @@ between `<!-- BEGIN -->` / `<!-- END -->` markers — change the task/epic file 
 |---|---|---|
 | EPIC-002 | in-progress | 4/9 done |
 | EPIC-003 | todo | 0/7 done |
+| EPIC-004 | todo | 0/10 done |
 <!-- END:epics -->
 
 ## TODO
@@ -27,6 +28,16 @@ between `<!-- BEGIN -->` / `<!-- END -->` markers — change the task/epic file 
 - TASK-043 — Context/token usage safety-valve interrupt + usage reporting  `EPIC-003` ⛔ blocked_by TASK-041
 - TASK-044 — Follow-up task creation policy with a configurable per-batch limit  `EPIC-003` ⛔ blocked_by TASK-041
 - TASK-045 — Opt-in, critic-gated, per-batch-capped auto-merge  `EPIC-003` ⛔ blocked_by TASK-041
+- TASK-054 — Agent roster: per-role config keys and generated .claude/agents/*.md  `EPIC-004` ⛔ blocked_by TASK-040, TASK-042, TASK-043, TASK-044, TASK-045
+- TASK-055 — OpenRouter client: live model catalog, pricing, and balance  `EPIC-004` ⛔ blocked_by TASK-040, TASK-042, TASK-043, TASK-044, TASK-045
+- TASK-056 — Critic client: diff to structured findings JSON  `EPIC-004` ⛔ blocked_by TASK-054, TASK-055
+- TASK-057 — Pre-send safety: opt-in flag, secret scan, diff-size cap for external review  `EPIC-004` ⛔ blocked_by TASK-055
+- TASK-058 — Budget guardrail: OpenRouter credit floor and burn-rate monitor  `EPIC-004` ⛔ blocked_by TASK-055
+- TASK-059 — Critic-report triage taxonomy with a severity floor  `EPIC-004` ⛔ blocked_by TASK-056
+- TASK-060 — Rework state: 3-strike cap, stale-report guard, second-opinion cap  `EPIC-004` ⛔ blocked_by TASK-059
+- TASK-061 — Dynamic worker effort/model tiering by task difficulty  `EPIC-004` ⛔ blocked_by TASK-054
+- TASK-062 — Worker scope fence: SubagentStop hook denying out-of-scope diffs  `EPIC-004` ⛔ blocked_by TASK-054
+- TASK-063 — orchestrate-batch skill: wire orchestrator/worker/critic into implement-task's loop  `EPIC-004` ⛔ blocked_by TASK-056, TASK-057, TASK-058, TASK-059, TASK-060, TASK-061, TASK-062
 
 ## In Progress
 

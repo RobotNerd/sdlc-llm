@@ -1,6 +1,6 @@
 ---
 id: TASK-040
-title: "TDD mode for implement-task phase 2"
+title: TDD mode for implement-task phase 2
 type: feature
 status: todo
 epic: EPIC-003
@@ -9,7 +9,7 @@ branch: task-040-tdd-mode
 pr: null
 merge_commit: null
 blocked_by: [TASK-032, TASK-033, TASK-034, TASK-035, TASK-036, TASK-037, TASK-038]
-blocks: []
+blocks: [TASK-054, TASK-055]
 ---
 
 # TASK-040: TDD mode for implement-task phase 2
