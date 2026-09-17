@@ -54,7 +54,7 @@ module with the skills' own scripts.
 | TASK-036 | todo | SPEC/TASK-reference scan hook (repo-only, never copied) |
 | TASK-037 | todo | SessionStart board-context hook |
 | TASK-038 | todo | Wire hooks into upgrade and config migration |
-| TASK-052 | in-review | Re-scope guidelines.md to the non-outsourceable core and add a skill-selection map |
+| TASK-052 | done | Re-scope guidelines.md to the non-outsourceable core and add a skill-selection map |
 
-Progress: 0/8 done
+Progress: 1/8 done
 <!-- END:children -->

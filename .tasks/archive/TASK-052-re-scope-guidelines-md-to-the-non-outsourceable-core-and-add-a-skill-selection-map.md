@@ -2,12 +2,12 @@
 id: TASK-052
 title: Re-scope guidelines.md to the non-outsourceable core and add a skill-selection map
 type: docs
-status: in-review
+status: done
 epic: EPIC-002
 created: 2026-09-16
 branch: task-052-re-scope-guidelines-md-to-the-non-outsourceable-core-and-add-a-skill-selection-map
 pr: "https://github.com/RobotNerd/sdlc-llm/pull/57"
-merge_commit: null
+merge_commit: 1a13ff994770bf0ab881745eb14e2c23f8476bb4
 blocked_by: []
 blocks: [TASK-037]
 ---
