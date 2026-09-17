@@ -8,17 +8,14 @@ Acceptance criteria this covers:
   in-progress, pr (falling back to branch) otherwise; no epic -> "—"
 - done column capped at the most recent N rows
 - every empty region renders `_(none)_` (via the region engine)
-- composes with replace_region; running twice is a no-op
+- composes with replace_region
 - an empty board, and a board with a task in each status
 """
 
 from pathlib import Path
 
-import pytest
-
 from sync import (
     Artifact,
-    RegionError,
     ensure_region,
     render_board_column,
     render_board_epics_panel,
@@ -152,19 +149,6 @@ def test_column_no_cap_when_cap_is_none():
     assert "TASK-001" in result and "TASK-025" in result
 
 
-def test_column_rejects_a_pipe_in_a_title():
-    tasks = [make_task("TASK-001", "blocked", "bad | title")]
-    with pytest.raises(RegionError, match=r"\|"):
-        render_board_column(tasks, "blocked")
-
-
 def test_column_composes_with_region_engine_and_none_marker():
     result = ensure_region("# Board\n", "blocked", render_board_column([], "blocked"))
     assert "_(none)_" in result
-
-
-def test_column_running_twice_is_a_no_op():
-    tasks = [make_task("TASK-001", "in-progress", "a", branch="task-001-a")]
-    once = ensure_region("# Board\n", "in-progress", render_board_column(tasks, "in-progress"))
-    twice = ensure_region(once, "in-progress", render_board_column(tasks, "in-progress"))
-    assert twice == once

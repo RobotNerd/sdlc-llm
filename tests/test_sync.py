@@ -22,56 +22,55 @@ from sync import Artifact, FrontmatterError, discover, parse_frontmatter, render
 # ---------------------------------------------------------------------------
 
 
-def test_parses_bare_and_quoted_scalars():
-    text = '---\nid: TASK-001\ntitle: "sync: a title with a colon"\nstatus: todo\n---\nbody\n'
+@pytest.mark.parametrize(
+    "text,expected_fields,extra_check",
+    [
+        (
+            '---\nid: TASK-001\ntitle: "sync: a title with a colon"\nstatus: todo\n---\nbody\n',
+            {"id": "TASK-001", "title": "sync: a title with a colon", "status": "todo"},
+            lambda fields, body, order: order == ["id", "title", "status"] and body == "body\n",
+        ),
+        (
+            "---\npr: null\nallow_auto_merge: false\nrebase_before_pr: true\nworkflow_version: 1\n---\n",
+            {"pr": None, "allow_auto_merge": False, "rebase_before_pr": True, "workflow_version": 1},
+            # int, not bool -- `1 == True` in Python, so this catches a parser that
+            # silently mis-typed the value in a way `==` alone wouldn't reveal
+            lambda fields, body, order: fields["workflow_version"] is not True,
+        ),
+        ("---\nn: -3\n---\n", {"n": -3}, None),
+        (
+            "---\nblocked_by: []\nblocks: [TASK-006, TASK-010, TASK-011]\n---\n",
+            {"blocked_by": [], "blocks": ["TASK-006", "TASK-010", "TASK-011"]},
+            None,
+        ),
+        (
+            "---\nflags: [true, false, null, 1, plain]\n---\n",
+            {"flags": [True, False, None, 1, "plain"]},
+            None,
+        ),
+        (
+            "---\nstatus: draft            # draft | approved | superseded\n---\n",
+            {"status": "draft"},
+            None,
+        ),
+        ('---\ntitle: "issue #3 in the title"\n---\n', {"title": "issue #3 in the title"}, None),
+        (
+            "---\nid: TASK-001\n\ntitle: x\n---\n",
+            {"id": "TASK-001", "title": "x"},
+            lambda fields, body, order: order == ["id", "title"],
+        ),
+    ],
+    ids=[
+        "bare-and-quoted-scalars", "null-bool-and-int", "negative-int", "empty-and-populated-lists",
+        "list-items-as-scalars", "trailing-comment-ignored", "hash-inside-quotes-not-a-comment",
+        "blank-lines-skipped",
+    ],
+)
+def test_parses_scalar_cases(text, expected_fields, extra_check):
     fields, body, order = parse_frontmatter(text)
-    assert fields == {"id": "TASK-001", "title": "sync: a title with a colon", "status": "todo"}
-    assert order == ["id", "title", "status"]
-    assert body == "body\n"
-
-
-def test_parses_null_bool_and_int():
-    text = "---\npr: null\nallow_auto_merge: false\nrebase_before_pr: true\nworkflow_version: 1\n---\n"
-    fields, _, _ = parse_frontmatter(text)
-    assert fields == {
-        "pr": None,
-        "allow_auto_merge": False,
-        "rebase_before_pr": True,
-        "workflow_version": 1,
-    }
-    assert fields["workflow_version"] is not True  # int, not bool
-
-
-def test_parses_negative_int():
-    fields, _, _ = parse_frontmatter("---\nn: -3\n---\n")
-    assert fields == {"n": -3}
-
-
-def test_parses_empty_and_populated_lists():
-    text = "---\nblocked_by: []\nblocks: [TASK-006, TASK-010, TASK-011]\n---\n"
-    fields, _, _ = parse_frontmatter(text)
-    assert fields == {"blocked_by": [], "blocks": ["TASK-006", "TASK-010", "TASK-011"]}
-
-
-def test_list_items_parsed_as_scalars_not_just_strings():
-    fields, _, _ = parse_frontmatter("---\nflags: [true, false, null, 1, plain]\n---\n")
-    assert fields == {"flags": [True, False, None, 1, "plain"]}
-
-
-def test_trailing_comment_is_ignored():
-    fields, _, _ = parse_frontmatter("---\nstatus: draft            # draft | approved | superseded\n---\n")
-    assert fields == {"status": "draft"}
-
-
-def test_hash_inside_quotes_is_not_a_comment():
-    fields, _, _ = parse_frontmatter('---\ntitle: "issue #3 in the title"\n---\n')
-    assert fields == {"title": "issue #3 in the title"}
-
-
-def test_blank_lines_in_frontmatter_are_skipped():
-    fields, _, order = parse_frontmatter("---\nid: TASK-001\n\ntitle: x\n---\n")
-    assert fields == {"id": "TASK-001", "title": "x"}
-    assert order == ["id", "title"]
+    assert fields == expected_fields
+    if extra_check:
+        assert extra_check(fields, body, order)
 
 
 def test_body_after_frontmatter_is_preserved():

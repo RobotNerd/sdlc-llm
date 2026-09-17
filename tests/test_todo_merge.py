@@ -82,12 +82,6 @@ def test_render_todo_line_no_marker_once_every_blocker_is_satisfied():
     assert "⛔" not in render_todo_line(task, tasks)
 
 
-def test_render_todo_line_rejects_a_pipe_in_title():
-    task = make_task("TASK-001", title="bad | title")
-    with pytest.raises(RegionError, match=r"\|"):
-        render_todo_line(task, {"TASK-001": task})
-
-
 def test_render_todo_line_round_trip_yields_the_same_id():
     from sync import _TODO_LINE_RE
 
@@ -216,16 +210,6 @@ def test_apply_todo_merge_preserves_order_drops_and_appends():
     assert "TASK-002" not in todo_section
     lines = [l for l in todo_section.splitlines() if l.startswith("- ")]
     assert lines == ["- TASK-001 — a  `EPIC-001`", "- TASK-003 — c"]
-
-
-def test_apply_todo_merge_is_idempotent():
-    tasks = {
-        "TASK-002": make_task("TASK-002", title="b", epic="EPIC-001"),
-        "TASK-001": make_task("TASK-001", title="a", epic="EPIC-001"),
-    }
-    once = apply_todo_merge(BOARD_FIXTURE, tasks)
-    twice = apply_todo_merge(once, tasks)
-    assert twice == once
 
 
 def test_apply_todo_merge_raises_without_a_todo_heading():

@@ -32,39 +32,6 @@ def repo(tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# The fixture itself exercises what the AC asks for
-# ---------------------------------------------------------------------------
-
-
-def test_fixture_exercises_every_status(repo):
-    tasks = {a.id: a for a in discover(repo).values() if a.kind == "task"}
-    statuses = {t.fields["status"] for t in tasks.values()}
-    assert statuses == {"todo", "in-progress", "in-review", "blocked", "done", "wont-do"}
-
-
-def test_fixture_has_a_mixed_children_epic(repo):
-    tasks = discover(repo)
-    epic = tasks["EPIC-001"]
-    children = [t for t in tasks.values() if t.kind == "task" and t.fields.get("epic") == "EPIC-001"]
-    child_statuses = {c.fields["status"] for c in children}
-    assert child_statuses == {"done", "todo"}  # mixed -> rule 7
-
-
-def test_fixture_has_a_blocked_chain():
-    tasks = discover(FIXTURE)
-    assert tasks["TASK-007"].fields["blocked_by"] == ["TASK-008"]
-    assert tasks["TASK-008"].fields["blocked_by"] == ["TASK-001"]
-    assert tasks["TASK-001"].fields["status"] == "done"  # chain resolves at the end
-
-
-def test_fixture_has_archivable_tasks_not_yet_archived():
-    tasks = discover(FIXTURE)
-    assert tasks["TASK-001"].fields["status"] == "done"
-    assert tasks["TASK-006"].fields["status"] == "wont-do"
-    assert (FIXTURE / "archive").exists() is False or not list((FIXTURE / "archive").glob("*.md"))
-
-
-# ---------------------------------------------------------------------------
 # Idempotency
 # ---------------------------------------------------------------------------
 

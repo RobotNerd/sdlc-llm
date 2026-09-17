@@ -149,58 +149,33 @@ def test_apply_managed_files_skips_self_copy(tmp_path):
 # ---------------------------------------------------------------------------
 
 
-def test_classify_new_when_target_missing(tmp_path):
+@pytest.mark.parametrize(
+    "source_content,target_content,manifest_hash_content,expected_bucket",
+    [
+        (None, None, None, "new"),
+        ("content\n", "content\n", None, "up_to_date"),
+        ("new content\n", "old content\n", "old content\n", "clean_update"),
+        ("new content\n", "someone's edit\n", "old content\n", "locally_modified"),
+        # a pre-manifest project: no `manifest_hashes` entry for this file at all, and it
+        # doesn't match the incoming source either -- must not be silently treated as safe
+        # to overwrite.
+        ("new content\n", "pre-existing local content\n", None, "locally_modified"),
+    ],
+    ids=["new", "up-to-date", "clean-update", "locally-modified-hash-mismatch", "locally-modified-no-manifest-entry"],
+)
+def test_classify(tmp_path, source_content, target_content, manifest_hash_content, expected_bucket):
     source = tmp_path / "source.md"
-    source.write_text("content\n")
+    source.write_text(source_content or "content\n")
     root = tmp_path / "target"
     root.mkdir()
-    result = scaffold.classify_managed_files({source: Path("file.md")}, root, {})
-    assert result["new"] == [Path("file.md")]
+    if target_content is not None:
+        (root / "file.md").write_text(target_content)
+    manifest_hashes = {}
+    if manifest_hash_content is not None:
+        manifest_hashes["file.md"] = hashlib.sha256(manifest_hash_content.encode()).hexdigest()
 
-
-def test_classify_up_to_date_when_matching(tmp_path):
-    source = tmp_path / "source.md"
-    source.write_text("content\n")
-    root = tmp_path / "target"
-    root.mkdir()
-    (root / "file.md").write_text("content\n")
-    result = scaffold.classify_managed_files({source: Path("file.md")}, root, {})
-    assert result["up_to_date"] == [Path("file.md")]
-
-
-def test_classify_clean_update_when_target_matches_manifest_not_source(tmp_path):
-    source = tmp_path / "source.md"
-    source.write_text("new content\n")
-    root = tmp_path / "target"
-    root.mkdir()
-    (root / "file.md").write_text("old content\n")
-    manifest_hashes = {"file.md": hashlib.sha256(b"old content\n").hexdigest()}
     result = scaffold.classify_managed_files({source: Path("file.md")}, root, manifest_hashes)
-    assert result["clean_update"] == [Path("file.md")]
-
-
-def test_classify_locally_modified_when_target_matches_neither(tmp_path):
-    source = tmp_path / "source.md"
-    source.write_text("new content\n")
-    root = tmp_path / "target"
-    root.mkdir()
-    (root / "file.md").write_text("someone's edit\n")
-    manifest_hashes = {"file.md": hashlib.sha256(b"old content\n").hexdigest()}
-    result = scaffold.classify_managed_files({source: Path("file.md")}, root, manifest_hashes)
-    assert result["locally_modified"] == [Path("file.md")]
-
-
-def test_classify_locally_modified_when_no_manifest_entry_at_all(tmp_path):
-    """A pre-manifest project: no `manifest_hashes` entry for this file at all, and it doesn't
-    match the incoming source either -- must not be silently treated as safe to overwrite.
-    """
-    source = tmp_path / "source.md"
-    source.write_text("new content\n")
-    root = tmp_path / "target"
-    root.mkdir()
-    (root / "file.md").write_text("pre-existing local content\n")
-    result = scaffold.classify_managed_files({source: Path("file.md")}, root, {})
-    assert result["locally_modified"] == [Path("file.md")]
+    assert result[expected_bucket] == [Path("file.md")]
 
 
 def test_manifest_round_trips(tmp_path):

@@ -10,9 +10,22 @@ Acceptance criteria this covers:
   file, and the idempotent-replace case
 """
 
+from pathlib import Path
+
 import pytest
 
-from sync import RegionError, RegionSpan, ensure_region, find_region, replace_region
+from sync import (
+    Artifact,
+    RegionError,
+    RegionSpan,
+    ensure_region,
+    find_region,
+    render_board_column,
+    render_epic_children,
+    render_spec_epics,
+    render_todo_line,
+    replace_region,
+)
 
 ONE_REGION = (
     "# Doc\n\n"
@@ -233,7 +246,31 @@ def test_ensure_region_empty_body_renders_none_marker_on_first_creation():
     assert result[span.begin_end:span.end_start] == "_(none)_\n"
 
 
-def test_ensure_region_is_idempotent_once_created():
-    once = ensure_region("# Doc\n", "epics", "content")
-    twice = ensure_region(once, "epics", "content")
-    assert twice == once
+# ---------------------------------------------------------------------------
+# every renderer built on the region engine shares its pipe guard
+# ---------------------------------------------------------------------------
+
+
+def _task(title: str, **extra) -> Artifact:
+    fields = {"id": "TASK-001", "status": "todo", "title": title, "epic": None, "blocked_by": [], **extra}
+    return Artifact(id="TASK-001", kind="task", path=Path("TASK-001.md"), fields=fields, order=list(fields), body="")
+
+
+def _epic(title: str) -> Artifact:
+    fields = {"id": "EPIC-001", "title": title, "status": "todo"}
+    return Artifact(id="EPIC-001", kind="epic", path=Path("EPIC-001.md"), fields=fields, order=list(fields), body="")
+
+
+@pytest.mark.parametrize(
+    "render",
+    [
+        lambda title: render_board_column([_task(title, status="blocked")], "blocked"),
+        lambda title: render_epic_children(_epic("x"), [_task(title)]),
+        lambda title: render_spec_epics([(_epic(title), [])]),
+        lambda title: render_todo_line(_task(title), {"TASK-001": _task(title)}),
+    ],
+    ids=["board_column", "epic_children", "spec_epics", "todo_line"],
+)
+def test_renderers_reject_a_pipe_in_a_title(render):
+    with pytest.raises(RegionError, match=r"\|"):
+        render("bad | title")

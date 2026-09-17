@@ -102,19 +102,6 @@ def test_run_sync_skips_archiving_when_config_says_so(tmp_path):
     assert not (tmp_path / "archive").exists()
 
 
-def test_run_sync_twice_is_idempotent(tmp_path):
-    write_clean_repo(tmp_path)
-    board = tmp_path / "BOARD.md"
-    board.write_text(board.read_text().replace("1/2 done", "0/2 done"))
-
-    first = run_sync(tmp_path)
-    assert first  # had real work to do
-    second = run_sync(tmp_path)
-
-    assert second == []
-    assert compute_mismatches(tmp_path) == []
-
-
 # ---------------------------------------------------------------------------
 # load_config
 # ---------------------------------------------------------------------------

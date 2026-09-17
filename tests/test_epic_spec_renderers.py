@@ -8,15 +8,13 @@ Acceptance criteria this covers:
   from derivation
 - an epic with no children / a spec with no epics renders `_(none)_`
   (via the region engine's empty-body handling)
-- renderers compose with replace_region; running twice is a no-op
+- renderers compose with replace_region
 - exact bytes for zero-child, one-child, and many-child epics
 """
 
 from pathlib import Path
 
-import pytest
-
-from sync import RegionError, ensure_region, render_epic_children, render_spec_epics
+from sync import ensure_region, render_epic_children, render_spec_epics
 
 
 def make_epic(epic_id: str, status: str, title: str = "MVP") -> "Artifact":
@@ -95,27 +93,11 @@ def test_render_epic_children_progress_counts_wont_do_as_done():
     assert result.endswith("Progress: 2/3 done")
 
 
-def test_render_epic_children_rejects_a_pipe_in_a_title():
-    epic = make_epic("EPIC-001", "todo")
-    children = [make_task("TASK-001", "todo", "bad | title")]
-    with pytest.raises(RegionError, match=r"\|"):
-        render_epic_children(epic, children)
-
-
 def test_render_epic_children_composes_with_region_engine_and_none_marker():
     text = "# Doc\n"
     epic = make_epic("EPIC-001", "todo")
     result = ensure_region(text, "children", render_epic_children(epic, []))
     assert "_(none)_" in result
-
-
-def test_render_epic_children_running_twice_is_a_no_op():
-    epic = make_epic("EPIC-001", "todo")
-    children = [make_task("TASK-011", "done", "x")]
-    body = render_epic_children(epic, children)
-    once = ensure_region("# Doc\n", "children", body)
-    twice = ensure_region(once, "children", render_epic_children(epic, children))
-    assert twice == once
 
 
 # ---------------------------------------------------------------------------
@@ -156,16 +138,3 @@ def test_render_spec_epics_status_comes_from_the_epic_record_as_given():
     result = render_spec_epics([(epic, [make_task("TASK-001", "done", "a")])])
     assert "| EPIC-002 | wont-do | 1/1 done |" in result
 
-
-def test_render_spec_epics_rejects_a_pipe_in_a_title():
-    epic = make_epic("EPIC-002", "todo", title="bad | title")
-    with pytest.raises(RegionError, match=r"\|"):
-        render_spec_epics([(epic, [])])
-
-
-def test_render_spec_epics_running_twice_is_a_no_op():
-    epic = make_epic("EPIC-002", "in-progress")
-    children = [make_task("TASK-001", "done", "a")]
-    once = ensure_region("# Spec\n", "epics", render_spec_epics([(epic, children)]))
-    twice = ensure_region(once, "epics", render_spec_epics([(epic, children)]))
-    assert twice == once

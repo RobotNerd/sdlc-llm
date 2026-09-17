@@ -58,81 +58,72 @@ INIT_PROJECT_ANSWERS = {
 # ---------------------------------------------------------------------------
 
 
-def test_resume_phase_no_in_flight_task():
-    assert implement_task_scaffold.resume_phase(
-        in_flight=None, working_tree_dirty=False, gh_pr_state=None
-    ) == {"phase": "phase1"}
-
-
-def test_resume_phase_in_flight_but_branch_gone():
-    in_flight = {"id": "TASK-001", "status": "in-progress", "pr": None, "merge_commit": None, "branch_exists": False}
-    assert implement_task_scaffold.resume_phase(
-        in_flight=in_flight, working_tree_dirty=False, gh_pr_state=None
-    ) == {"phase": "phase1"}
-
-
-def test_resume_phase_in_progress_dirty_is_phase2():
-    in_flight = {"id": "TASK-001", "status": "in-progress", "pr": None, "merge_commit": None, "branch_exists": True}
-    result = implement_task_scaffold.resume_phase(in_flight=in_flight, working_tree_dirty=True, gh_pr_state=None)
-    assert result == {"phase": "phase2", "task_id": "TASK-001"}
-
-
-def test_resume_phase_in_progress_clean_is_phase3():
-    in_flight = {"id": "TASK-001", "status": "in-progress", "pr": None, "merge_commit": None, "branch_exists": True}
-    result = implement_task_scaffold.resume_phase(in_flight=in_flight, working_tree_dirty=False, gh_pr_state=None)
-    assert result == {"phase": "phase3", "task_id": "TASK-001"}
-
-
-def test_resume_phase_in_progress_with_pr_is_ambiguous():
-    in_flight = {
-        "id": "TASK-001", "status": "in-progress", "pr": "https://x/1", "merge_commit": None, "branch_exists": True
-    }
-    result = implement_task_scaffold.resume_phase(in_flight=in_flight, working_tree_dirty=False, gh_pr_state=None)
-    assert result["phase"] == "ambiguous"
-
-
-def test_resume_phase_in_review_open_is_phase4_open():
-    in_flight = {
-        "id": "TASK-001", "status": "in-review", "pr": "https://x/1", "merge_commit": None, "branch_exists": True
-    }
-    result = implement_task_scaffold.resume_phase(in_flight=in_flight, working_tree_dirty=False, gh_pr_state="OPEN")
-    assert result == {"phase": "phase4_open", "task_id": "TASK-001"}
-
-
-def test_resume_phase_in_review_merged_not_yet_recorded_is_phase4_merged():
-    in_flight = {
-        "id": "TASK-001", "status": "in-review", "pr": "https://x/1", "merge_commit": None, "branch_exists": True
-    }
-    result = implement_task_scaffold.resume_phase(in_flight=in_flight, working_tree_dirty=False, gh_pr_state="MERGED")
-    assert result == {"phase": "phase4_merged", "task_id": "TASK-001"}
-
-
-def test_resume_phase_in_review_merged_already_recorded_is_ambiguous():
-    in_flight = {
-        "id": "TASK-001", "status": "in-review", "pr": "https://x/1", "merge_commit": "abc123", "branch_exists": True
-    }
-    result = implement_task_scaffold.resume_phase(in_flight=in_flight, working_tree_dirty=False, gh_pr_state="MERGED")
-    assert result["phase"] == "ambiguous"
-
-
-def test_resume_phase_in_review_closed_not_merged():
-    in_flight = {
-        "id": "TASK-001", "status": "in-review", "pr": "https://x/1", "merge_commit": None, "branch_exists": True
-    }
-    result = implement_task_scaffold.resume_phase(in_flight=in_flight, working_tree_dirty=False, gh_pr_state="CLOSED")
-    assert result == {"phase": "phase4_closed_not_merged", "task_id": "TASK-001"}
-
-
-def test_resume_phase_in_review_no_pr_is_ambiguous():
-    in_flight = {"id": "TASK-001", "status": "in-review", "pr": None, "merge_commit": None, "branch_exists": True}
-    result = implement_task_scaffold.resume_phase(in_flight=in_flight, working_tree_dirty=False, gh_pr_state=None)
-    assert result["phase"] == "ambiguous"
-
-
-def test_resume_phase_unexpected_status_is_ambiguous():
-    in_flight = {"id": "TASK-001", "status": "blocked", "pr": None, "merge_commit": None, "branch_exists": True}
-    result = implement_task_scaffold.resume_phase(in_flight=in_flight, working_tree_dirty=False, gh_pr_state=None)
-    assert result["phase"] == "ambiguous"
+@pytest.mark.parametrize(
+    "in_flight,working_tree_dirty,gh_pr_state,expected",
+    [
+        (None, False, None, {"phase": "phase1"}),
+        (
+            {"id": "TASK-001", "status": "in-progress", "pr": None, "merge_commit": None, "branch_exists": False},
+            False, None, {"phase": "phase1"},
+        ),
+        (
+            {"id": "TASK-001", "status": "in-progress", "pr": None, "merge_commit": None, "branch_exists": True},
+            True, None, {"phase": "phase2", "task_id": "TASK-001"},
+        ),
+        (
+            {"id": "TASK-001", "status": "in-progress", "pr": None, "merge_commit": None, "branch_exists": True},
+            False, None, {"phase": "phase3", "task_id": "TASK-001"},
+        ),
+        (
+            {
+                "id": "TASK-001", "status": "in-progress", "pr": "https://x/1",
+                "merge_commit": None, "branch_exists": True,
+            },
+            False, None, "ambiguous",
+        ),
+        (
+            {"id": "TASK-001", "status": "in-review", "pr": "https://x/1", "merge_commit": None, "branch_exists": True},
+            False, "OPEN", {"phase": "phase4_open", "task_id": "TASK-001"},
+        ),
+        (
+            {"id": "TASK-001", "status": "in-review", "pr": "https://x/1", "merge_commit": None, "branch_exists": True},
+            False, "MERGED", {"phase": "phase4_merged", "task_id": "TASK-001"},
+        ),
+        (
+            {
+                "id": "TASK-001", "status": "in-review", "pr": "https://x/1",
+                "merge_commit": "abc123", "branch_exists": True,
+            },
+            False, "MERGED", "ambiguous",
+        ),
+        (
+            {"id": "TASK-001", "status": "in-review", "pr": "https://x/1", "merge_commit": None, "branch_exists": True},
+            False, "CLOSED", {"phase": "phase4_closed_not_merged", "task_id": "TASK-001"},
+        ),
+        (
+            {"id": "TASK-001", "status": "in-review", "pr": None, "merge_commit": None, "branch_exists": True},
+            False, None, "ambiguous",
+        ),
+        (
+            {"id": "TASK-001", "status": "blocked", "pr": None, "merge_commit": None, "branch_exists": True},
+            False, None, "ambiguous",
+        ),
+    ],
+    ids=[
+        "no-in-flight-task", "in-flight-branch-gone", "in-progress-dirty", "in-progress-clean",
+        "in-progress-with-pr", "in-review-open", "in-review-merged-not-recorded",
+        "in-review-merged-already-recorded", "in-review-closed-not-merged", "in-review-no-pr",
+        "unexpected-status",
+    ],
+)
+def test_resume_phase(in_flight, working_tree_dirty, gh_pr_state, expected):
+    result = implement_task_scaffold.resume_phase(
+        in_flight=in_flight, working_tree_dirty=working_tree_dirty, gh_pr_state=gh_pr_state
+    )
+    if expected == "ambiguous":
+        assert result["phase"] == "ambiguous"
+    else:
+        assert result == expected
 
 
 # ---------------------------------------------------------------------------
@@ -144,11 +135,11 @@ def test_compute_branch_name_formats():
     assert implement_task_scaffold.compute_branch_name("task-", "TASK-024", "my-slug") == "task-024-my-slug"
 
 
-def test_slugify_normalizes_title():
+def test_implement_task_slugify_normalizes_title():
     assert implement_task_scaffold.slugify("Add a Widget: v2!") == "add-a-widget-v2"
 
 
-def test_slugify_raises_on_unslugifiable_title():
+def test_implement_task_slugify_raises_on_unslugifiable_title():
     with pytest.raises(ValueError):
         implement_task_scaffold.slugify("!!!")
 
@@ -180,31 +171,31 @@ def test_compute_branch_name_round_trips_every_real_task_branch():
 # ---------------------------------------------------------------------------
 
 
-def test_decide_push_args_plain():
+@pytest.mark.parametrize(
+    "force,expected",
+    [
+        (False, ["push", "origin", "task-001-x"]),
+        (True, ["push", "--force-with-lease", "origin", "task-001-x"]),
+    ],
+    ids=["plain", "force-with-lease"],
+)
+def test_decide_push_args(force, expected):
     args = implement_task_scaffold.decide_push_args(
-        current_branch="task-001-x", task_branch="task-001-x", default_branch="main", remote="origin", force=False
+        current_branch="task-001-x", task_branch="task-001-x", default_branch="main", remote="origin", force=force
     )
-    assert args == ["push", "origin", "task-001-x"]
+    assert args == expected
 
 
-def test_decide_push_args_force_with_lease():
-    args = implement_task_scaffold.decide_push_args(
-        current_branch="task-001-x", task_branch="task-001-x", default_branch="main", remote="origin", force=True
-    )
-    assert args == ["push", "--force-with-lease", "origin", "task-001-x"]
-
-
-def test_decide_push_args_refuses_wrong_branch():
+@pytest.mark.parametrize(
+    "current_branch,task_branch",
+    [("main", "task-001-x"), ("main", "main")],
+    ids=["wrong-branch", "default-branch"],
+)
+def test_decide_push_args_refuses(current_branch, task_branch):
     with pytest.raises(ValueError):
         implement_task_scaffold.decide_push_args(
-            current_branch="main", task_branch="task-001-x", default_branch="main", remote="origin", force=False
-        )
-
-
-def test_decide_push_args_refuses_default_branch():
-    with pytest.raises(ValueError):
-        implement_task_scaffold.decide_push_args(
-            current_branch="main", task_branch="main", default_branch="main", remote="origin", force=False
+            current_branch=current_branch, task_branch=task_branch,
+            default_branch="main", remote="origin", force=False,
         )
 
 
