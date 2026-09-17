@@ -251,25 +251,18 @@ def test_apply_reorder_applies_the_given_order():
     assert ids[:3] == ["TASK-003", "TASK-001", "TASK-002"]
 
 
-def test_apply_reorder_refuses_missing_task():
-    with pytest.raises(ValueError, match="missing"):
-        refine_backlog_scaffold.apply_reorder(
-            BOARD_FOR_REORDER, ["TASK-001", "TASK-002"], _reorder_tasks(), sync_mod
-        )
-
-
-def test_apply_reorder_refuses_unexpected_task():
-    with pytest.raises(ValueError, match="unexpected"):
-        refine_backlog_scaffold.apply_reorder(
-            BOARD_FOR_REORDER, ["TASK-001", "TASK-002", "TASK-003", "TASK-999"], _reorder_tasks(), sync_mod
-        )
-
-
-def test_apply_reorder_refuses_duplicate():
-    with pytest.raises(ValueError, match="duplicate"):
-        refine_backlog_scaffold.apply_reorder(
-            BOARD_FOR_REORDER, ["TASK-001", "TASK-001", "TASK-002", "TASK-003"], _reorder_tasks(), sync_mod
-        )
+@pytest.mark.parametrize(
+    "order,match",
+    [
+        (["TASK-001", "TASK-002"], "missing"),
+        (["TASK-001", "TASK-002", "TASK-003", "TASK-999"], "unexpected"),
+        (["TASK-001", "TASK-001", "TASK-002", "TASK-003"], "duplicate"),
+    ],
+    ids=["missing-task", "unexpected-task", "duplicate-task"],
+)
+def test_apply_reorder_refuses(order, match):
+    with pytest.raises(ValueError, match=match):
+        refine_backlog_scaffold.apply_reorder(BOARD_FOR_REORDER, order, _reorder_tasks(), sync_mod)
 
 
 # ---------------------------------------------------------------------------

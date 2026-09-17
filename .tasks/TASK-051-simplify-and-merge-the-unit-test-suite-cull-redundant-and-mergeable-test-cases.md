@@ -2,7 +2,7 @@
 id: TASK-051
 title: "Simplify and merge the unit test suite: cull redundant and mergeable test cases"
 type: refactor
-status: todo
+status: in-progress
 epic: EPIC-001
 created: 2026-09-16
 branch: task-051-simplify-and-merge-the-unit-test-suite-cull-redundant-and-mergeable-test-cases
@@ -82,7 +82,74 @@ Rename (to name the module) rather than delete in these cases.
 
 ## Worklog
 
-_(empty — appended during implementation)_
+**Baseline** (before any test change): `pytest -q` — 420 passed. Coverage
+(`coverage run --source=.tasks/bin,.claude/skills -m pytest -q && coverage report`):
+
+| Module | Stmts | Miss | Cover |
+|---|---|---|---|
+| `.claude/skills/add-task/scaffold.py` | 172 | 100 | 42% |
+| `.claude/skills/implement-task/scaffold.py` | 437 | 337 | 23% |
+| `.claude/skills/init-project/scaffold.py` | 324 | 177 | 45% |
+| `.claude/skills/plan-feature/scaffold.py` | 168 | 91 | 46% |
+| `.claude/skills/refine-backlog/scaffold.py` | 200 | 98 | 51% |
+| `.claude/skills/review-docs/scaffold.py` | 151 | 84 | 44% |
+| `.claude/skills/strip-project-references/scaffold.py` | 138 | 21 | 85% |
+| `.tasks/bin/sync` | 528 | 39 | 93% |
+| **TOTAL** | 2118 | 947 | **55%** |
+
+**Actual redundancy found** differed somewhat from the pre-task survey's counts (the survey was a
+starting point, not a final audit — confirmed against the task's own Notes: "a test that covers a
+distinct branch stays even if it looks like its neighbor"). Full disposition, file by file:
+
+- **Idempotence/no-op cluster**: audited 13 tests (not quite the surveyed 17) across 9 files.
+  Kept 5 as genuinely distinct code paths — `test_archive_is_idempotent` (sync archiving),
+  `test_apply_mechanical_is_idempotent` (apply_mechanical), `test_upgrade_second_run_is_a_true_noop`
+  (upgrade), `test_merge_config_schema_is_idempotent` (merge_config_schema),
+  `test_sync_twice_reaches_a_stable_no_op_state` (end-to-end anchor) — plus
+  `test_replace_region_is_a_true_no_op_when_unchanged` (the region-engine primitive every renderer
+  composes with, including its `is once` identity check) and
+  `test_run_sync_is_a_true_no_op_once_settled` (sync + archiving at the `run_sync` unit level).
+  Deleted 6 renderer-level duplicates whose property is already proven by the primitive +
+  end-to-end tests: `test_ensure_region_is_idempotent_once_created`,
+  `test_column_running_twice_is_a_no_op`, `test_render_epic_children_running_twice_is_a_no_op`,
+  `test_render_spec_epics_running_twice_is_a_no_op`, `test_apply_todo_merge_is_idempotent`,
+  `test_run_sync_twice_is_idempotent`.
+- **Pipe-in-title rejection** (4 near-identical tests across `test_board_renderers.py`,
+  `test_epic_spec_renderers.py` ×2, `test_todo_merge.py`): all call the same `_reject_pipe` helper
+  at 4 different call sites. Collapsed into one parametrized
+  `test_renderers_reject_a_pipe_in_a_title` in `test_region_engine.py` (the region engine's own
+  home), one case per renderer.
+- **Duplicate test names** (`slugify`/`missing_keys` pairs across `test_add_task_scaffold.py`,
+  `test_implement_task_scaffold.py`, `test_init_project_scaffold.py`): renamed per the task's own
+  guidance (these are separate module copies, not redundant) — e.g.
+  `test_slugify_normalizes_title` → `test_add_task_slugify_normalizes_title` /
+  `test_implement_task_slugify_normalizes_title`. Zero duplicate test names remain suite-wide
+  (verified by a full-suite name scan).
+- **Single-assert refusal/parse clusters → parametrize tables**: `test_add_task_scaffold.py`'s
+  5 `test_run_refuses_*`, `test_init_project_scaffold.py`'s 3 `test_run_refuses_*` + 2
+  `test_run_target_*`, `test_sync.py`'s 8 `test_parses_*`/`test_*_is_ignored`. Also applied the
+  same pattern beyond the task's explicit list, once the shape was visible: `implement-task`'s
+  11-case `resume_phase` table (SPEC-001 §0's own table) and 4-case `decide_push_args`,
+  `init-project-upgrade`'s 5-case `classify_managed_files`, `refine-backlog`'s 3-case
+  `apply_reorder` refusals, `add-task`'s 2-case `reposition_todo_line` refusals. Case count is
+  unchanged in every one (each parametrize case is still individually collected and run) — only
+  line count and duplicated setup logic drop.
+- **Fixture-asserting tests removed**: `test_end_to_end.py`'s `test_fixture_exercises_every_status`
+  and its 3 siblings (`test_fixture_has_a_mixed_children_epic`, `test_fixture_has_a_blocked_chain`,
+  `test_fixture_has_archivable_tasks_not_yet_archived`) asserted on the fixture, not on `sync`; if
+  the fixture's structure regresses, the tests that actually depend on it (derivation matrix, TODO
+  preservation, archiving) already fail. The module docstring documents the fixture's shape instead.
+
+**After**: `pytest -q` — 410 passed (was 420; -10, all genuine deletions — every parametrize
+conversion preserved its original case count). Test-file line count: 5,732 (was 5,854; -122).
+Coverage re-run: **byte-identical** to the baseline table above, module by module — no coverage
+regression anywhere.
+
+`sync check` — exit 0.
+Repo-reality tests (`test_portable_surface.py`,
+`test_review_docs_scaffold.py::test_report_against_this_repos_real_docs_is_clean`,
+`test_strip_project_references_scaffold.py::test_scan_against_this_repos_real_skills_tree_is_clean`)
+— all pass.
 
 ## Notes
 

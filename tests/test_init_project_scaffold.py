@@ -14,6 +14,8 @@ import sys
 from importlib.machinery import SourceFileLoader
 from pathlib import Path
 
+import pytest
+
 import sync as sync_mod  # loaded by conftest.py from .tasks/bin/sync
 
 SKILL_DIR = Path(__file__).resolve().parent.parent / ".claude" / "skills" / "init-project"
@@ -81,11 +83,11 @@ def test_render_config_drops_leading_comment():
     assert text.startswith("---\n")
 
 
-def test_missing_keys_empty_when_all_present():
+def test_init_project_missing_keys_empty_when_all_present():
     assert scaffold.missing_keys(SAMPLE_ANSWERS) == []
 
 
-def test_missing_keys_reports_absent_ones():
+def test_init_project_missing_keys_reports_absent_ones():
     incomplete = dict(SAMPLE_ANSWERS)
     del incomplete["merge_strategy"]
     assert scaffold.missing_keys(incomplete) == ["merge_strategy"]
@@ -96,41 +98,43 @@ def test_missing_keys_reports_absent_ones():
 # ---------------------------------------------------------------------------
 
 
-def test_run_refuses_if_tasks_already_exists(tmp_path):
+def _setup_tasks_already_exists(tmp_path):
     _init_git_repo(tmp_path)
     (tmp_path / ".tasks").mkdir()
-    answers_path = tmp_path / "answers.json"
-    answers_path.write_text(json.dumps(SAMPLE_ANSWERS))
-
-    result = _run_scaffold(tmp_path, answers_path)
-
-    assert result.returncode != 0
-    assert "already exists" in result.stderr
-    assert not (tmp_path / ".tasks" / "config.md").exists()
+    return SAMPLE_ANSWERS
 
 
-def test_run_refuses_if_not_a_git_repo(tmp_path):
-    answers_path = tmp_path / "answers.json"
-    answers_path.write_text(json.dumps(SAMPLE_ANSWERS))
-
-    result = _run_scaffold(tmp_path, answers_path)
-
-    assert result.returncode != 0
-    assert not (tmp_path / ".tasks").exists()
+def _setup_not_a_git_repo(tmp_path):
+    return SAMPLE_ANSWERS
 
 
-def test_run_refuses_if_required_answer_missing(tmp_path):
+def _setup_missing_required_answer(tmp_path):
     _init_git_repo(tmp_path)
     incomplete = dict(SAMPLE_ANSWERS)
     del incomplete["merge_strategy"]
+    return incomplete
+
+
+@pytest.mark.parametrize(
+    "setup,needle",
+    [
+        (_setup_tasks_already_exists, "already exists"),
+        (_setup_not_a_git_repo, None),
+        (_setup_missing_required_answer, "merge_strategy"),
+    ],
+    ids=["tasks-already-exists", "not-a-git-repo", "missing-required-answer"],
+)
+def test_run_refuses(tmp_path, setup, needle):
+    answers = setup(tmp_path)
     answers_path = tmp_path / "answers.json"
-    answers_path.write_text(json.dumps(incomplete))
+    answers_path.write_text(json.dumps(answers))
 
     result = _run_scaffold(tmp_path, answers_path)
 
     assert result.returncode != 0
-    assert "merge_strategy" in result.stderr
-    assert not (tmp_path / ".tasks").exists()
+    if needle:
+        assert needle in result.stderr
+    assert not (tmp_path / ".tasks" / "config.md").exists()
 
 
 def test_run_scaffolds_a_fresh_repo_and_sync_check_is_clean(tmp_path):
@@ -261,27 +265,30 @@ def test_run_with_target_manifest_covers_skill_files(tmp_path):
     assert ".claude/skills/add-task/SKILL.md" in manifest["files"]
 
 
-def test_run_target_nonexistent_path_exits_nonzero(tmp_path):
-    answers_path = tmp_path / "answers.json"
-    answers_path.write_text(json.dumps(SAMPLE_ANSWERS))
-    missing = tmp_path / "does-not-exist"
-
-    result = _run_scaffold_target(tmp_path, answers_path, missing)
-
-    assert result.returncode != 0
-    assert str(missing) in result.stderr
+def _nonexistent_target(tmp_path):
+    return tmp_path / "does-not-exist"
 
 
-def test_run_target_not_a_git_repo_exits_nonzero(tmp_path):
-    answers_path = tmp_path / "answers.json"
-    answers_path.write_text(json.dumps(SAMPLE_ANSWERS))
+def _non_git_target(tmp_path):
     plain_dir = tmp_path / "plain"
     plain_dir.mkdir()
+    return plain_dir
 
-    result = _run_scaffold_target(tmp_path, answers_path, plain_dir)
+
+@pytest.mark.parametrize(
+    "make_target",
+    [_nonexistent_target, _non_git_target],
+    ids=["nonexistent-path", "not-a-git-repo"],
+)
+def test_run_target_bad_path_exits_nonzero(tmp_path, make_target):
+    answers_path = tmp_path / "answers.json"
+    answers_path.write_text(json.dumps(SAMPLE_ANSWERS))
+    target = make_target(tmp_path)
+
+    result = _run_scaffold_target(tmp_path, answers_path, target)
 
     assert result.returncode != 0
-    assert str(plain_dir) in result.stderr
+    assert str(target) in result.stderr
 
 
 def test_run_target_already_has_tasks_dir_exits_2(tmp_path):

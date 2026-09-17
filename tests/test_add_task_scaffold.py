@@ -129,11 +129,11 @@ BASE_ANSWERS = {
 # ---------------------------------------------------------------------------
 
 
-def test_missing_keys_empty_when_all_present():
+def test_add_task_missing_keys_empty_when_all_present():
     assert add_task_scaffold.missing_keys(BASE_ANSWERS) == []
 
 
-def test_missing_keys_reports_absent_ones():
+def test_add_task_missing_keys_reports_absent_ones():
     incomplete = dict(BASE_ANSWERS)
     del incomplete["title"]
     assert add_task_scaffold.missing_keys(incomplete) == ["title"]
@@ -144,11 +144,11 @@ def test_missing_keys_requires_priority_after_when_mode_is_after():
     assert add_task_scaffold.missing_keys(answers) == ["priority_after"]
 
 
-def test_slugify_normalizes_title():
+def test_add_task_slugify_normalizes_title():
     assert add_task_scaffold.slugify("Add a Widget: v2!") == "add-a-widget-v2"
 
 
-def test_slugify_raises_on_unslugifiable_title():
+def test_add_task_slugify_raises_on_unslugifiable_title():
     with pytest.raises(ValueError):
         add_task_scaffold.slugify("!!!")
 
@@ -280,16 +280,14 @@ def test_reposition_end_is_a_noop_when_already_last():
     assert result == BOARD_TEXT
 
 
-def test_reposition_raises_when_task_not_found():
+@pytest.mark.parametrize(
+    "task_id,mode,after",
+    [("TASK-404", "top", None), ("TASK-003", "after", "TASK-404")],
+    ids=["task-not-found", "after-target-not-found"],
+)
+def test_reposition_raises(task_id, mode, after):
     with pytest.raises(ValueError):
-        add_task_scaffold.reposition_todo_line(BOARD_TEXT, "TASK-404", "top", None, sync_mod)
-
-
-def test_reposition_raises_when_after_target_not_found():
-    with pytest.raises(ValueError):
-        add_task_scaffold.reposition_todo_line(
-            BOARD_TEXT, "TASK-003", "after", "TASK-404", sync_mod
-        )
+        add_task_scaffold.reposition_todo_line(BOARD_TEXT, task_id, mode, after, sync_mod)
 
 
 # ---------------------------------------------------------------------------
@@ -306,34 +304,21 @@ def test_run_refuses_if_missing_required_answer(repo):
     assert list((repo / ".tasks").glob("TASK-*.md")) == []
 
 
-def test_run_refuses_on_unknown_type(repo):
-    result = _run_add_task(repo, {**BASE_ANSWERS, "type": "not-a-type"})
+@pytest.mark.parametrize(
+    "overrides,needle",
+    [
+        ({"type": "not-a-type"}, "not-a-type"),
+        ({"epic": "EPIC-999"}, "EPIC-999"),
+        ({"blocked_by": ["TASK-999"]}, "TASK-999"),
+        ({"priority_mode": "sideways"}, "sideways"),
+        ({"priority_mode": "after"}, "priority_after"),
+    ],
+    ids=["unknown-type", "unknown-epic", "unknown-blocked-by", "unknown-priority-mode", "missing-priority-after"],
+)
+def test_run_refuses_on_bad_answers(repo, overrides, needle):
+    result = _run_add_task(repo, {**BASE_ANSWERS, **overrides})
     assert result.returncode != 0
-    assert "not-a-type" in result.stderr
-
-
-def test_run_refuses_on_unknown_epic(repo):
-    result = _run_add_task(repo, {**BASE_ANSWERS, "epic": "EPIC-999"})
-    assert result.returncode != 0
-    assert "EPIC-999" in result.stderr
-
-
-def test_run_refuses_on_unknown_blocked_by(repo):
-    result = _run_add_task(repo, {**BASE_ANSWERS, "blocked_by": ["TASK-999"]})
-    assert result.returncode != 0
-    assert "TASK-999" in result.stderr
-
-
-def test_run_refuses_on_unknown_priority_mode(repo):
-    result = _run_add_task(repo, {**BASE_ANSWERS, "priority_mode": "sideways"})
-    assert result.returncode != 0
-    assert "sideways" in result.stderr
-
-
-def test_run_refuses_on_missing_priority_after(repo):
-    result = _run_add_task(repo, {**BASE_ANSWERS, "priority_mode": "after"})
-    assert result.returncode != 0
-    assert "priority_after" in result.stderr
+    assert needle in result.stderr
 
 
 def test_run_appends_at_end_and_sync_check_stays_clean(repo):
