@@ -2,11 +2,11 @@
 id: TASK-034
 title: Branch-name + dirty-tree gate hook
 type: feature
-status: todo
+status: in-review
 epic: EPIC-002
 created: 2026-09-14
 branch: task-034-branch-dirty-tree-gate-hook
-pr: null
+pr: "https://github.com/RobotNerd/sdlc-llm/pull/61"
 merge_commit: null
 blocked_by: [TASK-032, TASK-028]
 blocks: [TASK-039, TASK-040]
@@ -44,8 +44,33 @@ instead of relying on the model checking them itself.
 
 ## Worklog
 
-_(empty — appended during implementation)_
+Added to `guardrails.py`: `branch_name_violation(branch, branch_prefix)` (pure -- matches
+`<branch_prefix><NNN>-<slug>`, the exact shape `compute_branch_name` produces) and
+`dirty_tree_violation(cwd, ignored_paths)` (mirrors `implement-task/scaffold.py`'s existing
+`dirty_files` logic -- same `git status --porcelain --untracked-files=all` handling, including
+the untracked-directory-collapse gotcha -- but self-contained here so `guardrails.py` stays
+independently vendorable; didn't touch `implement-task/scaffold.py`'s own copy, out of this
+task's stated scope -- flagging the duplication as a candidate follow-up, not doing it silently).
+`check_branch_create` parses `command` for a `git checkout -b|-B`/`git switch -c|-C` anywhere
+in it (reusing the existing command-segment/shlex helpers from TASK-032), checks dirty-tree
+first, then branch-name pattern. No new hook script needed -- `checkout`/`switch` are `Bash`
+commands, so this slots into the existing `evaluate_bash_command` dispatcher, which now also
+reads `ignored_paths` from config.
+
+Testing strategy:
+1. Unit tests for both functions (`tests/test_branch_create_guardrail.py`) against
+   config-shaped fixtures with varying `branch_prefix`/`ignored_paths` -- conforming/
+   non-conforming names, clean/dirty/dirty-but-ignored trees, and the `ignored_paths: []`
+   default flagging any dirty file. **Pass.**
+2. Hook-script tests: real subprocess invocation of the existing `pretooluse_bash.py` with
+   representative `git checkout -b`/`git switch -c` commands and varied working-tree fixtures.
+   **Pass.**
+3. `python3 -m pytest -q` -- 493 passed (464 + 29 new), no regressions. **Pass.**
+4. `python3 .tasks/bin/sync check` -- exit 0. **Pass.**
 
 ## Notes
 
 - Depends on TASK-032's `guardrails.py` module/hook-wiring and TASK-028's `ignored_paths` key.
+- Follow-up candidate (not filed as a task, just noted): `implement-task/scaffold.py`'s own
+  `dirty_files` could be migrated to call `guardrails.dirty_tree_violation` instead of keeping
+  its own copy, per SPEC-002's "define guardrail logic once" goal -- out of this task's scope.
