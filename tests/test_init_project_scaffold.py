@@ -237,6 +237,7 @@ def test_run_with_target_scaffolds_full_skill_table_into_a_separate_repo(tmp_pat
         ".tasks/bin/guardrails.py",
         ".claude/settings.json",
         ".claude/hooks/pretooluse_bash.py",
+        ".claude/hooks/pretooluse_edit_write.py",
         ".github/pull_request_template.md",
         ".claude/skills/add-task/SKILL.md",
         ".claude/skills/init-project/SKILL.md",
@@ -245,6 +246,7 @@ def test_run_with_target_scaffolds_full_skill_table_into_a_separate_repo(tmp_pat
     assert (target / ".tasks" / "bin" / "sync").stat().st_mode & 0o777 == 0o755
     assert (target / ".tasks" / "bin" / "guardrails.py").stat().st_mode & 0o777 == 0o755
     assert (target / ".claude" / "hooks" / "pretooluse_bash.py").stat().st_mode & 0o777 == 0o755
+    assert (target / ".claude" / "hooks" / "pretooluse_edit_write.py").stat().st_mode & 0o777 == 0o755
     assert not (target / ".claude" / "skills" / "strip-project-references").exists()
     # nothing was written to the unrelated cwd
     assert not (cwd / ".tasks").exists()

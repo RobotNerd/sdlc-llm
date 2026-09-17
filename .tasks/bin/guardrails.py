@@ -2,10 +2,12 @@
 """guardrails — the shared logic behind this workflow's structurally-enforced rules.
 
 One module holds every guardrail as a small function taking explicit inputs (a command
-string, the working directory, config values) and returning a `GuardrailResult` — never
-raising, never touching anything but `git`'s own read-only plumbing. Both the `PreToolUse`
-hook script (`.claude/hooks/pretooluse_bash.py`) and any skill script that wants the same
-check call into these functions directly, so the rule is defined once.
+string or a tool call's `tool_input`, the working directory, config values) and returning a
+`GuardrailResult` — never raising, never touching anything but `git`'s own read-only
+plumbing and the file a tool call already names. Every `PreToolUse` hook script
+(`.claude/hooks/pretooluse_bash.py`, `.claude/hooks/pretooluse_edit_write.py`) and any skill
+script that wants the same check call into these functions directly, so the rule is defined
+once.
 
 Covers, today:
 
@@ -16,6 +18,10 @@ Covers, today:
   file whose only changed frontmatter fields are `status`/`merge_commit`/`pr`).
 - `git push --force` misuse — bare `--force` is always denied; `--force-with-lease` is denied
   on any branch that isn't the currently `in-progress` task's own.
+- An `Edit`/`Write` that would actually change a generated region's content, or remove its
+  markers — denied regardless of which file carries the region.
+- An `Edit`/`Write` that hand-sets an epic's `status` to anything but `wont-do` — denied;
+  status is otherwise derived, never hand-set.
 
 It imports nothing outside the Python standard library (plus `sync`, its sibling in this same
 directory), to stay dependency-free for any project it's vendored into.
@@ -359,6 +365,173 @@ def evaluate_bash_command(command: str, cwd: Path) -> GuardrailResult:
         check_push_to_default_branch(command, cwd, default_branch, remote),
         check_force_push(command, cwd, branch_prefix),
     ):
+        if not result.allow:
+            return result
+    return GuardrailResult(allow=True)
+
+
+# ---------------------------------------------------------------------------
+# Guardrail 4: hand-editing a generated region
+# ---------------------------------------------------------------------------
+
+
+_REGION_NAMES_BY_BOARD = ("epics", "in-progress", "in-review", "blocked", "done")
+
+
+def _region_names_for_path(name: str) -> tuple[str, ...]:
+    """The `BEGIN:name`/`END:name` region names that can legitimately appear in a file
+    named `name`, given this workflow's fixed set of generated regions.
+    """
+    if name == "BOARD.md":
+        return _REGION_NAMES_BY_BOARD
+    if re.fullmatch(r"EPIC-\d{3}-.*\.md", name):
+        return ("children",)
+    if re.fullmatch(r"SPEC-\d{3}-.*\.md", name):
+        return ("epics",)
+    return ()
+
+
+def region_edit_violation(path_name: str, old_content: str, new_content: str) -> str | None:
+    """The name of the first generated region whose content actually changed (or whose
+    markers were removed entirely) between `old_content` and `new_content` for a file named
+    `path_name` -- `None` if every region that exists in `old_content` still has identical
+    content in `new_content`. Reuses `sync.find_region` directly rather than reimplementing
+    region detection; a file with no regions of the given kind is never a violation.
+    """
+    sync_mod = _load_sync()
+    for name in _region_names_for_path(path_name):
+        try:
+            old_span = sync_mod.find_region(old_content, name)
+        except sync_mod.RegionError:
+            continue
+        if old_span is None:
+            continue
+        old_body = old_content[old_span.begin_end:old_span.end_start]
+        try:
+            new_span = sync_mod.find_region(new_content, name)
+        except sync_mod.RegionError:
+            new_span = None
+        new_body = new_content[new_span.begin_end:new_span.end_start] if new_span else None
+        if new_body != old_body:
+            return name
+    return None
+
+
+# ---------------------------------------------------------------------------
+# Guardrail 5: hand-editing an epic's status away from a derived value
+# ---------------------------------------------------------------------------
+
+
+def epic_status_edit_violation(path_name: str, old_content: str, new_content: str) -> str | None:
+    """The new `status` value if `path_name` is an epic file and its frontmatter `status`
+    changed to anything but `wont-do` between `old_content` and `new_content` -- `None`
+    otherwise (unchanged, changed *to* `wont-do`, not an epic file, or unparseable).
+    """
+    if not re.fullmatch(r"EPIC-\d{3}-.*\.md", path_name):
+        return None
+    sync_mod = _load_sync()
+    try:
+        old_fields, _old_body, _old_order = sync_mod.parse_frontmatter(old_content)
+        new_fields, _new_body, _new_order = sync_mod.parse_frontmatter(new_content)
+    except Exception:
+        return None
+    old_status = old_fields.get("status")
+    new_status = new_fields.get("status")
+    if new_status != old_status and new_status != "wont-do":
+        return new_status
+    return None
+
+
+# ---------------------------------------------------------------------------
+# Edit/Write: computing the hypothetical "after" content, and the dispatcher
+# ---------------------------------------------------------------------------
+
+
+def _apply_edit(old_content: str, old_string: str, new_string: str, replace_all: bool) -> str | None:
+    """The file content `Edit` would produce, or `None` if `old_string` isn't found (or
+    isn't unique and `replace_all` wasn't given) -- callers treat that as "can't tell, don't
+    block on our own uncertainty," matching how the tool call itself would refuse.
+    """
+    count = old_content.count(old_string)
+    if count == 0 or (count > 1 and not replace_all):
+        return None
+    if replace_all:
+        return old_content.replace(old_string, new_string)
+    return old_content.replace(old_string, new_string, 1)
+
+
+def _edit_before_after(tool_name: str, tool_input: dict, cwd: Path) -> tuple[str | None, str | None, Path | None]:
+    """`(old_content, new_content, path)` for an `Edit`/`Write` tool call against a file that
+    exists on disk -- `(None, None, None)` if there's nothing to compare (a new file, a tool
+    other than `Edit`/`Write`, or `Edit` input that doesn't resolve to a determinate result).
+    """
+    file_path = tool_input.get("file_path")
+    if not file_path:
+        return None, None, None
+    path = Path(file_path)
+    if not path.is_absolute():
+        path = cwd / path
+    if not path.is_file():
+        return None, None, None
+    old_content = path.read_text()
+
+    if tool_name == "Write":
+        new_content = tool_input.get("content")
+        if new_content is None:
+            return None, None, None
+    elif tool_name == "Edit":
+        old_string = tool_input.get("old_string")
+        new_string = tool_input.get("new_string")
+        if old_string is None or new_string is None:
+            return None, None, None
+        new_content = _apply_edit(old_content, old_string, new_string, bool(tool_input.get("replace_all")))
+        if new_content is None:
+            return None, None, None
+    else:
+        return None, None, None
+
+    return old_content, new_content, path
+
+
+def check_region_edit(tool_name: str, tool_input: dict, cwd: Path) -> GuardrailResult:
+    old_content, new_content, path = _edit_before_after(tool_name, tool_input, cwd)
+    if old_content is None:
+        return GuardrailResult(allow=True)
+    region = region_edit_violation(path.name, old_content, new_content)
+    if region is None:
+        return GuardrailResult(allow=True)
+    return GuardrailResult(
+        allow=False,
+        reason=(
+            f"hand-editing the {region!r} generated region in {path.name} is denied -- change "
+            "the source task/epic file and run `.tasks/bin/sync` to regenerate it."
+        ),
+    )
+
+
+def check_epic_status_edit(tool_name: str, tool_input: dict, cwd: Path) -> GuardrailResult:
+    old_content, new_content, path = _edit_before_after(tool_name, tool_input, cwd)
+    if old_content is None:
+        return GuardrailResult(allow=True)
+    new_status = epic_status_edit_violation(path.name, old_content, new_content)
+    if new_status is None:
+        return GuardrailResult(allow=True)
+    return GuardrailResult(
+        allow=False,
+        reason=(
+            f"hand-editing {path.name}'s epic `status` to {new_status!r} is denied -- epic status "
+            "is derived by `sync` from its children; the only hand-set value allowed is `wont-do` "
+            "(a cancellation decision)."
+        ),
+    )
+
+
+def evaluate_edit_write(tool_name: str, tool_input: dict, cwd: Path) -> GuardrailResult:
+    """Run every structural-edit guardrail above against an `Edit`/`Write` tool call, in
+    order, returning the first denial (or an allow if none fires).
+    """
+    for check in (check_region_edit, check_epic_status_edit):
+        result = check(tool_name, tool_input, cwd)
         if not result.allow:
             return result
     return GuardrailResult(allow=True)
