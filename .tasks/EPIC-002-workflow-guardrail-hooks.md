@@ -49,7 +49,7 @@ module with the skills' own scripts.
 |---|---|---|
 | TASK-032 | done | Hooks infrastructure + shared guardrails module + core git/gh guardrail hooks |
 | TASK-033 | done | Structural edit guardrails hook: generated regions and epic status |
-| TASK-034 | in-progress | Branch-name + dirty-tree gate hook |
+| TASK-034 | in-review | Branch-name + dirty-tree gate hook |
 | TASK-035 | todo | Pre-PR quality gate hook: sync check, test, lint, format |
 | TASK-036 | todo | SPEC/TASK-reference scan hook (repo-only, never copied) |
 | TASK-037 | todo | SessionStart board-context hook |
