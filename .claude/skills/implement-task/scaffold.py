@@ -65,6 +65,24 @@ def _run_sync(sync_path: Path, *extra_args: str) -> subprocess.CompletedProcess:
     )
 
 
+def load_guardrails_module() -> ModuleType:
+    """`.tasks/bin/guardrails.py`, reusing an already-loaded copy (e.g. `tests/conftest.py`'s)
+    if present so the hook path and this skill never run two independent instances of the same
+    module. Resolved from this script's own location, not any `cwd` argument -- `init-project`
+    vendors `scaffold.py` and `guardrails.py` at the same fixed relative offset in every target
+    repo, so this holds both here and once vendored.
+    """
+    if "guardrails" in sys.modules:
+        return sys.modules["guardrails"]
+    guardrails_path = Path(__file__).resolve().parents[3] / ".tasks" / "bin" / "guardrails.py"
+    loader = SourceFileLoader("guardrails", str(guardrails_path))
+    spec = importlib.util.spec_from_loader("guardrails", loader)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules["guardrails"] = module
+    loader.exec_module(module)
+    return module
+
+
 # ---------------------------------------------------------------------------
 # git/gh wrappers -- thin, side-effecting; kept separate from the pure
 # decision functions below so those can be unit-tested without real git/gh
@@ -72,29 +90,14 @@ def _run_sync(sync_path: Path, *extra_args: str) -> subprocess.CompletedProcess:
 
 
 def dirty_files(cwd: Path, ignore: tuple[str, ...] = ()) -> list[str]:
-    """Paths `git status --porcelain` reports as dirty, excluding `ignore` -- the project's own
+    """Paths `git status` reports as dirty in `cwd`, excluding `ignore` -- the project's own
     `ignored_paths` (`.tasks/config.md`), a carve-out for paths like a personal prompt scratchpad
-    that aren't part of any task's actual work.
-
-    `--untracked-files=all` matters here: without it, git collapses a brand-new, entirely
-    untracked directory into one `?? dirname/` line instead of listing the file inside it --
-    an `ignored_paths` entry naming that file (its first time ever existing, not yet committed)
-    would then never match and the tree would wrongly read as dirty.
+    that aren't part of any task's actual work. Thin delegate to
+    `guardrails.dirty_tree_violation`, which owns the actual `git status`/porcelain-parsing logic
+    (and its fail-open-on-broken-git behavior) so it's defined once for both the hook path and
+    this skill.
     """
-    result = subprocess.run(
-        ["git", "status", "--porcelain", "--untracked-files=all"],
-        cwd=cwd, capture_output=True, text=True, check=True,
-    )
-    files = []
-    for line in result.stdout.splitlines():
-        path = line[3:].strip()
-        if " -> " in path:  # rename: "old -> new"
-            path = path.split(" -> ", 1)[1]
-        if path.startswith('"') and path.endswith('"'):
-            path = path[1:-1]
-        if path not in ignore:
-            files.append(path)
-    return files
+    return load_guardrails_module().dirty_tree_violation(cwd, tuple(ignore))
 
 
 def current_branch(cwd: Path) -> str:
