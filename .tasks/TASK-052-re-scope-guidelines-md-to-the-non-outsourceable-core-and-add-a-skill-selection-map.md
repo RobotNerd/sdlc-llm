@@ -2,7 +2,7 @@
 id: TASK-052
 title: Re-scope guidelines.md to the non-outsourceable core and add a skill-selection map
 type: docs
-status: todo
+status: in-progress
 epic: EPIC-002
 created: 2026-09-16
 branch: task-052-re-scope-guidelines-md-to-the-non-outsourceable-core-and-add-a-skill-selection-map
@@ -113,7 +113,33 @@ fallback (a human following it by hand would get denied).
 
 ## Worklog
 
-_(empty — appended during implementation)_
+Trimmed both mirrors to five sections: preamble+terminology, the artifact model, what `sync` owns
+vs. what you own, a new "which skill when" table, and guardrails needing judgement. Dropped the
+four-phase walkthrough/Resumability/Bail-out (duplicated `implement-task/SKILL.md`), the five
+hook-covered Guardrails bullets, checkbox formatting, and the "follow by hand" fallback.
+`.tasks/guidelines.md`: 91 → 62 lines. Portable mirror: 87 → 57 lines. The "which skill when"
+table uses plain markdown-table rows (not this repo's `- **`name`**` bulleted convention) so
+`review-docs`'s `skill_list_mismatch` check — which recognizes only that bulleted format — doesn't
+mistake the portable mirror's deliberate 6-skill list for a mismatch against the real 7-skill
+`.claude/skills/` directory.
+
+`CLAUDE.md`'s "The workflow model" section re-read against the trimmed file: still accurate as
+written (it restates the artifact model itself rather than describing guidelines.md's internal
+structure, and the pointer sentence — "`.tasks/guidelines.md` states the operating rules" — still
+holds). No change needed. `README.md:81`'s mention of `guidelines.md` in the upgrade description
+also still reads correctly, per the task's Notes.
+
+Testing strategy:
+1. `python3 -m pytest -q` — 410 passed, no regressions. **Pass.**
+2. `python3 .claude/skills/strip-project-references/scaffold.py scan` — `{"mechanical": [],
+   "judgment": []}`, no findings against the trimmed portable mirror. **Pass.**
+3. `python3 .claude/skills/review-docs/scaffold.py report` — `dangling_references: {}`,
+   `skill_list_mismatches: {}`, `guidelines_mirror_diff` non-empty (diverges exactly as intended:
+   the repo copy's SPEC-001 citations and 7th skill row are the only differences). **Pass.**
+4. `python3 .tasks/bin/sync check` — exit 0. **Pass.**
+5. Manual read-through of both trimmed files: each is self-contained — the artifact model, what
+   `sync` owns, and which skill to reach for are all answerable from the file alone, with no
+   dependency on the sections that were removed. **Pass.**
 
 ## Notes
 

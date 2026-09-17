@@ -4,83 +4,54 @@ workflow_version: 1
 
 # Workflow guidelines
 
-The operating rules for this repo's "kanban in markdown" workflow. This file states the rules;
-`.tasks/config.md` holds the per-project values they refer to.
+The shared model every skill assumes — the parts of this "kanban in markdown" workflow that
+don't belong to any one skill. `.tasks/config.md` holds the per-project values these rules refer
+to. Each skill's own `SKILL.md` owns its own step-by-step procedure — this file doesn't repeat it.
 
 Terminology: **task**, always — never "ticket" or "story".
 
-## The lifecycle
+## The artifact model
 
-### Spec → Epic → Task
+**Frontmatter is the source of truth; everything else is a rendering of it.**
 
-- [ ] A **spec** (`.tasks/specs/SPEC-NNN-slug.md`) captures the "why": problem, alternatives
-      considered, non-goals. Written by `plan-feature`.
-- [ ] An **epic** (`.tasks/EPIC-NNN-slug.md`) groups a body of work and links back to its spec via
-      `spec:`. Its `status` is **derived by `sync`** from its children — never hand-set, except to
-      mark it `wont-do` (cancelling is a human decision).
-- [ ] A **task** (`.tasks/TASK-NNN-slug.md`) is one unit of work: one branch, one PR, one sitting.
-      No sub-tasks — split the task or promote it to an epic instead. Links to its epic via
-      `epic:` (nullable — a loose chore needs none).
-- [ ] IDs are allocated by `sync next-id <type>` — never by counting files yourself.
+- A **spec** (`.tasks/specs/SPEC-NNN-slug.md`) captures the "why": problem, alternatives
+  considered, non-goals. Written by `plan-feature`.
+- An **epic** (`.tasks/EPIC-NNN-slug.md`) groups a body of work and links back to its spec via
+  `spec:`. Its `status` is **derived by `sync`** from its children — never hand-set, except to
+  mark it `wont-do` (cancelling is a human decision).
+- A **task** (`.tasks/TASK-NNN-slug.md`) is one unit of work: one branch, one PR, one sitting. No
+  sub-tasks — split the task or promote it to an epic instead. Links to its epic via `epic:`
+  (nullable — a loose chore needs none).
+- IDs are allocated by `sync next-id <type>` — never by counting files yourself.
 
-### Board
+## What `sync` owns, and what you own
 
-- [ ] `.tasks/BOARD.md` is mostly generated. The **TODO list is the only hand-maintained part** —
-      it is priority order, which nothing can infer, and `sync` never reorders it.
-- [ ] Everything between `<!-- BEGIN:name -->` / `<!-- END:name -->` markers — in `BOARD.md`,
-      every `EPIC-*.md`, and every `SPEC-*.md` — is generated. **Never hand-edit inside a marked
-      region.** Change the source task/epic file and run `.tasks/bin/sync` to regenerate it.
-      `sync check` is the read-only form — use it to verify, never to fix.
+`sync` (`.tasks/bin/sync`) owns: ID allocation, regenerating every `BEGIN:`/`END:` region in
+`BOARD.md`/`EPIC-*.md`/`SPEC-*.md`, deriving epic status, reconciling `blocked_by`/`blocks`, and
+archiving `done`/`wont-do` tasks. None of that is model judgement — run `sync`, don't hand-compute
+it. `sync check` is the read-only form: it verifies, it never fixes.
 
-## Working a task — `implement-task`, four phases
+You own the **TODO list's hand-ordered priority** — the one thing in `BOARD.md` that's
+hand-maintained, because priority order is a judgement call `sync` can't infer. Nothing else in
+`BOARD.md`, and nothing inside a `BEGIN:`/`END:` region anywhere, is yours to edit by hand —
+change the source task/epic file and re-run `sync`.
 
-Run this via the `implement-task` skill; if it isn't set up in this repo yet, follow this
-checklist by hand. Each phase ends in a **STOP** for human input.
+## Which skill when
 
-1. **Start.** Refuse to begin if the working tree is dirty (`ignored_paths` in `config.md`
-   excepted). Pick the top unblocked TODO task,
-   announcing any blocked ones skipped. `git fetch <remote>`, branch from
-   `<remote>/<default_branch>` as `<branch_prefix><NNN>-<slug>`. Set `status: in-progress` and
-   `branch:`, then run `sync` to regenerate the board and epic. **Restate the plan and acceptance
-   criteria for approval before writing anything.** — STOP —
-2. **Implement + test.** Write the change and its tests. Run `test_command` (and `lint_command`,
-   if not `null`). Walk the task's Testing strategy; hand anything non-automatable to the human
-   and record the result in the task's **Worklog** — never skip silently. Stay in scope: check
-   `git diff --name-only` before committing. — STOP —
-3. **Wrap up.** Update the files in `docs_paths` if the change touches them. Commit
-   (conventional, citing the task ID). If `rebase_before_pr`, `git fetch <remote>` and rebase onto
-   `<remote>/<default_branch>` — stop and surface any conflict rather than guessing. Push
-   (`--force-with-lease` if the rebase rewrote already-pushed history). `gh pr create` with
-   acceptance criteria as a checklist and test results filled in. Record the returned URL in
-   `pr:`, set `status: in-review`, run `sync`. **STOP — a human reviews and merges.**
-4. **Merge — observed, never performed.** A human reviews the PR on GitHub and **squash-merges**
-   it (`merge_strategy`). Poll `gh pr view --json state,mergeCommit`; once `MERGED`, record
-   `merge_commit:`, set `status: done`, run `sync` (which regenerates the board/epic and archives
-   the task). If `delete_branch_after_merge`, delete the branch locally and on `<remote>`, then
-   fast-forward local `<default_branch>`. **The skill never runs `gh pr merge`.**
+| Situation | Skill |
+|---|---|
+| Scaffold `.tasks/` into a new repo, or refresh an already-scaffolded one | `init-project` |
+| Turn a rough request into a well-formed task | `add-task` |
+| Do a task: branch → implement → PR → observed merge | `implement-task` |
+| Periodic backlog triage: reprioritize, recompute blocked status, flag stale/underspecified tasks | `refine-backlog` |
+| Plan a larger feature: spec → epics → vertical-slice tasks | `plan-feature` |
+| Periodic docs health pass: staleness, dangling references, guidelines-mirror drift | `review-docs` |
 
-**Resumability:** on invocation, infer the current phase from working-tree state, branch existence
-(`git branch --list`), frontmatter `status`/`pr`, and `gh pr view --json state,mergeCommit` —
-continue from there rather than restarting.
+## Guardrails that need your judgement
 
-**Bail-out:** if the task turns out wrong or underspecified mid-flight, stop, write findings into
-the task file, set `status` back to `todo` or `blocked`, run `sync`, and surface it.
+Most guardrails here are hook-enforced, not something to reason about by hand. Two aren't,
+because no hook can supply the judgement:
 
-## Guardrails
-
-- Never push *task work* to `default_branch`. Always branch from the freshly-fetched
-  `<remote>/<default_branch>`. The one exception: phase 4's own bookkeeping (`merge_commit`,
-  `status: done`, archiving, board/epic regeneration) may commit straight to `default_branch` —
-  it records a fact about a merge a human already reviewed, not new work, and requiring a PR to
-  document a PR's own merge is unbounded regress.
-- **Never merge.** The skill opens the PR and stops; a human reviews and squash-merges on GitHub.
-  Phase 4 only observes that merge and records it. Never run `gh pr merge`.
-- Force-pushing is allowed **only** as `git push --force-with-lease` on the current task's own
-  branch, immediately after a rebase onto `default_branch` — never plain `--force`, never on
-  `default_branch`, never on a branch anyone else uses.
-- Never touch files outside the current task's scope (`git diff --name-only` is the check).
-- Never hand-edit text inside a `BEGIN:`/`END:` generated region — change the source task/epic
-  file and run `sync`.
-- Never hand-edit an epic's `status` except to set `wont-do`.
-- Board regeneration, ID allocation, archiving, and "is this task blocked" are `sync`'s job, not
-  model judgement.
+- Never touch files outside the current task's scope — `git diff --name-only` is the check.
+- Never skip a Testing strategy step silently. Hand anything non-automatable to the human and
+  record the result in the task's Worklog.
