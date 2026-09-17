@@ -2,12 +2,12 @@
 id: TASK-050
 title: implement-task asks which task to work instead of auto-picking the top of TODO
 type: bug
-status: in-review
+status: done
 epic: EPIC-001
 created: 2026-09-16
 branch: task-050-implement-task-asks-which-task-to-work-instead-of-auto-picking-the-top-of-todo
 pr: "https://github.com/RobotNerd/sdlc-llm/pull/54"
-merge_commit: null
+merge_commit: 0bd728829b61d1844e54f6a5facb0f1a33a80ab2
 blocked_by: []
 blocks: []
 ---

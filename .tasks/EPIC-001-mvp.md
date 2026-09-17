@@ -2,7 +2,7 @@
 id: EPIC-001
 title: MVP
 spec: SPEC-001
-status: in-progress
+status: done
 created: 2026-09-10
 ---
 
@@ -74,7 +74,7 @@ by this repo managing its own `.tasks/` end to end.
 | TASK-047 | done | review-docs skill: periodic pass to catch stale docs and dangling references |
 | TASK-048 | done | Add strip-project-references skill: detect and fix portable-surface reference leaks |
 | TASK-049 | done | init-project: scaffold and upgrade a separate target repo via --target |
-| TASK-050 | in-review | implement-task asks which task to work instead of auto-picking the top of TODO |
+| TASK-050 | done | implement-task asks which task to work instead of auto-picking the top of TODO |
 
-Progress: 35/36 done
+Progress: 36/36 done
 <!-- END:children -->
