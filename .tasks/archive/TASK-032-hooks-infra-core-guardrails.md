@@ -2,12 +2,12 @@
 id: TASK-032
 title: Hooks infrastructure + shared guardrails module + core git/gh guardrail hooks
 type: feature
-status: in-review
+status: done
 epic: EPIC-002
 created: 2026-09-14
 branch: task-032-hooks-infra-core-guardrails
 pr: "https://github.com/RobotNerd/sdlc-llm/pull/59"
-merge_commit: null
+merge_commit: e3209d60ff3dfdc74fac42f3a76bba541d6fb1d9
 blocked_by: []
 blocks: [TASK-033, TASK-034, TASK-035, TASK-036, TASK-037, TASK-038, TASK-039, TASK-040, TASK-045]
 ---
