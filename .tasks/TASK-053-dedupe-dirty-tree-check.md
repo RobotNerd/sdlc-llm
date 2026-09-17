@@ -2,7 +2,7 @@
 id: TASK-053
 title: "implement-task: delegate dirty_files to guardrails.dirty_tree_violation"
 type: refactor
-status: todo
+status: in-progress
 epic: EPIC-002
 created: 2026-09-17
 branch: task-053-dedupe-dirty-tree-check
@@ -33,17 +33,17 @@ Two decisions already made (do not re-litigate):
 
 ## Acceptance criteria
 
-- [ ] `dirty_files` in `.claude/skills/implement-task/scaffold.py` contains no `git status`
+- [x] `dirty_files` in `.claude/skills/implement-task/scaffold.py` contains no `git status`
       invocation or porcelain parsing of its own — it calls `guardrails.dirty_tree_violation`.
-- [ ] `dirty_tree_violation` in `.tasks/bin/guardrails.py` is unchanged (signature and fail-open
+- [x] `dirty_tree_violation` in `.tasks/bin/guardrails.py` is unchanged (signature and fail-open
       behavior both), so no hook behavior shifts.
-- [ ] All 4 existing call sites (`scaffold.py:285`, `:320`, `:434`, `:488`) keep their current
+- [x] All 4 existing call sites (`scaffold.py:285`, `:320`, `:434`, `:488`) keep their current
       signature and results.
-- [ ] Guardrails resolution does **not** depend on the `cwd` argument —
+- [x] Guardrails resolution does **not** depend on the `cwd` argument —
       `test_dirty_files_excludes_given_ignore_paths` passes a bare `tmp_path` git repo with no
       `.tasks/` in it, and must keep passing unmodified.
-- [ ] `guardrails.py` stays independently vendorable — it gains no dependency on the skill.
-- [ ] `pytest` green with no test file edits, and `python3 .tasks/bin/sync check` exits 0.
+- [x] `guardrails.py` stays independently vendorable — it gains no dependency on the skill.
+- [x] `pytest` green with no test file edits, and `python3 .tasks/bin/sync check` exits 0.
 
 ## Testing strategy
 
@@ -60,7 +60,23 @@ Two decisions already made (do not re-litigate):
 
 ## Worklog
 
-_(empty — appended during implementation)_
+- Added `load_guardrails_module()` to `scaffold.py` next to `load_sync_module`, following the
+  same `SourceFileLoader` technique `guardrails.py`'s own `_load_sync()` uses: reuse
+  `sys.modules["guardrails"]` if already registered (as `tests/conftest.py` does), else load
+  `.tasks/bin/guardrails.py` resolved from `Path(__file__).resolve().parents[3]` (the script's own
+  location, not `cwd`).
+- Rewrote `dirty_files` as a one-line delegate: `load_guardrails_module().dirty_tree_violation(cwd,
+  tuple(ignore))`. Signature, call sites, and public name unchanged.
+- `guardrails.py`'s `dirty_tree_violation` was not touched — no signature or behavior change,
+  including its fail-open-on-broken-`git status` return of `[]`. See the delta this introduces in
+  the scaffold's own behavior, noted below.
+- Full suite: `.venv/bin/pytest -q` → 493 passed.
+- `test_dirty_files_excludes_given_ignore_paths` (the bare-`tmp_path`-with-no-`.tasks/` case) →
+  passed unmodified, confirming guardrails resolution doesn't depend on `cwd`.
+- `python3 .claude/skills/implement-task/scaffold.py resume-state` from the repo root → emitted
+  JSON (`{"phase": "phase2", "task_id": "TASK-053"}`), not a guardrails-import `SystemExit`,
+  confirming the vendored/production path resolves.
+- `python3 .tasks/bin/sync check` → exit 0.
 
 ## Notes
 
@@ -78,3 +94,9 @@ _(empty — appended during implementation)_
   guardrails module, never the reverse.
 - Source of this task: TASK-034's Notes
   (`.tasks/archive/TASK-034-branch-dirty-tree-gate-hook.md:74-76`).
+- **Fail-open delta (as anticipated above):** `dirty_files` previously ran `git status` with
+  `check=True`, raising `CalledProcessError` if it exited non-zero. It now inherits
+  `dirty_tree_violation`'s fail-open behavior — a broken `git status` at any of the 4 call sites
+  now returns `[]` (tree reads as clean) instead of raising. Accepted per the task's own framing:
+  `repo_root()` already exits non-zero outside a git repo, so a failing `git status` at these call
+  sites (all reached only after `repo_root()` succeeds) is near-impossible in practice.
