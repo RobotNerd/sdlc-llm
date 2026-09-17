@@ -22,6 +22,9 @@ Covers, today:
   markers — denied regardless of which file carries the region.
 - An `Edit`/`Write` that hand-sets an epic's `status` to anything but `wont-do` — denied;
   status is otherwise derived, never hand-set.
+- `git checkout -b`/`git switch -c` (branch creation) — denied when the working tree is dirty
+  outside `ignored_paths`, or when the new branch name doesn't conform to
+  `<branch_prefix><NNN>-<slug>`.
 
 It imports nothing outside the Python standard library (plus `sync`, its sibling in this same
 directory), to stay dependency-free for any project it's vendored into.
@@ -347,6 +350,104 @@ def check_force_push(command: str, cwd: Path, branch_prefix: str) -> GuardrailRe
 
 
 # ---------------------------------------------------------------------------
+# Guardrail 4: branch-creation gate (dirty tree, non-conforming name)
+# ---------------------------------------------------------------------------
+
+
+_BRANCH_NAME_RE_TEMPLATE = r"^{prefix}\d{{3}}-[a-z0-9]+(?:-[a-z0-9]+)*$"
+
+
+def branch_name_violation(branch: str, branch_prefix: str) -> str | None:
+    """`None` if `branch` matches `<branch_prefix><NNN>-<slug>` (the workflow's branch-naming
+    convention -- see `compute_branch_name`); otherwise a reason string.
+    """
+    pattern = re.compile(_BRANCH_NAME_RE_TEMPLATE.format(prefix=re.escape(branch_prefix)))
+    if pattern.fullmatch(branch):
+        return None
+    return (
+        f"branch name {branch!r} doesn't match the required {branch_prefix!r} + 3-digit id + "
+        "'-' + slug pattern"
+    )
+
+
+def dirty_tree_violation(cwd: Path, ignored_paths: tuple[str, ...]) -> list[str]:
+    """Paths `git status` reports as dirty in `cwd`, excluding `ignored_paths` -- `[]` if the
+    tree is clean modulo those paths. `--untracked-files=all` matters: without it, git
+    collapses a brand-new, entirely untracked directory into one `?? dirname/` line instead of
+    listing the file inside it, and an `ignored_paths` entry naming that file would then never
+    match.
+    """
+    result = subprocess.run(
+        ["git", "status", "--porcelain", "--untracked-files=all"],
+        cwd=cwd, capture_output=True, text=True,
+    )
+    if result.returncode != 0:
+        return []
+    files = []
+    for line in result.stdout.splitlines():
+        path = line[3:].strip()
+        if " -> " in path:  # rename: "old -> new"
+            path = path.split(" -> ", 1)[1]
+        if path.startswith('"') and path.endswith('"'):
+            path = path[1:-1]
+        if path not in ignored_paths:
+            files.append(path)
+    return files
+
+
+_CHECKOUT_CREATE_FLAGS = ("-b", "-B")
+_SWITCH_CREATE_FLAGS = ("-c", "-C")
+
+
+def _parse_branch_create(command: str) -> str | None:
+    """The new branch name from a `git checkout -b|-B <name>` or `git switch -c|-C <name>`
+    invocation found anywhere in `command` -- `None` if there isn't one.
+    """
+    for segment in _split_command_segments(command):
+        tokens = _safe_split(segment)
+        if len(tokens) < 2 or tokens[0] != "git":
+            continue
+        if tokens[1] == "checkout":
+            flags = _CHECKOUT_CREATE_FLAGS
+        elif tokens[1] == "switch":
+            flags = _SWITCH_CREATE_FLAGS
+        else:
+            continue
+        for i, tok in enumerate(tokens[2:], start=2):
+            if tok in flags and i + 1 < len(tokens):
+                return tokens[i + 1]
+    return None
+
+
+def check_branch_create(
+    command: str, cwd: Path, branch_prefix: str, ignored_paths: tuple[str, ...]
+) -> GuardrailResult:
+    """Deny `git checkout -b`/`git switch -c` (branch creation) when the working tree is
+    dirty outside `ignored_paths`, or when the new branch name doesn't conform to
+    `<branch_prefix><NNN>-<slug>`. Makes `implement-task` phase 1's existing preconditions
+    structural instead of relying on the model checking them itself.
+    """
+    branch = _parse_branch_create(command)
+    if branch is None:
+        return GuardrailResult(allow=True)
+
+    dirty = dirty_tree_violation(cwd, ignored_paths)
+    if dirty:
+        return GuardrailResult(
+            allow=False,
+            reason=(
+                "branch creation is denied -- the working tree is dirty outside "
+                f"`ignored_paths`: {', '.join(sorted(dirty))}. Commit or stash first."
+            ),
+        )
+
+    reason = branch_name_violation(branch, branch_prefix)
+    if reason:
+        return GuardrailResult(allow=False, reason=reason)
+    return GuardrailResult(allow=True)
+
+
+# ---------------------------------------------------------------------------
 # Dispatcher -- what the `PreToolUse`/`Bash` hook script actually calls
 # ---------------------------------------------------------------------------
 
@@ -359,11 +460,13 @@ def evaluate_bash_command(command: str, cwd: Path) -> GuardrailResult:
     default_branch = config.get("default_branch") or "main"
     remote = config.get("remote") or "origin"
     branch_prefix = config.get("branch_prefix") or ""
+    ignored_paths = tuple(config.get("ignored_paths") or [])
 
     for result in (
         check_gh_pr_merge(command),
         check_push_to_default_branch(command, cwd, default_branch, remote),
         check_force_push(command, cwd, branch_prefix),
+        check_branch_create(command, cwd, branch_prefix, ignored_paths),
     ):
         if not result.allow:
             return result
