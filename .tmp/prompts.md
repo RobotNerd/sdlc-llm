@@ -132,9 +132,29 @@ Change it so that it shows a diff and requires the human to rerun with `--force`
 
 Please update TASK-049 to reflect this change. Note that I removed an acceptance criteria in TASK-049 for fixing the frontmatter on the `init-project` skill since it looks like you already fixed it. -->
 
+<!-- There is an open PR for TASK-049 https://github.com/RobotNerd/sdlc-llm/pull/49. Before merging it, I tested init-project manually on another repo and there's one change I want you to make. When it prompts the user to populate config.md details, the prompt for the `docs_path` wasn't as user-friendly as I want. It should use phrasing like "which documents should be automatically updated in this repository when working on tasks?" -->
+
+/add-task A new bug ticket at the top of the TODO list in EPIC-001. Earlier in this session I ran the /implement-task skill. My intention was to trigger you to pick the next task from the top of the TODO list, since there were no tasks in progress, no outstanding PRs waiting to be merged, and the most recent changes had been merged into main. But it didn't work, and you simply responded `Still nothing in progress — ready to start a new task. Auto-pick the top of TODO, or work a specific task?`. I want you to figure out why this happened, propose a fix, and create the new ticket to implement the fix.
+
 ---
 
-> TODO: Come back to planning this later
+/add-task A new task at the top of the TODO list in EPIC-001. Simplify and merge unit tests. Perform an analysis of all existing unit test looking for redundant tests, test cases that can be merged, and test cases that can be simplified. My suspicion is that we don't need all of the test cases that we currently have, and culling the ones we don't need will reduce context load in our working sessions.
+
+---
+
+EPIC-003: Make sure the planning stage for a task doesn't require user interaction, either in an existing task or a new one.
+
+---
+
+EPIC-002: Once all the current tasks in this epic are implemented, will the file @.tasks/guidelines.md still serve any purpose, or will all of the details defined there have been successfully offloaded to skills and hooks? If not, identify which remaining parts, if any, can be moved to skills and/or hooks. Identify which portions of the doc can't be outsourced. Are the portions that can't be outsourced useful as instructions to the LLM for how to use these skills? If not, who is the intended target of this doc?
+
+---
+
+Rewrite README to be more human-readable; right now it seems geared more towards AI, with some sections being too dense; focus on simplifying by removing technical details and focus on usage from a human user perspective; [TODO] provide examples to the LLM of good READMEs from other projects to use as a guide
+
+---
+
+<!-- > TODO: Come back to planning this later
 
 /plan-feature Context/session management and multiple agents. Goes on board after all current epics, blocked by all current epics. The goal is to add the option to this workflow to run multiple agents.
 
@@ -172,4 +192,17 @@ NOTE: Claude's initial analysis:
 
   On cost, plainly: a Pro plan's usage limit is one account-wide pool on a rolling 5-hour/weekly window, shared across everything you run. Three simultaneous long-lived instances don't triple your budget — they draw on the same pool
   three times as fast, so you'd hit the weekly ceiling sooner in wall-clock time for the same total spend. Worth designing the defaults around that reality rather than around "more instances = more capacity."
-```
+``` -->
+
+/plan-feature Run multiple agents.
+
+- all models and effort levels are configurable
+- Orchestrator: A more powerful model that does the planning.
+- Worker: A less powerful model that implements work planned by the orchestrator.
+- Critic: A model that reviews changes implemented by the worker.
+
+- The orchestrator triggers the worker to start working on a task or a set of tasks.
+- The orchestrator triggers the critic to review changes implemented by the worker.
+- The cri
+
+- The critic is outsourced to a less expensive model. Part of this work should be to investigate and choose a model, considering ones like deepseek, kimi, etc. I have an openrouter account that can be used to access the model.
