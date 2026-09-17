@@ -56,6 +56,7 @@ module with the skills' own scripts.
 | TASK-038 | todo | Wire hooks into upgrade and config migration |
 | TASK-052 | done | Re-scope guidelines.md to the non-outsourceable core and add a skill-selection map |
 | TASK-053 | done | implement-task: delegate dirty_files to guardrails.dirty_tree_violation |
+| TASK-065 | in-progress | Fix test_command so it resolves outside an activated venv shell |
 
-Progress: 6/9 done
+Progress: 6/10 done
 <!-- END:children -->
