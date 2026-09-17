@@ -25,6 +25,10 @@ Covers, today:
 - `git checkout -b`/`git switch -c` (branch creation) — denied when the working tree is dirty
   outside `ignored_paths`, or when the new branch name doesn't conform to
   `<branch_prefix><NNN>-<slug>`.
+- `gh pr create` — denied unless `sync check`, `test_command`, `lint_command` (if not `null`),
+  and `format_command` (if not `null`, in a check-only mode -- it runs, any change it makes is
+  captured as a diff and reverted, never left applied) all pass; the failing gate's output is
+  attached to the denial so the agent fixes and retries.
 
 It imports nothing outside the Python standard library (plus `sync`, its sibling in this same
 directory), to stay dependency-free for any project it's vendored into.
@@ -448,6 +452,144 @@ def check_branch_create(
 
 
 # ---------------------------------------------------------------------------
+# Guardrail 5: pre-PR quality gate (`gh pr create`)
+# ---------------------------------------------------------------------------
+
+
+_GH_PR_CREATE_RE = re.compile(r"(?:^|[;&|]\s*)gh\s+pr\s+create\b")
+
+
+def _is_gh_pr_create(command: str) -> bool:
+    return bool(_GH_PR_CREATE_RE.search(command))
+
+
+def _sync_check_output(cwd: Path) -> str | None:
+    """The `sync check` diff text if `cwd`'s `.tasks/` has drift, `None` if it's clean --
+    or if `.tasks/` isn't in a state `compute_mismatches` can even evaluate (no `.tasks/`
+    yet, no `BOARD.md`), which is treated as "can't tell, don't block on our own
+    uncertainty", same convention as `_default_branch_push_violations`.
+    """
+    sync_mod = _load_sync()
+    try:
+        mismatches = sync_mod.compute_mismatches(cwd / ".tasks")
+    except OSError:
+        return None
+    if not mismatches:
+        return None
+    return "".join(mismatch.diff() for mismatch in mismatches)
+
+
+def _run_shell_check(command: str, cwd: Path) -> str | None:
+    """Run `command` (a shell command from config, e.g. `test_command`/`lint_command`) in
+    `cwd`; `None` on a zero exit, else its combined stdout+stderr.
+    """
+    result = subprocess.run(command, shell=True, cwd=cwd, capture_output=True, text=True)
+    if result.returncode == 0:
+        return None
+    output = (result.stdout + result.stderr).strip()
+    return output or f"`{command}` exited {result.returncode} with no output"
+
+
+def _untracked_paths(cwd: Path) -> set[str]:
+    result = subprocess.run(
+        ["git", "status", "--porcelain", "--untracked-files=all"], cwd=cwd, capture_output=True, text=True
+    )
+    return {line[3:] for line in result.stdout.splitlines() if line.startswith("??")}
+
+
+def _format_check_output(format_command: str, cwd: Path) -> str | None:
+    """Run `format_command`, then report -- without ever leaving applied -- whatever it
+    changed: capture the `git diff` it produced on tracked files and revert those exact
+    paths, and delete any new file it created, so the tree ends exactly as it started
+    regardless of outcome -- an auto-fixing hook that silently committed a formatter's
+    changes would be hard to reason about and could surprise a human mid-review, so the diff
+    is reported instead, for the agent to apply in their own commit.
+    """
+    before_untracked = _untracked_paths(cwd)
+    subprocess.run(format_command, shell=True, cwd=cwd, capture_output=True, text=True)
+
+    diff = subprocess.run(["git", "diff"], cwd=cwd, capture_output=True, text=True).stdout
+    changed = subprocess.run(
+        ["git", "diff", "--name-only"], cwd=cwd, capture_output=True, text=True
+    ).stdout.split()
+    if changed:
+        subprocess.run(["git", "checkout", "--", *changed], cwd=cwd, capture_output=True, text=True)
+
+    new_files = sorted(_untracked_paths(cwd) - before_untracked)
+    report = diff
+    for rel_path in new_files:
+        try:
+            (cwd / rel_path).unlink()
+        except OSError:
+            pass
+        report += f"\n(new file {rel_path!r} created by format_command -- removed)\n"
+
+    return report or None
+
+
+def check_pre_pr_quality_gate(
+    command: str,
+    cwd: Path,
+    test_command: str | None,
+    lint_command: str | None,
+    format_command: str | None,
+) -> GuardrailResult:
+    """Deny `gh pr create` unless `sync check`, `test_command`, `lint_command` (if set), and
+    `format_command` (if set, check-only) all pass -- the structural backstop for
+    `implement-task`'s own pre-PR steps, for when the agent runs `gh pr create` by hand
+    instead of through the skill's script. A `None` `lint_command`/`format_command` skips
+    that gate entirely, same as today's skill-prose behavior.
+    """
+    if not _is_gh_pr_create(command):
+        return GuardrailResult(allow=True)
+
+    sync_output = _sync_check_output(cwd)
+    if sync_output:
+        return GuardrailResult(
+            allow=False,
+            reason=(
+                "`gh pr create` is denied -- `sync check` found drift. Run `.tasks/bin/sync` "
+                f"and commit the result before opening a PR:\n\n{sync_output}"
+            ),
+        )
+
+    if test_command:
+        output = _run_shell_check(test_command, cwd)
+        if output is not None:
+            return GuardrailResult(
+                allow=False,
+                reason=(
+                    f"`gh pr create` is denied -- `test_command` ({test_command!r}) failed:\n\n"
+                    f"{output}"
+                ),
+            )
+
+    if lint_command:
+        output = _run_shell_check(lint_command, cwd)
+        if output is not None:
+            return GuardrailResult(
+                allow=False,
+                reason=(
+                    f"`gh pr create` is denied -- `lint_command` ({lint_command!r}) failed:\n\n"
+                    f"{output}"
+                ),
+            )
+
+    if format_command:
+        diff = _format_check_output(format_command, cwd)
+        if diff:
+            return GuardrailResult(
+                allow=False,
+                reason=(
+                    f"`gh pr create` is denied -- `format_command` ({format_command!r}) would "
+                    f"change files. Run it and commit the result before opening a PR:\n\n{diff}"
+                ),
+            )
+
+    return GuardrailResult(allow=True)
+
+
+# ---------------------------------------------------------------------------
 # Dispatcher -- what the `PreToolUse`/`Bash` hook script actually calls
 # ---------------------------------------------------------------------------
 
@@ -461,12 +603,16 @@ def evaluate_bash_command(command: str, cwd: Path) -> GuardrailResult:
     remote = config.get("remote") or "origin"
     branch_prefix = config.get("branch_prefix") or ""
     ignored_paths = tuple(config.get("ignored_paths") or [])
+    test_command = config.get("test_command")
+    lint_command = config.get("lint_command")
+    format_command = config.get("format_command")
 
     for result in (
         check_gh_pr_merge(command),
         check_push_to_default_branch(command, cwd, default_branch, remote),
         check_force_push(command, cwd, branch_prefix),
         check_branch_create(command, cwd, branch_prefix, ignored_paths),
+        check_pre_pr_quality_gate(command, cwd, test_command, lint_command, format_command),
     ):
         if not result.allow:
             return result
