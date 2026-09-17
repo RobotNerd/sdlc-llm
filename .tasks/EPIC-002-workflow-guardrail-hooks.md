@@ -55,7 +55,7 @@ module with the skills' own scripts.
 | TASK-037 | todo | SessionStart board-context hook |
 | TASK-038 | todo | Wire hooks into upgrade and config migration |
 | TASK-052 | done | Re-scope guidelines.md to the non-outsourceable core and add a skill-selection map |
-| TASK-053 | in-progress | implement-task: delegate dirty_files to guardrails.dirty_tree_violation |
+| TASK-053 | in-review | implement-task: delegate dirty_files to guardrails.dirty_tree_violation |
 
 Progress: 4/9 done
 <!-- END:children -->

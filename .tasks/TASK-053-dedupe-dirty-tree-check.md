@@ -2,11 +2,11 @@
 id: TASK-053
 title: "implement-task: delegate dirty_files to guardrails.dirty_tree_violation"
 type: refactor
-status: in-progress
+status: in-review
 epic: EPIC-002
 created: 2026-09-17
 branch: task-053-dedupe-dirty-tree-check
-pr: null
+pr: "https://github.com/RobotNerd/sdlc-llm/pull/63"
 merge_commit: null
 blocked_by: []
 blocks: []
