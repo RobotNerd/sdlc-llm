@@ -1,6 +1,6 @@
 ---
 workflow_version: 1
-test_command: pytest
+test_command: python3 -c "import sys; sys.exit(1)"
 lint_command: null
 format_command: null
 docs_paths: [README.md, CLAUDE.md]
