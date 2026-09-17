@@ -2,12 +2,12 @@
 id: TASK-035
 title: "Pre-PR quality gate hook: sync check, test, lint, format"
 type: feature
-status: in-review
+status: done
 epic: EPIC-002
 created: 2026-09-14
 branch: task-035-pre-pr-quality-gate-hook
 pr: "https://github.com/RobotNerd/sdlc-llm/pull/66"
-merge_commit: null
+merge_commit: d7ba18d78502f391838683da595a3a76881f5458
 blocked_by: [TASK-032, TASK-031]
 blocks: [TASK-039, TASK-040]
 ---
