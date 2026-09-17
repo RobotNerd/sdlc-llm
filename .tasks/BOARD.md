@@ -10,19 +10,20 @@ between `<!-- BEGIN -->` / `<!-- END -->` markers — change the task/epic file 
 | Epic | Status | Progress |
 |---|---|---|
 | EPIC-001 | in-progress | 36/37 done |
-| EPIC-002 | todo | 0/7 done |
+| EPIC-002 | todo | 0/8 done |
 | EPIC-003 | todo | 0/7 done |
 <!-- END:epics -->
 
 ## TODO
 
 - TASK-051 — Simplify and merge the unit test suite: cull redundant and mergeable test cases  `EPIC-001`
+- TASK-052 — Re-scope guidelines.md to the non-outsourceable core and add a skill-selection map  `EPIC-002`
 - TASK-032 — Hooks infrastructure + shared guardrails module + core git/gh guardrail hooks  `EPIC-002`
 - TASK-033 — Structural edit guardrails hook: generated regions and epic status  `EPIC-002` ⛔ blocked_by TASK-032
 - TASK-034 — Branch-name + dirty-tree gate hook  `EPIC-002` ⛔ blocked_by TASK-032
 - TASK-035 — Pre-PR quality gate hook: sync check, test, lint, format  `EPIC-002` ⛔ blocked_by TASK-032
 - TASK-036 — SPEC/TASK-reference scan hook (repo-only, never copied)  `EPIC-002` ⛔ blocked_by TASK-032
-- TASK-037 — SessionStart board-context hook  `EPIC-002` ⛔ blocked_by TASK-032
+- TASK-037 — SessionStart board-context hook  `EPIC-002` ⛔ blocked_by TASK-032, TASK-052
 - TASK-038 — Wire hooks into upgrade and config migration  `EPIC-002` ⛔ blocked_by TASK-032
 - TASK-039 — Batch selection + deterministic validation script  `EPIC-003` ⛔ blocked_by TASK-032, TASK-033, TASK-034, TASK-035, TASK-036, TASK-037, TASK-038
 - TASK-040 — TDD mode for implement-task phase 2  `EPIC-003` ⛔ blocked_by TASK-032, TASK-033, TASK-034, TASK-035, TASK-036, TASK-037, TASK-038

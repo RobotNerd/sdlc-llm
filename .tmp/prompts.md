@@ -134,19 +134,20 @@ Please update TASK-049 to reflect this change. Note that I removed an acceptance
 
 <!-- There is an open PR for TASK-049 https://github.com/RobotNerd/sdlc-llm/pull/49. Before merging it, I tested init-project manually on another repo and there's one change I want you to make. When it prompts the user to populate config.md details, the prompt for the `docs_path` wasn't as user-friendly as I want. It should use phrasing like "which documents should be automatically updated in this repository when working on tasks?" -->
 
-/add-task A new bug ticket at the top of the TODO list in EPIC-001. Earlier in this session I ran the /implement-task skill. My intention was to trigger you to pick the next task from the top of the TODO list, since there were no tasks in progress, no outstanding PRs waiting to be merged, and the most recent changes had been merged into main. But it didn't work, and you simply responded `Still nothing in progress — ready to start a new task. Auto-pick the top of TODO, or work a specific task?`. I want you to figure out why this happened, propose a fix, and create the new ticket to implement the fix.
+<!-- /add-task A new bug ticket at the top of the TODO list in EPIC-001. Earlier in this session I ran the /implement-task skill. My intention was to trigger you to pick the next task from the top of the TODO list, since there were no tasks in progress, no outstanding PRs waiting to be merged, and the most recent changes had been merged into main. But it didn't work, and you simply responded `Still nothing in progress — ready to start a new task. Auto-pick the top of TODO, or work a specific task?`. I want you to figure out why this happened, propose a fix, and create the new ticket to implement the fix. -->
 
 ---
 
-/add-task A new task at the top of the TODO list in EPIC-001. Simplify and merge unit tests. Perform an analysis of all existing unit test looking for redundant tests, test cases that can be merged, and test cases that can be simplified. My suspicion is that we don't need all of the test cases that we currently have, and culling the ones we don't need will reduce context load in our working sessions.
+<!-- /add-task A new task at the top of the TODO list in EPIC-001. Simplify and merge unit tests. Perform an analysis of all existing unit test looking for redundant tests, test cases that can be merged, and test cases that can be simplified. My suspicion is that we don't need all of the test cases that we currently have, and culling the ones we don't need will reduce context load in our working sessions. -->
 
 ---
 
-EPIC-003: Make sure the planning stage for a task doesn't require user interaction, either in an existing task or a new one.
+<!-- I have some questions about EPIC-002: Once all the current tasks in this epic are implemented, will the file @.tasks/guidelines.md still serve any purpose, or will all of the details defined there have been successfully offloaded to skills and hooks? If not, identify which remaining parts, if any, can be moved to skills and/or hooks. Identify which portions of the doc can't be outsourced. Are the portions that can't be outsourced useful as instructions to the LLM for how to use these skills? If not, who is the intended target of this doc?
 
----
-
-EPIC-002: Once all the current tasks in this epic are implemented, will the file @.tasks/guidelines.md still serve any purpose, or will all of the details defined there have been successfully offloaded to skills and hooks? If not, identify which remaining parts, if any, can be moved to skills and/or hooks. Identify which portions of the doc can't be outsourced. Are the portions that can't be outsourced useful as instructions to the LLM for how to use these skills? If not, who is the intended target of this doc?
+Ultimately, I'm trying to achieve these things:
+- I want to understand if the LLM needs a broad overview like this guidelines doc that tells it how these skills should be used together and gives an overview of the spec/epic/task system.
+- If the doc is needed/userful, where is the best place for that to live? Is the guidelines doc a good choice?
+- If we keep the guidelines doc, then it will continue to be copied to a new repo when using the init-project skill. In this case, how would a claude code session started in the target repo know to load this guidelines doc as a reference, since we aren't modifying the existing CLAUDE.md in the target repo? -->
 
 ---
 
