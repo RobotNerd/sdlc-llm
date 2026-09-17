@@ -1,6 +1,6 @@
 ---
 id: TASK-043
-title: "Context/token usage safety-valve interrupt + usage reporting"
+title: Context/token usage safety-valve interrupt + usage reporting
 type: feature
 status: todo
 epic: EPIC-003
@@ -9,7 +9,7 @@ branch: task-043-context-token-safety-valve
 pr: null
 merge_commit: null
 blocked_by: [TASK-041]
-blocks: []
+blocks: [TASK-054, TASK-055, TASK-064]
 ---
 
 # TASK-043: Context/token usage safety-valve interrupt + usage reporting

@@ -1,6 +1,6 @@
 ---
 id: TASK-044
-title: "Follow-up task creation policy with a configurable per-batch limit"
+title: Follow-up task creation policy with a configurable per-batch limit
 type: feature
 status: todo
 epic: EPIC-003
@@ -9,7 +9,7 @@ branch: task-044-follow-up-task-creation-policy
 pr: null
 merge_commit: null
 blocked_by: [TASK-041]
-blocks: []
+blocks: [TASK-054, TASK-055]
 ---
 
 # TASK-044: Follow-up task creation policy with a configurable per-batch limit

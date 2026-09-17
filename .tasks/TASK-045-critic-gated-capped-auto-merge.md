@@ -1,6 +1,6 @@
 ---
 id: TASK-045
-title: "Opt-in, critic-gated, per-batch-capped auto-merge"
+title: Opt-in, critic-gated, per-batch-capped auto-merge
 type: feature
 status: todo
 epic: EPIC-003
@@ -9,7 +9,7 @@ branch: task-045-critic-gated-capped-auto-merge
 pr: null
 merge_commit: null
 blocked_by: [TASK-041, TASK-032]
-blocks: []
+blocks: [TASK-054, TASK-055]
 ---
 
 # TASK-045: Opt-in, critic-gated, per-batch-capped auto-merge

@@ -9,7 +9,7 @@ branch: task-042-interrupt-taxonomy
 pr: null
 merge_commit: null
 blocked_by: [TASK-041]
-blocks: []
+blocks: [TASK-054, TASK-055]
 ---
 
 # TASK-042: Interrupt taxonomy: isolated skip-task vs. systemic halt-batch routing

@@ -149,11 +149,15 @@ Ultimately, I'm trying to achieve these things:
 - If the doc is needed/userful, where is the best place for that to live? Is the guidelines doc a good choice?
 - If we keep the guidelines doc, then it will continue to be copied to a new repo when using the init-project skill. In this case, how would a claude code session started in the target repo know to load this guidelines doc as a reference, since we aren't modifying the existing CLAUDE.md in the target repo? -->
 
----
+<!-- Read @.tasks/guidelines.md to gain context.
 
-Rewrite README to be more human-readable; right now it seems geared more towards AI, with some sections being too dense; focus on simplifying by removing technical details and focus on usage from a human user perspective; [TODO] provide examples to the LLM of good READMEs from other projects to use as a guide
+Then use the add-task skill to create a new task in EPIC-002 and place it at the top of the TODO list. The task is to implement the changes in the note added on @.tasks/archive/TASK-034-branch-dirty-tree-gate-hook.md:
 
----
+```
+- Follow-up candidate (not filed as a task, just noted): `implement-task/scaffold.py`'s own
+  `dirty_files` could be migrated to call `guardrails.dirty_tree_violation` instead of keeping
+  its own copy, per SPEC-002's "define guardrail logic once" goal -- out of this task's scope.
+``` -->
 
 <!-- > TODO: Come back to planning this later
 
@@ -195,15 +199,44 @@ NOTE: Claude's initial analysis:
   three times as fast, so you'd hit the weekly ceiling sooner in wall-clock time for the same total spend. Worth designing the defaults around that reality rather than around "more instances = more capacity."
 ``` -->
 
-/plan-feature Run multiple agents.
+<!-- /plan-feature Run multiple agents. This should go in a new epic that is placed at the bottom of the TODO list. It is blocked by EPIC-003.
 
-- all models and effort levels are configurable
 - Orchestrator: A more powerful model that does the planning.
 - Worker: A less powerful model that implements work planned by the orchestrator.
 - Critic: A model that reviews changes implemented by the worker.
+- All models and effort levels are configurable.
 
+Behavior
 - The orchestrator triggers the worker to start working on a task or a set of tasks.
 - The orchestrator triggers the critic to review changes implemented by the worker.
-- The cri
+- The critic reports its findings back to the orchestrator, and the orchestrator determines if the report requires a follow up action. Follow up actions can include: determine that no action is necessary and the current task can be completed, rework the current task to fix/improve issues based on the report feedback, create new tasks to address the critic's feedback later, stop work and ask the human user for clarification. I am open to your suggestions for additional follow up actions or changes to the ones I listed.
+- Determine what level of capability you would recommend for each agent. The orchestrator should clearly be the smartest and most capable. How smart/capable do the worker and critic need to be in comparision.
+- Is it possible to adjust the worker and critic effort level on the fly based on the difficultly level of the task? This would be decided by the orchestrator when delegating work to one of the other agents, and the adjustment to that agent's effort level one change before starting work, but only if this is an actual efficiency improvement.
 
-- The critic is outsourced to a less expensive model. Part of this work should be to investigate and choose a model, considering ones like deepseek, kimi, etc. I have an openrouter account that can be used to access the model.
+Providers
+- Each agent can optionally be outsourced to a model outside of the Anthropic ecosystem.
+- The critic will be outsourced to a less expensive non-Anthropic model by default.
+- Include an investigation while planning this feature to rank external models. Consider the latest ones from providers like qwen, deepseek, z.ai, gemini, kimi, and any others you find that are popular. Compare based on cost vs performance.
+- Propose strategies to make this multi-agent process efficient. I want to avoid hitting the limits with claude/anthropic as well as keep costs reasonably low for openrouter/external model usage. For anthropic, I'm on the $20/month plan at the moment. I may upgrade later, but target this level of plan in your analysis for now.
+
+Guardrails
+- Guardrails are added to the critic-to-orchestrator feedback/rework loop to prevent it from getting stuck. If the critic kicks back the same task 3 times to the orchestrator to rework it, the orchestrator stops the automation and prompts the human user for clarification.
+- Monitor available openrouter credits. Stop work and alert the user if the credits dip below a configurable threshold and/or the rate of credit consumption is greater than a configurable threshold (credit usage per request for the last 2 requests).
+- I would like your suggestions for additional guardrails and/or changes to the ones I mentioned above.
+
+Other
+- Any deterministic behavior should be planned for implementation in a script.
+- Implement behaviors in skills and hooks as appropriate.
+- Propose any new skills and hooks that you would add for these features, if any. -->
+
+Read @.tasks/guidelines.md to gain context.
+
+---
+
+<!-- /add-task New task in EPIC-004 at the bottom of the TODO list. I want a mechanism to automatically compact (or clear if that make more sense) the context for orchestrator and worker agents. Since these will be long-running agents, then I expect their context to eventually fill up and degrade performance.
+
+One call out--I assume that the worker will be a long-running agent, but I need to verify that with you. The other possible workflow I can imagine is that the orchestrator would create a new instance of the worker for every task (sequentially). I'll defer to you to tell me which workflow is a more performant. -->
+
+---
+
+Rewrite README to be more human-readable; right now it seems geared more towards AI, with some sections being too dense; focus on simplifying by removing technical details and focus on usage from a human user perspective; [TODO] provide examples to the LLM of good READMEs from other projects to use as a guide
