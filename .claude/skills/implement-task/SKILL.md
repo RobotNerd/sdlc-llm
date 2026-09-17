@@ -23,6 +23,8 @@ a JSON result on success (exit `0`); on failure it prints a message to stderr an
 **Parameter (optional):** a specific task id (e.g. `TASK-NNN`) to work instead of auto-picking the
 top of TODO. If given, `start` still verifies it's actually `todo` and unblocked — if it's already
 `in-progress`/`in-review`, `start` refuses and says so; that's a resume, not a new start (see §0).
+**Omitting it is not a question to put to the human** — it means auto-pick the top of TODO, and
+§1's `start` call runs immediately with `{"task_id": null}`, no confirmation first.
 
 **STOP semantics, as actually run (not a stricter reading than this):** Phase 1 ends in a hard
 STOP — restate the plan, wait for explicit approval before writing anything. Once approved,
@@ -31,6 +33,11 @@ in phase 2 needs a decision (a test fails and the fix isn't obvious, a non-autom
 the human's hands, the task turns out ambiguous) — surface it and stop right there instead. Phase
 3 always ends in a hard STOP (PR open, waiting for review). Phase 4 is event-driven: resume and
 poll on invocation, don't loop waiting.
+
+**This list is the complete set of STOPs.** Never insert an extra confirmation before any
+scripted step at any phase boundary — not before picking a task in phase 1 (see §0/§1), not before
+recording a merge in phase 4 (`phase4_merged` — see §4). Once a phase's inputs are settled, run its
+`scaffold.py` call; ask only where this file says ASK or STOP.
 
 ## 0. Resume detection — run this first, every invocation
 
@@ -43,7 +50,7 @@ state. It returns
 
 | `phase` | Resume at |
 |---|---|
-| `phase1` | Phase 1 — pick a task |
+| `phase1` | Phase 1 — run `start` immediately (auto-pick top of TODO if no task id was given; never ask which task) |
 | `phase2` | Phase 2 |
 | `phase3` | Phase 3 |
 | `phase4_open` | Phase 4 — report status, stop again |
@@ -52,6 +59,9 @@ state. It returns
 | `ambiguous` | **STOP**, show `detail`, ask rather than guess |
 
 ## 1. Start
+
+On `phase1`, run this immediately — with no task id parameter, that means
+`{"task_id": null}` right away, **not** a question to the human about which task to work.
 
 Run `python3 .claude/skills/implement-task/scaffold.py start <answers.json>` with
 `{"task_id": "TASK-NNN"}` (the given parameter) or `{"task_id": null}` to auto-pick the top

@@ -1,8 +1,8 @@
 ---
 id: TASK-050
-title: "implement-task asks which task to work instead of auto-picking the top of TODO"
+title: implement-task asks which task to work instead of auto-picking the top of TODO
 type: bug
-status: todo
+status: in-progress
 epic: EPIC-001
 created: 2026-09-16
 branch: task-050-implement-task-asks-which-task-to-work-instead-of-auto-picking-the-top-of-todo
@@ -77,7 +77,21 @@ test; the outstanding TASK-031 phase-4 bookkeeping (see Notes).
 
 ## Worklog
 
-_(empty — appended during implementation)_
+- Edited `.claude/skills/implement-task/SKILL.md` only, four passages: the Parameter note, the
+  STOP-semantics paragraph (added a "this is the complete set" sentence), §0's `phase1` table row,
+  and §1 Start's opening sentence. No `scaffold.py` change.
+- Testing strategy step 1 (`pytest tests/ -q` via the repo's `.venv`): **420 passed**, 0 failed.
+- Testing strategy step 2 (`python3 .tasks/bin/sync check`): exit 0.
+- Testing strategy step 3 (re-read the four passages together, and against
+  `.tasks/guidelines.md:38`): consistent — all four now say "no task id ⇒ auto-pick immediately,
+  never ask which task."
+- Testing strategy steps 4–5 (human-run behavioral checks): **not run this session** — genuinely
+  can't stage "nothing in progress" while this very task occupies phase 1–4 of the workflow the
+  fix changes. This session's own phase-1 invocation *did* auto-pick TASK-050 without asking, but
+  that's not a clean test of the fix (the assistant already knew the intended behavior from writing
+  it, independent of what SKILL.md said). Recommend the human treat the *next* task's `/implement-task`
+  kickoff (no argument, nothing in flight) as the real step-4 check, and a `/implement-task TASK-NNN`
+  invocation as the step-5 check, and flag back here if either misbehaves.
 
 ## Notes
 
