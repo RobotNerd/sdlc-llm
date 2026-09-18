@@ -2,11 +2,11 @@
 id: TASK-067
 title: "batch_select range mode: use BOARD.md's hand-ordered TODO slice, not numeric task-id order"
 type: bug
-status: in-progress
+status: in-review
 epic: EPIC-003
 created: 2026-09-18
 branch: task-067-range-mode-board-order
-pr: null
+pr: "https://github.com/RobotNerd/sdlc-llm/pull/76"
 merge_commit: null
 blocked_by: []
 blocks: []
