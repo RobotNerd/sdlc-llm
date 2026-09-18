@@ -2,12 +2,12 @@
 id: TASK-040
 title: TDD mode for implement-task phase 2
 type: feature
-status: in-review
+status: done
 epic: EPIC-003
 created: 2026-09-14
 branch: task-040-tdd-mode
 pr: "https://github.com/RobotNerd/sdlc-llm/pull/77"
-merge_commit: null
+merge_commit: 5dd8118ec2325f5f585f062963ba5d94abfa36e0
 blocked_by: [TASK-032, TASK-033, TASK-034, TASK-035, TASK-036, TASK-037, TASK-038]
 blocks: [TASK-054, TASK-055]
 ---
