@@ -2,12 +2,12 @@
 id: TASK-066
 title: "init-project: merge Python ignore entries into the target repo's .gitignore"
 type: feature
-status: in-review
+status: done
 epic: null
 created: 2026-09-17
 branch: task-066-gitignore-python-artifacts
 pr: "https://github.com/RobotNerd/sdlc-llm/pull/73"
-merge_commit: null
+merge_commit: b4d603c6510f40d1a0582bd1b2a0a53f4aa2b3d8
 blocked_by: []
 blocks: []
 ---
