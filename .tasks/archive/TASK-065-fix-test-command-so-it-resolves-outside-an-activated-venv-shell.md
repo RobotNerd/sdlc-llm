@@ -2,12 +2,12 @@
 id: TASK-065
 title: Fix test_command so it resolves outside an activated venv shell
 type: bug
-status: in-review
+status: done
 epic: EPIC-002
 created: 2026-09-17
 branch: task-065-fix-test-command-so-it-resolves-outside-an-activated-venv-shell
 pr: "https://github.com/RobotNerd/sdlc-llm/pull/68"
-merge_commit: null
+merge_commit: 85040e67d0fd84f834ea4cce37f129b6c29034e2
 blocked_by: []
 blocks: []
 ---
