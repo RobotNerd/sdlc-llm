@@ -53,7 +53,7 @@ module with the skills' own scripts.
 | TASK-035 | done | Pre-PR quality gate hook: sync check, test, lint, format |
 | TASK-036 | done | SPEC/TASK-reference scan hook (repo-only, never copied) |
 | TASK-037 | done | SessionStart board-context hook |
-| TASK-038 | todo | Wire hooks into upgrade and config migration |
+| TASK-038 | in-progress | Wire hooks into upgrade and config migration |
 | TASK-052 | done | Re-scope guidelines.md to the non-outsourceable core and add a skill-selection map |
 | TASK-053 | done | implement-task: delegate dirty_files to guardrails.dirty_tree_violation |
 | TASK-065 | done | Fix test_command so it resolves outside an activated venv shell |

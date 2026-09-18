@@ -125,25 +125,35 @@ Omit `--target` to refresh the current repo; pass it to refresh a separate proje
 prose). (`--source`/`--ref` default to the toolkit repo's own URL and `main` — only pass them to
 pull from somewhere else, e.g. a fork or a specific tag.) This refreshes every portable skill
 under `.claude/skills/` plus `guidelines.md`, `.tasks/templates/*`, `.tasks/bin/sync`,
-`.tasks/bin/guardrails.py`, `.claude/hooks/*`, `.claude/settings.json`, and
-`.github/pull_request_template.md` from a fresh clone of the source. It never touches `BOARD.md`,
-`config.md`, any `SPEC-*`/`EPIC-*`/`TASK-*` file, or `.tasks/archive/` — those are project-owned.
+`.tasks/bin/guardrails.py`, `.claude/hooks/*`, and `.github/pull_request_template.md` from a fresh
+clone of the source. It never touches `BOARD.md`, `config.md`, any `SPEC-*`/`EPIC-*`/`TASK-*`
+file, or `.tasks/archive/` — those are project-owned.
+
+`.claude/settings.json` is handled separately from that hash-classified table, automatically, in
+the same `upgrade` run: a project can genuinely extend it (its own extra hook registration), so
+instead of whole-file overwrite-or-conflict it's additively merged — any hook registration the
+current toolkit ships that the project's file structurally lacks is inserted, and everything the
+project already has (including a hook registration no template will ever ship) is left exactly
+alone. No STOP for this part; it can only add, never remove or overwrite.
 
 - Exit `0` with no locally-modified files reported: show the human the JSON summary
-  (`new`/`updated`/`up_to_date` counts), then continue to **config.md migration** below.
-- Exit non-zero listing locally-modified files: it wrote nothing. Show the human the printed diffs
-  — each one is a managed file edited by hand since the last `run`/`upgrade`, which a plain
-  overwrite would silently destroy. **STOP** and ask whether to keep the local edit (leave that
-  file alone, rerun `upgrade` some other time), resolve it by hand first, or accept the incoming
-  version. Only after the human explicitly accepts overwriting **all** the listed files, re-run
-  with `--force` — it re-clones and reapplies the exact same classification, this time writing the
+  (`new`/`updated`/`up_to_date` counts, plus `settings_hooks_added` — the hook registrations, if
+  any, `.claude/settings.json` just gained), then continue to **config.md migration** below.
+- Exit non-zero listing locally-modified files: it wrote nothing (`.claude/settings.json`
+  included, even if it had something to add). Show the human the printed diffs — each one is a
+  managed file edited by hand since the last `run`/`upgrade`, which a plain overwrite would
+  silently destroy. **STOP** and ask whether to keep the local edit (leave that file alone, rerun
+  `upgrade` some other time), resolve it by hand first, or accept the incoming version. Only after
+  the human explicitly accepts overwriting **all** the listed files, re-run with `--force` — it
+  re-clones and reapplies the exact same classification, this time writing the
   previously-conflicting files too.
-- Exit non-zero for any other reason (clone failure, `sync`/`sync check` failing after a write):
-  **STOP**, show the human the error — same posture as `run`, not something to paper over.
+- Exit non-zero for any other reason (clone failure, `sync`/`sync check` failing after a write, or
+  `.claude/settings.json` not parsing as JSON): **STOP**, show the human the error — same posture
+  as `run`, not something to paper over.
 
 Use `--dry-run` first if the human wants to preview the classification without committing to
-either path — it prints the same JSON and writes nothing, `locally_modified` included, regardless
-of `--force`.
+either path — it prints the same JSON (plus `settings_hooks_would_add`, the settings-merge
+preview) and writes nothing, `locally_modified` included, regardless of `--force`.
 
 ### config.md migration
 

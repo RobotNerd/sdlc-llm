@@ -28,6 +28,7 @@ Standard library only -- no third-party dependencies, consistent with `.tasks/bi
 from __future__ import annotations
 
 import argparse
+import copy
 import difflib
 import hashlib
 import importlib.util
@@ -198,6 +199,47 @@ def merge_config_schema(project_text: str, sync_module: ModuleType) -> tuple[str
 
     merged = sync_module.render_frontmatter(new_fields, new_order) + body
     return merged, added, bumped_to
+
+
+def merge_settings_hooks(project: dict, template: dict) -> tuple[dict, list[str]]:
+    """Additively merge `template`'s (the toolkit's current `settings.json`) hook registrations
+    into `project`'s (a target project's existing `.claude/settings.json`, or `{}` if it has
+    none yet).
+
+    For every event (`"PreToolUse"`, `"SessionStart"`, ...) and every matcher-group under it in
+    `template`, matched to `project`'s corresponding group by its `matcher` value (including no
+    `matcher` key at all, e.g. `SessionStart`'s): a group `project` altogether lacks is appended
+    whole; an existing group only gains the individual hook commands it's missing, appended after
+    whatever's already there. A hook is identified by its `command` string alone -- if the
+    project already has *any* hook with that exact command in that group, it's left untouched, so
+    a project's own edit to a shipped hook (a different flag, say) is never duplicated or
+    clobbered. Nothing `project` already has -- its own extra events, groups, or hooks -- is ever
+    removed or reordered, which is exactly what lets a project keep a guardrail hook of its own
+    that no template will ever ship (this toolkit's own repo has one such repo-only hook).
+
+    Returns `(merged, added)` -- `added` is `[]` (and `merged == project`, structurally) when
+    `project` already has every hook `template` does.
+    """
+    merged = copy.deepcopy(project)
+    added: list[str] = []
+    hooks = merged.setdefault("hooks", {})
+
+    for event, template_groups in template.get("hooks", {}).items():
+        project_groups = hooks.setdefault(event, [])
+        for template_group in template_groups:
+            matcher = template_group.get("matcher")
+            project_group = next((g for g in project_groups if g.get("matcher") == matcher), None)
+            if project_group is None:
+                project_groups.append(copy.deepcopy(template_group))
+                added.extend(f"{event}/{matcher!r}: {h['command']}" for h in template_group["hooks"])
+                continue
+            existing_commands = {h.get("command") for h in project_group.setdefault("hooks", [])}
+            for hook in template_group["hooks"]:
+                if hook["command"] not in existing_commands:
+                    project_group["hooks"].append(copy.deepcopy(hook))
+                    added.append(f"{event}/{matcher!r}: {hook['command']}")
+
+    return merged, added
 
 
 def repo_root() -> Path:
@@ -517,11 +559,38 @@ def cmd_upgrade(args: argparse.Namespace) -> int:
 
         commit = _git_head_commit(clone_dir)
         files = managed_files(clone_dir)
+
+        # `.claude/settings.json` is excluded from the hash-classified table below -- unlike
+        # every other managed file, a project can genuinely extend it (its own extra hook
+        # registration), and a whole-file hash comparison can't tell "the project edited the
+        # shipped content" apart from "the project only ever added to it". It still gets
+        # `managed_files()`'s ordinary whole-file copy for a *fresh* `run` (nothing to merge
+        # with yet there); `upgrade` alone additively merges it via `merge_settings_hooks`,
+        # further down, once the exact same clone has been fetched anyway.
+        settings_target = Path(".claude/settings.json")
+        settings_source = next((s for s, t in files.items() if t == settings_target), None)
+        if settings_source is not None:
+            del files[settings_source]
+
         manifest_hashes = load_manifest(root).get("files", {})
         classification = classify_managed_files(files, root, manifest_hashes)
 
+        settings_hooks_would_add: list[str] = []
+        if settings_source is not None:
+            template_settings = json.loads(settings_source.read_text())
+            settings_path = root / settings_target
+            try:
+                project_settings = json.loads(settings_path.read_text()) if settings_path.is_file() else {}
+            except json.JSONDecodeError as exc:
+                print(f"init-project: {settings_path} does not parse as JSON: {exc}", file=sys.stderr)
+                return 2
+            _, settings_hooks_would_add = merge_settings_hooks(project_settings, template_settings)
+
         if args.dry_run:
-            print(json.dumps({k: [str(p) for p in v] for k, v in classification.items()}))
+            print(json.dumps({
+                **{k: [str(p) for p in v] for k, v in classification.items()},
+                "settings_hooks_would_add": settings_hooks_would_add,
+            }))
             return 0
 
         if classification["locally_modified"] and not args.force:
@@ -533,6 +602,14 @@ def cmd_upgrade(args: argparse.Namespace) -> int:
             to_write |= set(classification["locally_modified"])
         apply_managed_files({s: t for s, t in files.items() if t in to_write}, root)
         write_manifest(root, source=source, ref=ref, commit=commit, files=files)
+
+        settings_hooks_added: list[str] = []
+        if settings_source is not None and settings_hooks_would_add:
+            settings_path = root / settings_target
+            project_settings = json.loads(settings_path.read_text()) if settings_path.is_file() else {}
+            merged_settings, settings_hooks_added = merge_settings_hooks(project_settings, template_settings)
+            settings_path.parent.mkdir(parents=True, exist_ok=True)
+            settings_path.write_text(json.dumps(merged_settings, indent=2) + "\n")
 
         # Captured (unlike `run`'s equivalent calls): `upgrade`'s own stdout is JSON a caller
         # parses, so `sync`'s own chatter must not leak into it.
@@ -562,6 +639,7 @@ def cmd_upgrade(args: argparse.Namespace) -> int:
         "updated": [str(p) for p in classification["clean_update"]],
         "forced": [str(p) for p in classification["locally_modified"]] if args.force else [],
         "up_to_date": len(classification["up_to_date"]),
+        "settings_hooks_added": settings_hooks_added,
     }))
     return 0
 
