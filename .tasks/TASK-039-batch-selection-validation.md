@@ -2,11 +2,11 @@
 id: TASK-039
 title: Batch selection + deterministic validation script
 type: feature
-status: in-progress
+status: in-review
 epic: EPIC-003
 created: 2026-09-14
 branch: task-039-batch-selection-validation
-pr: null
+pr: "https://github.com/RobotNerd/sdlc-llm/pull/74"
 merge_commit: null
 blocked_by: [TASK-032, TASK-033, TASK-034, TASK-035, TASK-036, TASK-037, TASK-038]
 blocks: [TASK-041]
