@@ -9,6 +9,7 @@ repo -- `--source` points at the local path so the real `git clone` path is exer
 the task's own testing strategy.
 """
 
+import copy
 import hashlib
 import importlib.util
 import json
@@ -390,6 +391,201 @@ def test_upgrade_force_overwrites_locally_modified(target, toolkit_source):
 
 
 # ---------------------------------------------------------------------------
+# Hook scripts (TASK-038 acceptance criterion 1) -- `.claude/hooks/*` classifies and
+# refreshes exactly like a skill file, via the same generic managed_files() table
+# ---------------------------------------------------------------------------
+
+
+def test_upgrade_picks_up_a_staled_hook_script(target, toolkit_source):
+    first = _run_upgrade(toolkit_source, target)
+    assert first.returncode == 0, first.stderr
+    _git(["add", "-A"], cwd=target)
+    _git(["commit", "-q", "-m", "upgrade"], cwd=target)
+
+    staled_source = toolkit_source / ".claude" / "skills" / "init-project" / "vendored-hooks" / "pretooluse_bash.py"
+    staled_source.write_text(staled_source.read_text() + "\n# staled upstream change\n")
+    _git(["add", "-A"], cwd=toolkit_source)
+    _git(["commit", "-q", "-m", "stale hook script"], cwd=toolkit_source)
+
+    result = _run_upgrade(toolkit_source, target)
+    assert result.returncode == 0, result.stderr
+    output = json.loads(result.stdout)
+    assert ".claude/hooks/pretooluse_bash.py" in output["updated"]
+    target_path = target / ".claude" / "hooks" / "pretooluse_bash.py"
+    assert target_path.read_text().endswith("# staled upstream change\n")
+
+
+def test_upgrade_refuses_a_locally_modified_hook_script_and_writes_nothing(target, toolkit_source):
+    first = _run_upgrade(toolkit_source, target)
+    assert first.returncode == 0, first.stderr
+    _git(["add", "-A"], cwd=target)
+    _git(["commit", "-q", "-m", "upgrade"], cwd=target)
+
+    upstream_source = toolkit_source / ".claude" / "skills" / "init-project" / "vendored-hooks" / "pretooluse_bash.py"
+    upstream_source.write_text(upstream_source.read_text() + "\n# upstream change\n")
+    _git(["add", "-A"], cwd=toolkit_source)
+    _git(["commit", "-q", "-m", "upstream hook change"], cwd=toolkit_source)
+
+    local_path = target / ".claude" / "hooks" / "pretooluse_bash.py"
+    local_path.write_text(local_path.read_text() + "\n# local edit\n")
+
+    result = _run_upgrade(toolkit_source, target)
+
+    assert result.returncode != 0
+    assert "pretooluse_bash.py" in result.stderr
+    status = _git(["status", "--short"], cwd=target)
+    assert status.stdout.strip() == "M .claude/hooks/pretooluse_bash.py"
+
+
+# ---------------------------------------------------------------------------
+# `.claude/settings.json`'s hook registrations (TASK-038 acceptance criterion 2) --
+# additively merged, never hash-classified/overwritten like the rest of the table
+# ---------------------------------------------------------------------------
+
+
+def _settings_json(project) -> dict:
+    return json.loads((project / ".claude" / "settings.json").read_text())
+
+
+def test_upgrade_adds_a_settings_hook_registration_the_target_is_missing(target, toolkit_source):
+    first = _run_upgrade(toolkit_source, target)
+    assert first.returncode == 0, first.stderr
+    _git(["add", "-A"], cwd=target)
+    _git(["commit", "-q", "-m", "upgrade"], cwd=target)
+
+    # Simulate the toolkit gaining a brand-new hook (a synthetic event name, so this doesn't
+    # interact with the real `SessionStart` entry the template already carries) after `target`
+    # was last upgraded.
+    template_path = (
+        toolkit_source / ".claude" / "skills" / "init-project" / "templates" / "settings.json"
+    )
+    template = json.loads(template_path.read_text())
+    template["hooks"]["Notification"] = [
+        {"hooks": [{"type": "command", "command": "python3 $CLAUDE_PROJECT_DIR/.claude/hooks/new_hook.py"}]}
+    ]
+    template_path.write_text(json.dumps(template, indent=2) + "\n")
+    _git(["add", "-A"], cwd=toolkit_source)
+    _git(["commit", "-q", "-m", "add a new hook"], cwd=toolkit_source)
+
+    result = _run_upgrade(toolkit_source, target)
+
+    assert result.returncode == 0, result.stderr
+    output = json.loads(result.stdout)
+    assert any("new_hook.py" in entry for entry in output["settings_hooks_added"])
+    assert _settings_json(target)["hooks"]["Notification"] == template["hooks"]["Notification"]
+
+
+def test_upgrade_preserves_a_targets_own_extra_settings_hook_registration(target, toolkit_source):
+    """The interesting case isn't a no-op re-upgrade -- it's a merge that genuinely writes
+    something new (a real template addition) landing *alongside* a project's own custom
+    registration without disturbing it.
+    """
+    first = _run_upgrade(toolkit_source, target)
+    assert first.returncode == 0, first.stderr
+
+    settings_path = target / ".claude" / "settings.json"
+    settings = json.loads(settings_path.read_text())
+    settings["hooks"].setdefault("PreToolUse", []).append({
+        "matcher": "Bash",
+        "hooks": [{"type": "command", "command": "python3 $CLAUDE_PROJECT_DIR/.dev/hooks/project_only_check.py"}],
+    })
+    settings_path.write_text(json.dumps(settings, indent=2) + "\n")
+    _git(["add", "-A"], cwd=target)
+    _git(["commit", "-q", "-m", "add a project-only hook registration"], cwd=target)
+
+    template_path = (
+        toolkit_source / ".claude" / "skills" / "init-project" / "templates" / "settings.json"
+    )
+    template = json.loads(template_path.read_text())
+    template["hooks"]["Notification"] = [
+        {"hooks": [{"type": "command", "command": "python3 $CLAUDE_PROJECT_DIR/.claude/hooks/new_hook.py"}]}
+    ]
+    template_path.write_text(json.dumps(template, indent=2) + "\n")
+    _git(["add", "-A"], cwd=toolkit_source)
+    _git(["commit", "-q", "-m", "add a new hook"], cwd=toolkit_source)
+
+    result = _run_upgrade(toolkit_source, target)
+
+    assert result.returncode == 0, result.stderr
+    output = json.loads(result.stdout)
+    assert any("new_hook.py" in entry for entry in output["settings_hooks_added"])
+    merged = _settings_json(target)
+    assert merged["hooks"]["Notification"] == template["hooks"]["Notification"]
+    bash_groups = merged["hooks"]["PreToolUse"]
+    assert any(
+        g.get("matcher") == "Bash" and any("project_only_check.py" in h["command"] for h in g["hooks"])
+        for g in bash_groups
+    )
+
+
+def test_upgrade_settings_json_already_current_reports_nothing_added(target, toolkit_source):
+    first = _run_upgrade(toolkit_source, target)
+    assert first.returncode == 0, first.stderr
+    before = (target / ".claude" / "settings.json").read_bytes()
+
+    result = _run_upgrade(toolkit_source, target)
+
+    assert result.returncode == 0, result.stderr
+    output = json.loads(result.stdout)
+    assert output["settings_hooks_added"] == []
+    assert (target / ".claude" / "settings.json").read_bytes() == before
+
+
+def test_upgrade_dry_run_reports_settings_hooks_would_add_and_writes_nothing(target, toolkit_source):
+    template_path = (
+        toolkit_source / ".claude" / "skills" / "init-project" / "templates" / "settings.json"
+    )
+    template = json.loads(template_path.read_text())
+    template["hooks"]["Notification"] = [
+        {"hooks": [{"type": "command", "command": "python3 $CLAUDE_PROJECT_DIR/.claude/hooks/new_hook.py"}]}
+    ]
+    template_path.write_text(json.dumps(template, indent=2) + "\n")
+    _git(["add", "-A"], cwd=toolkit_source)
+    _git(["commit", "-q", "-m", "add a new hook"], cwd=toolkit_source)
+
+    before = (target / ".claude" / "settings.json").exists()
+    assert before is False  # `target` hasn't been upgraded yet in this test
+
+    result = _run_upgrade(toolkit_source, target, "--dry-run")
+
+    assert result.returncode == 0, result.stderr
+    output = json.loads(result.stdout)
+    assert any("new_hook.py" in entry for entry in output["settings_hooks_would_add"])
+    assert not (target / ".claude").exists()
+
+
+def test_upgrade_writes_no_settings_hooks_when_another_conflict_blocks_the_whole_upgrade(target, toolkit_source):
+    first = _run_upgrade(toolkit_source, target)
+    assert first.returncode == 0, first.stderr
+    _git(["add", "-A"], cwd=target)
+    _git(["commit", "-q", "-m", "upgrade"], cwd=target)
+
+    # A new template hook (something for settings.json to add) *and* an unrelated locally
+    # modified skill file (something that blocks the whole upgrade) at the same time.
+    template_path = (
+        toolkit_source / ".claude" / "skills" / "init-project" / "templates" / "settings.json"
+    )
+    template = json.loads(template_path.read_text())
+    template["hooks"]["Notification"] = [
+        {"hooks": [{"type": "command", "command": "python3 $CLAUDE_PROJECT_DIR/.claude/hooks/new_hook.py"}]}
+    ]
+    template_path.write_text(json.dumps(template, indent=2) + "\n")
+    upstream_source = toolkit_source / ".claude" / "skills" / "add-task" / "SKILL.md"
+    upstream_source.write_text(upstream_source.read_text() + "\n# upstream change\n")
+    _git(["add", "-A"], cwd=toolkit_source)
+    _git(["commit", "-q", "-m", "new hook + upstream skill change"], cwd=toolkit_source)
+
+    local_path = target / ".claude" / "skills" / "add-task" / "SKILL.md"
+    local_path.write_text(local_path.read_text() + "\n# local edit\n")
+    settings_before = (target / ".claude" / "settings.json").read_bytes()
+
+    result = _run_upgrade(toolkit_source, target)
+
+    assert result.returncode != 0
+    assert (target / ".claude" / "settings.json").read_bytes() == settings_before
+
+
+# ---------------------------------------------------------------------------
 # Data-loss guard (testing strategy step 4) -- the criterion that matters most
 # ---------------------------------------------------------------------------
 
@@ -439,6 +635,27 @@ def test_upgrade_never_touches_non_managed_tasks_or_github_files(target, toolkit
         if rel in managed_targets:
             continue
         assert after.get(rel) == digest, f"non-managed file changed: {rel}"
+
+
+def test_upgrade_never_touches_a_dev_only_hook_path(target, toolkit_source):
+    """Extends the data-loss guard above explicitly to a repo-only hook path (this toolkit's own
+    `.dev/hooks/*`, never in `managed_files()` at all): a regression that started copying under
+    `.dev/` should fail this loudly, not just pass silently because no test looked there.
+    """
+    dev_hook = target / ".dev" / "hooks" / "check-portable-references.py"
+    dev_hook.parent.mkdir(parents=True)
+    dev_hook.write_text("# repo-only, never vendored into another project\n")
+    _git(["add", "-A"], cwd=target)
+    _git(["commit", "-q", "-m", "simulate a repo-only dev hook"], cwd=target)
+
+    before = _hash_tree(target, ".dev")
+    assert before  # sanity: the fixture file above is actually there to protect
+
+    result = _run_upgrade(toolkit_source, target)
+    assert result.returncode == 0, result.stderr
+
+    after = _hash_tree(target, ".dev")
+    assert after == before
 
 
 # ---------------------------------------------------------------------------
@@ -640,6 +857,120 @@ def test_merge_config_schema_never_touches_a_required_interview_key():
     merged, added, _ = scaffold.merge_config_schema(old, installed_sync)
     assert "test_command" not in added
     assert "test_command:" not in merged
+
+
+# ---------------------------------------------------------------------------
+# `merge_settings_hooks` (TASK-038) -- pure function, hand-built fixtures
+# ---------------------------------------------------------------------------
+
+
+_ONE_HOOK_TEMPLATE = {
+    "hooks": {
+        "PreToolUse": [
+            {"matcher": "Bash", "hooks": [{"type": "command", "command": "python3 hooks/a.py"}]},
+        ],
+    },
+}
+
+
+def test_merge_settings_hooks_adds_everything_to_an_empty_project():
+    merged, added = scaffold.merge_settings_hooks({}, _ONE_HOOK_TEMPLATE)
+    assert merged == _ONE_HOOK_TEMPLATE
+    assert added == ["PreToolUse/'Bash': python3 hooks/a.py"]
+
+
+def test_merge_settings_hooks_noop_when_project_already_has_everything():
+    merged, added = scaffold.merge_settings_hooks(_ONE_HOOK_TEMPLATE, _ONE_HOOK_TEMPLATE)
+    assert added == []
+    assert merged == _ONE_HOOK_TEMPLATE
+
+
+def test_merge_settings_hooks_adds_a_missing_group_under_an_existing_event():
+    project = {
+        "hooks": {
+            "PreToolUse": [
+                {"matcher": "Edit|Write", "hooks": [{"type": "command", "command": "python3 hooks/b.py"}]},
+            ],
+        },
+    }
+    merged, added = scaffold.merge_settings_hooks(project, _ONE_HOOK_TEMPLATE)
+    matchers = {g["matcher"] for g in merged["hooks"]["PreToolUse"]}
+    assert matchers == {"Bash", "Edit|Write"}
+    assert added == ["PreToolUse/'Bash': python3 hooks/a.py"]
+
+
+def test_merge_settings_hooks_adds_a_missing_hook_to_an_existing_matcher_group():
+    project = {
+        "hooks": {
+            "PreToolUse": [
+                {"matcher": "Bash", "hooks": [{"type": "command", "command": "python3 hooks/other.py"}]},
+            ],
+        },
+    }
+    merged, added = scaffold.merge_settings_hooks(project, _ONE_HOOK_TEMPLATE)
+    bash_group = next(g for g in merged["hooks"]["PreToolUse"] if g["matcher"] == "Bash")
+    commands = [h["command"] for h in bash_group["hooks"]]
+    assert commands == ["python3 hooks/other.py", "python3 hooks/a.py"]
+    assert added == ["PreToolUse/'Bash': python3 hooks/a.py"]
+
+
+def test_merge_settings_hooks_handles_a_group_with_no_matcher_key():
+    template = {
+        "hooks": {"SessionStart": [{"hooks": [{"type": "command", "command": "python3 hooks/s.py"}]}]},
+    }
+    merged, added = scaffold.merge_settings_hooks({}, template)
+    assert merged == template
+    assert added == ["SessionStart/None: python3 hooks/s.py"]
+
+    # A second merge against the same (now-populated) project adds nothing further.
+    merged_again, added_again = scaffold.merge_settings_hooks(merged, template)
+    assert added_again == []
+    assert merged_again == merged
+
+
+def test_merge_settings_hooks_preserves_a_projects_own_extra_event_group_and_hook():
+    project = {
+        "hooks": {
+            "PreToolUse": [
+                {
+                    "matcher": "Bash",
+                    "hooks": [
+                        {"type": "command", "command": "python3 hooks/a.py"},
+                        {"type": "command", "command": "python3 .dev/hooks/project_only.py"},
+                    ],
+                },
+            ],
+            "PostToolUse": [
+                {"hooks": [{"type": "command", "command": "python3 hooks/project_only_post.py"}]},
+            ],
+        },
+    }
+    merged, added = scaffold.merge_settings_hooks(project, _ONE_HOOK_TEMPLATE)
+    assert added == []
+    assert merged == project
+
+
+def test_merge_settings_hooks_is_idempotent():
+    project = {
+        "hooks": {
+            "PreToolUse": [
+                {"matcher": "Bash", "hooks": [{"type": "command", "command": "python3 hooks/other.py"}]},
+            ],
+        },
+    }
+    once, _ = scaffold.merge_settings_hooks(project, _ONE_HOOK_TEMPLATE)
+    twice, added_second_time = scaffold.merge_settings_hooks(once, _ONE_HOOK_TEMPLATE)
+    assert added_second_time == []
+    assert twice == once
+
+
+def test_merge_settings_hooks_does_not_mutate_its_inputs():
+    project = {"hooks": {}}
+    project_copy = copy.deepcopy(project)
+    template_copy = copy.deepcopy(_ONE_HOOK_TEMPLATE)
+    scaffold.merge_settings_hooks(project, _ONE_HOOK_TEMPLATE)
+    assert project == project_copy
+    assert _ONE_HOOK_TEMPLATE == template_copy
 
 
 # ---------------------------------------------------------------------------

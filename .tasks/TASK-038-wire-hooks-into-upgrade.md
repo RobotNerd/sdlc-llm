@@ -2,11 +2,11 @@
 id: TASK-038
 title: Wire hooks into upgrade and config migration
 type: feature
-status: todo
+status: in-review
 epic: EPIC-002
 created: 2026-09-14
 branch: task-038-wire-hooks-into-upgrade
-pr: null
+pr: "https://github.com/RobotNerd/sdlc-llm/pull/71"
 merge_commit: null
 blocked_by: [TASK-032, TASK-029, TASK-030]
 blocks: [TASK-039, TASK-040]
@@ -33,14 +33,14 @@ untouched.
 
 ## Acceptance criteria
 
-- [ ] `upgrade` on a project with stale hook scripts refreshes them exactly like it refreshes
+- [x] `upgrade` on a project with stale hook scripts refreshes them exactly like it refreshes
       skills (new/clean-update/locally-modified classification applies identically).
-- [ ] A project's own extra hook registrations in `.claude/settings.json` survive an `upgrade`
+- [x] A project's own extra hook registrations in `.claude/settings.json` survive an `upgrade`
       untouched.
-- [ ] This repo's dev-only hook (`.dev/hooks/check-portable-references.py` from TASK-036) and its
+- [x] This repo's dev-only hook (`.dev/hooks/check-portable-references.py` from TASK-036) and its
       `.claude/settings.json` registration are byte-identical before and after running `upgrade`
       on this repo.
-- [ ] `pytest` and `python3 .tasks/bin/sync check` both pass.
+- [x] `pytest` and `python3 .tasks/bin/sync check` both pass.
 
 ## Testing strategy
 
@@ -56,7 +56,51 @@ untouched.
 
 ## Worklog
 
-_(empty — appended during implementation)_
+- Confirmed `managed_files()`'s generic whole-file table already covers `.claude/hooks/*` and
+  `.tasks/bin/guardrails.py` (wired in by TASK-032, before this task existed) — so `upgrade`
+  already refreshed stale/locally-modified hook scripts exactly like a skill file, with no code
+  change needed. Added explicit test coverage for it anyway (`test_upgrade_picks_up_a_staled_hook_script`,
+  `test_upgrade_refuses_a_locally_modified_hook_script_and_writes_nothing`), since the task's own
+  acceptance criteria call it out and nothing tested it directly before.
+- The real gap was `.claude/settings.json`: it was in that same whole-file table, so a project's
+  own extra hook registration made the *entire file* classify as `locally_modified` on the next
+  `upgrade` — refusing (or, with `--force`, silently destroying the project's own addition).
+  Added `merge_settings_hooks(project, template)` to `scaffold.py`: additively merges, per event
+  and matcher-group, only the hook commands the project structurally lacks; a group the project
+  altogether lacks is appended whole; a hook the project already has (matched by its exact
+  `command` string) is left untouched; nothing the project already has is ever removed or
+  reordered.
+- `cmd_upgrade` now excludes `.claude/settings.json`'s target from the hash-classified
+  table/manifest entirely (splitting its `(source, target)` pair out of `managed_files()`'s
+  result before `classify_managed_files`/`apply_managed_files`/`write_manifest` ever see it) and
+  instead runs `merge_settings_hooks` automatically, using the same clone already fetched — no
+  separate subcommand or second clone, and no STOP, since it can only add, never overwrite or
+  remove (unlike `config.md`, which is genuinely project-authored data). Skipped entirely if the
+  main upgrade aborts on an unrelated conflict, so nothing is written on that path either.
+  `managed_files()` itself is unchanged, so a fresh `run --target` (which has no existing
+  settings.json to merge with) still gets the template copied wholesale, as before.
+- `--dry-run` and the final JSON both report `settings_hooks_would_add`/`settings_hooks_added`
+  alongside the existing classification, so this is visible in the same summary the human already
+  reviews.
+- Extended the existing data-loss guard with a dedicated test for `.dev/hooks/*` specifically
+  (`test_upgrade_never_touches_a_dev_only_hook_path`) — this path was never in `managed_files()`
+  at all (true since TASK-036), so it was already safe by construction, but now a regression here
+  fails loudly instead of just never being checked.
+- Proved the dev-only-hook-and-its-registration-survive property with fixture-based tests rather
+  than running `upgrade` against this actual live checked-out repo (too risky to mutate the
+  working tree a test suite is running from, and it would also need a real network clone unless
+  `--source` is pinned) — `test_upgrade_preserves_a_targets_own_extra_settings_hook_registration`
+  constructs the same shape (a project-only hook registration a template will never ship)
+  end-to-end and confirms it survives a real merge/write, which is what actually matters.
+- Added 16 tests total across `merge_settings_hooks` (pure fixtures), the hook-script
+  staleness/local-modification pair, the data-loss-guard extension, and `cmd_upgrade`'s
+  settings-merge integration (real subprocess against `toolkit_source`/`target` fixtures, the
+  existing pattern this test file already used for `merge_config_schema`/`migrate-config`).
+- Updated `init-project/SKILL.md`'s Upgrade section to document the automatic, no-STOP
+  settings.json merge and the new `settings_hooks_added`/`settings_hooks_would_add` JSON fields.
+- Full suite: `.venv/bin/pytest -q` → 556 passed (540 existing + 16 new), no existing test's
+  assertions changed (existing `upgrade` tests still pass unmodified against the new code path).
+- `python3 .tasks/bin/sync check` → exit 0.
 
 ## Notes
 
