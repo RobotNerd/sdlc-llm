@@ -2,11 +2,11 @@
 id: TASK-038
 title: Wire hooks into upgrade and config migration
 type: feature
-status: in-progress
+status: in-review
 epic: EPIC-002
 created: 2026-09-14
 branch: task-038-wire-hooks-into-upgrade
-pr: null
+pr: "https://github.com/RobotNerd/sdlc-llm/pull/71"
 merge_commit: null
 blocked_by: [TASK-032, TASK-029, TASK-030]
 blocks: [TASK-039, TASK-040]
