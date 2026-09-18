@@ -6,9 +6,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 A **self-hosting toolkit** for a solo, LLM-driven SDLC workflow — "kanban in markdown". The repo
 uses its own workflow to build itself: `.tasks/` holds the specs, epics, and tasks for the
-toolkit, and the tooling manages that same `.tasks/` directory (dogfooded since TASK-019).
+toolkit, and the tooling manages that same `.tasks/` directory.
 
-All seven skills exist: `init-project`, `add-task`, `implement-task`, `refine-backlog`,
+Seven skills cover the workflow: `init-project`, `add-task`, `implement-task`, `refine-backlog`,
 `plan-feature`, `review-docs`, `strip-project-references` (`.claude/skills/`). Each pairs a
 `SKILL.md` checklist (judgment, interviews, STOP markers) with a `scaffold.py` (stdlib-only,
 mechanical work — file writes, `git`/`gh`, `sync` calls). `strip-project-references` is
@@ -18,22 +18,10 @@ copies skills into other projects. `.tasks/bin/sync` owns every generated region
 
 ## The workflow model
 
-`.tasks/guidelines.md` states the operating rules; `.tasks/specs/SPEC-001-llm-sdlc-workflow.md` is
-the full spec they're drawn from and the authority for every task. The one rule everything follows
-from: **frontmatter is the source of truth; everything else is a rendering of it.**
-
-- **`.tasks/specs/SPEC-*.md`** — the "why" (PRD). Written by `plan-feature`.
-- **`.tasks/EPIC-*.md`** — a grouping container with a `sync`-derived status. Never hand-edit an
-  epic's `status` (except to set `wont-do`).
-- **`.tasks/TASK-*.md`** — one task = one branch = one PR = one sitting. No sub-tasks.
-- **`.tasks/BOARD.md`** — mostly generated. Only the **TODO list** is hand-maintained (priority
-  order), and `sync` is forbidden from reordering it.
-- **`.tasks/config.md`** — per-project settings the skills and `sync` read.
-
-### Generated regions
-
-Text between `<!-- BEGIN:name -->` and `<!-- END:name -->` markers is owned by `sync`. **Never
-hand-edit inside them** — change the source task/epic file and run `.tasks/bin/sync`.
+`.tasks/guidelines.md` states the operating rules — the artifact model, what `sync` owns vs. what
+you own, generated regions — and `.tasks/specs/SPEC-001-llm-sdlc-workflow.md` is the full spec
+they're drawn from and the authority for every task. The one rule everything follows from:
+**frontmatter is the source of truth; everything else is a rendering of it.**
 
 ### `sync` (`.tasks/bin/sync`)
 
