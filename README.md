@@ -6,9 +6,7 @@ four-phase lifecycle, and a small stdlib-only Python script, `sync`, keeps every
 that data consistent.
 
 This repo builds itself with its own workflow: `.tasks/` holds the specs and tasks for the
-toolkit, and the resulting toolkit manages that same directory (see `TASK-019` — the first
-real `sync` run on this repo was a no-op, since the hand-written board/epic regions it replaced
-already matched byte-for-byte what `sync` produces).
+toolkit, and the resulting toolkit manages that same directory.
 
 ## The model
 
@@ -48,7 +46,7 @@ Its test suite needs `pytest` (the only dev dependency, declared in `pyproject.t
 
 ```
 pip install -e '.[dev]'
-pytest
+pytest              # or .venv/bin/pytest outside an activated venv shell
 ```
 
 ## Skills
@@ -70,7 +68,7 @@ refine-backlog → periodic: reprioritize, recompute blocked status, flag stale/
 | Phase | Does | Ends |
 |---|---|---|
 | 1. Start | dirty-tree check, pick top unblocked TODO task, branch, `status: in-progress`, restate plan | before any code |
-| 2. Implement + test | code, unit tests, run the Testing strategy, record results in Worklog, stay in scope | after tests |
+| 2. Implement + test | tests first when `tdd_enforced` (default), then code to green; run the Testing strategy, record results in Worklog, stay in scope | after tests |
 | 3. Wrap up | commit, rebase, push, `gh pr create`, `status: in-review` | PR open, not merged |
 | 4. Merge — observed | a human reviews and squash-merges; the skill records the merge, archives, cleans up | done |
 

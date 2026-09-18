@@ -259,6 +259,10 @@ One call out--I assume that the worker will be a long-running agent, but I need 
 
 Once you've finished the post-merge clean up, add a new task at the top of the board in EPIC-003. The range requirement I gave you for TASK-039 was wrong. The range doesn't account for the hand-ordered priority of the TODO list on the board. Change the behavior so that when I supply the starting and ending task ids, the range is taken from the existing ordering on the board starting with and ending with those tasks. -->
 
+<!-- TODO: planning
+- run /review-docs next
+- Is there any way to programmatically enforce TDD with hooks? Right now it's prose-only and relies on the LLM model's decision. See recent implementation details in @.tasks/archive/TASK-040-tdd-mode.md -->
+
 ---
 
 Rewrite README to be more human-readable; right now it seems geared more towards AI, with some sections being too dense; focus on simplifying by removing technical details and focus on usage from a human user perspective; [TODO] provide examples to the LLM of good READMEs from other projects to use as a guide
