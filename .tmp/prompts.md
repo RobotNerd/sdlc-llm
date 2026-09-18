@@ -229,13 +229,31 @@ Other
 - Implement behaviors in skills and hooks as appropriate.
 - Propose any new skills and hooks that you would add for these features, if any. -->
 
-Read @.tasks/guidelines.md to gain context.
+<!-- It failed on step 4. The command ` gh pr create --title "scratch dry run" --body "throwaway - do not merge` was not denied as it should have been. Instead, it showed this output:
 
----
+```
+Warning: 6 uncommitted changes
+
+Creating pull request for task-999-scratch-dryrun into main in RobotNerd/sdlc-llm
+
+https://github.com/RobotNerd/sdlc-llm/pull/64
+```
+
+This the modified line from .tasks/config.md:
+
+```
+test_command: python3 -c "import sys; sys.exit(1)"
+```
+
+And I added a line with the text `trivial change` to README.md for step 2.
+
+I cleaned up--PR deleted, scratch branch deleted. -->
 
 <!-- /add-task New task in EPIC-004 at the bottom of the TODO list. I want a mechanism to automatically compact (or clear if that make more sense) the context for orchestrator and worker agents. Since these will be long-running agents, then I expect their context to eventually fill up and degrade performance.
 
 One call out--I assume that the worker will be a long-running agent, but I need to verify that with you. The other possible workflow I can imagine is that the orchestrator would create a new instance of the worker for every task (sequentially). I'll defer to you to tell me which workflow is a more performant. -->
+
+/add-task Put at top of TODO list. No epic. This is an enhancement to the init-project skill due to a gap that I noticed while testing manually. The target project that I applied init-project to wasn't using python, and the .gitignore did not include a __pycache__ entry (nor other python-related exclusions). Update the init-project skill so that it updates the .gitignore in the target repo to exclude all python-related artifacts that shouldn't be commited to the repo, if these entries don't already exist in the target repo's .gitignore. Do this programmatically with code.
 
 ---
 
