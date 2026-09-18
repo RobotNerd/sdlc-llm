@@ -2,11 +2,11 @@
 id: TASK-037
 title: SessionStart board-context hook
 type: feature
-status: in-progress
+status: in-review
 epic: EPIC-002
 created: 2026-09-14
 branch: task-037-sessionstart-board-context-hook
-pr: null
+pr: "https://github.com/RobotNerd/sdlc-llm/pull/70"
 merge_commit: null
 blocked_by: [TASK-032, TASK-052]
 blocks: [TASK-039, TASK-040]
