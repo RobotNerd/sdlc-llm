@@ -174,6 +174,43 @@ def pick_top_unblocked(board_text: str, sync_mod: ModuleType) -> dict:
     return {"task_id": None, "skipped": skipped}
 
 
+def stop_required_for_phase1(*, batch_mode: bool) -> bool:
+    """Phase 1's announce-vs-block decision, for the autonomous batch mode: outside a batch, the
+    plan restatement always ends in a hard STOP (unchanged). Inside an approved batch, the batch
+    selection itself was the approval, so the plan is printed for the record but nothing blocks on
+    it -- the caller proceeds straight into phase 2.
+    """
+    return not batch_mode
+
+
+def record_outcome(outcomes: list[dict], entry: dict) -> list[dict]:
+    """Append one task's outcome record to a batch run's accumulator, in encounter order. Returns
+    a new list -- `outcomes` itself is never mutated, so a caller can keep holding the prior list.
+
+    `entry` must carry `task_id`/`title`/`status` (a `link` of `None` is fine -- not every status,
+    e.g. a task still `in-progress`, has a PR/merge-commit link yet); missing any of the first
+    three raises `ValueError` naming it, since a silently incomplete row would make the
+    end-of-batch summary misleading.
+    """
+    for key in ("task_id", "title", "status"):
+        if key not in entry:
+            raise ValueError(f"outcome entry missing required key: {key!r}")
+    return [*outcomes, dict(entry)]
+
+
+def render_outcome_table(outcomes: list[dict]) -> str:
+    """The end-of-batch summary table: `Task | Title | Status | PR/Merge`, one row per outcome in
+    accumulation order. An empty batch still renders a header-only table rather than raising --
+    the caller always has something to print. A missing/`None` `link` renders as `—` (halted
+    before a PR ever opened, or a task the batch skipped).
+    """
+    lines = ["| Task | Title | Status | PR/Merge |", "|---|---|---|---|"]
+    for entry in outcomes:
+        link = entry.get("link") or "—"
+        lines.append(f"| {entry['task_id']} | {entry['title']} | {entry['status']} | {link} |")
+    return "\n".join(lines)
+
+
 def resume_phase(*, in_flight: dict | None, working_tree_dirty: bool, gh_pr_state: str | None) -> dict:
     """The resume-detection table, as a pure function of already-gathered
     state (no git/gh calls in here -- see `cmd_resume_state` for the real gathering).
@@ -313,6 +350,7 @@ def cmd_start(args: argparse.Namespace) -> int:
     sync_mod = load_sync_module(tasks_root)
     answers = json.loads(Path(args.answers).read_text())
     task_id = answers.get("task_id")
+    batch_mode = bool(answers.get("batch_mode", False))
 
     config = sync_mod.load_config(tasks_root)
     remote = config.get("remote", "origin")
@@ -381,7 +419,10 @@ def cmd_start(args: argparse.Namespace) -> int:
         print(sync_result.stderr, file=sys.stderr)
         return sync_result.returncode
 
-    print(json.dumps({"task_id": task_id, "branch": branch, "skipped": skipped}))
+    print(json.dumps({
+        "task_id": task_id, "branch": branch, "skipped": skipped,
+        "stop_required": stop_required_for_phase1(batch_mode=batch_mode),
+    }))
     return 0
 
 
@@ -720,6 +761,24 @@ def cmd_bail_out(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_record_outcome(args: argparse.Namespace) -> int:
+    answers = json.loads(Path(args.answers).read_text())
+    try:
+        outcomes = record_outcome(answers.get("outcomes") or [], answers["entry"])
+    except ValueError as exc:
+        print(f"implement-task: {exc}", file=sys.stderr)
+        return 2
+    print(json.dumps({"outcomes": outcomes}))
+    return 0
+
+
+def cmd_render_outcome_table(args: argparse.Namespace) -> int:
+    answers = json.loads(Path(args.answers).read_text())
+    table = render_outcome_table(answers.get("outcomes") or [])
+    print(json.dumps({"table": table}))
+    return 0
+
+
 def cmd_gh_auth_status(args: argparse.Namespace) -> int:
     result = subprocess.run(["gh", "auth", "status"], capture_output=True, text=True)
     print(result.stdout)
@@ -739,6 +798,8 @@ def main(argv: list[str]) -> int:
         ("wrap-up", "phase 3: commit, rebase, push, gh pr create, record pr, run sync"),
         ("finish-merge", "phase 4: observe the merge, record it, archive, clean up branches"),
         ("bail-out", "set status back to todo/blocked and run sync"),
+        ("record-outcome", "batch mode: append one task's outcome to the accumulator"),
+        ("render-outcome-table", "batch mode: render the end-of-batch outcome table"),
     ):
         sub = subparsers.add_parser(name, help=help_text)
         sub.add_argument("answers", help="path to a JSON file with this subcommand's inputs")
@@ -751,6 +812,8 @@ def main(argv: list[str]) -> int:
         "wrap-up": cmd_wrap_up,
         "finish-merge": cmd_finish_merge,
         "bail-out": cmd_bail_out,
+        "record-outcome": cmd_record_outcome,
+        "render-outcome-table": cmd_render_outcome_table,
     }
     return dispatch[args.command](args)
 
