@@ -2,11 +2,11 @@
 id: TASK-036
 title: SPEC/TASK-reference scan hook (repo-only, never copied)
 type: feature
-status: in-progress
+status: in-review
 epic: EPIC-002
 created: 2026-09-14
 branch: task-036-spec-task-reference-scan-hook
-pr: null
+pr: "https://github.com/RobotNerd/sdlc-llm/pull/69"
 merge_commit: null
 blocked_by: [TASK-032, TASK-027]
 blocks: [TASK-039, TASK-040]
