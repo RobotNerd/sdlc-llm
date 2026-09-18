@@ -47,6 +47,7 @@ RUN_ANSWERS = {
     "delete_branch_after_merge": True,
     "ci_checks": [],
     "archive_done": True,
+    "tdd_enforced": True,
 }
 
 

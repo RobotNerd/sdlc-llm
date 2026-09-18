@@ -19,6 +19,7 @@
     {{delete_branch_after_merge}}    `true` or `false`
     {{ci_checks}}                    e.g. `[]` or `[test]` — CI job names, if any exist yet
     {{archive_done}}                 `true` or `false`
+    {{tdd_enforced}}                 `true` or `false`
 -->
 ---
 workflow_version: 1
@@ -37,6 +38,7 @@ delete_branch_after_merge: {{delete_branch_after_merge}}
 allow_auto_merge: false
 ci_checks: {{ci_checks}}
 archive_done: {{archive_done}}
+tdd_enforced: {{tdd_enforced}}
 ignored_paths: []
 ---
 
@@ -66,6 +68,10 @@ skills' logic identical across projects — only this file changes.
   `gh pr checks`) can gate merge on them. Empty until CI exists.
 - **`allow_auto_merge: false`** — reinforces the never-merge guardrail; not something init-time
   offers to change.
+- **`tdd_enforced`** — when `true`, `implement-task` phase 2 writes each Testing strategy
+  step's/acceptance criterion's test(s) first, confirms they fail for the expected reason, then
+  implements until green — an explicit step order, not left to model discretion. When `false`,
+  phase 2 writes code and its tests together, as before.
 - **`ignored_paths`** — paths `implement-task` never treats as dirty-tree blockers (phase 1's
   start check, phase 3's pre-rebase stash) — e.g. a personal prompt scratchpad convention that
   isn't part of any task's actual work. Empty by default, same posture as `docs_review_paths`; a

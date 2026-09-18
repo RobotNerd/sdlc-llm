@@ -72,6 +72,7 @@ for them.
 | `delete_branch_after_merge` | Delete the task branch after merge? | `true` |
 | `ci_checks` | Names of any CI checks that already exist to gate merge on | `[]` (empty — nothing to gate on yet) |
 | `archive_done` | Move `done`/`wont-do` tasks out to `.tasks/archive/`? | `true` |
+| `tdd_enforced` | Enforce test-first (TDD) in `implement-task` phase 2 — write a failing test before the implementation, every time? | `true` |
 
 `workflow_version` is always `1`, `allow_auto_merge` is always `false`, and `ignored_paths` always
 starts `[]` — don't ask about any of them; they're fixed by the template.
