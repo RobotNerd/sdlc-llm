@@ -201,6 +201,61 @@ def merge_config_schema(project_text: str, sync_module: ModuleType) -> tuple[str
     return merged, added, bumped_to
 
 
+# Python artifacts the toolkit's own vendored files (`.tasks/bin/sync`, every skill's
+# `scaffold.py`, the pytest suite) produce in a target repo -- irrelevant to whether the target
+# project itself uses Python, so `init-project` merges these into the target's `.gitignore`
+# unconditionally (see `merge_gitignore`).
+_GITIGNORE_HEADER = "# Python (added by init-project)"
+_GITIGNORE_ENTRIES = ("__pycache__/", "*.py[cod]", ".pytest_cache/")
+
+
+def _gitignore_entry_key(line: str) -> str | None:
+    """Canonicalize a single `.gitignore` line to one of `_GITIGNORE_ENTRIES`, tolerant of the
+    common equivalent spellings a hand-written (or another tool's) `.gitignore` might already use
+    -- a bare directory name, `**/`-prefixed, `*.pyc` instead of the wildcard-brace form, a
+    trailing slash or not. Returns `None` for a blank line, a comment, or anything unrelated to
+    those three entries -- the caller only uses this to detect what's already present, never to
+    touch other lines.
+    """
+    stripped = line.strip()
+    if not stripped or stripped.startswith("#"):
+        return None
+    bare = stripped[3:] if stripped.startswith("**/") else stripped
+    bare = bare.rstrip("/")
+    if bare == "__pycache__":
+        return "__pycache__/"
+    if bare == ".pytest_cache":
+        return ".pytest_cache/"
+    if stripped in ("*.pyc", "*.py[cod]"):
+        return "*.py[cod]"
+    return None
+
+
+def merge_gitignore(project_text: str) -> tuple[str, list[str]]:
+    """Additively merge this toolkit's Python-artifact `_GITIGNORE_ENTRIES` into a target
+    project's `.gitignore` text (`""` if the project doesn't have one yet).
+
+    Every existing line is scanned (via `_gitignore_entry_key`) for an entry already covering one
+    of the three; only the ones genuinely missing are appended, under a single new
+    `_GITIGNORE_HEADER` comment line, as their own block after whatever the project already has.
+    Nothing already present is reordered, rewritten, or removed -- this is append-only, exactly
+    like `merge_settings_hooks` below. Returns `(merged_text, added)` -- `added` is `[]` (and
+    `merged_text == project_text`) when every entry is already covered.
+    """
+    existing = {key for line in project_text.splitlines() if (key := _gitignore_entry_key(line))}
+    missing = [entry for entry in _GITIGNORE_ENTRIES if entry not in existing]
+    if not missing:
+        return project_text, []
+
+    prefix = project_text
+    if prefix and not prefix.endswith("\n"):
+        prefix += "\n"
+    if prefix:
+        prefix += "\n"  # blank line separating the new block from whatever's already there
+    block = "\n".join([_GITIGNORE_HEADER, *missing]) + "\n"
+    return prefix + block, missing
+
+
 def merge_settings_hooks(project: dict, template: dict) -> tuple[dict, list[str]]:
     """Additively merge `template`'s (the toolkit's current `settings.json`) hook registrations
     into `project`'s (a target project's existing `.claude/settings.json`, or `{}` if it has
@@ -506,6 +561,16 @@ def cmd_run(args: argparse.Namespace) -> int:
 
     apply_managed_files({s: t for s, t in files.items() if t in to_write}, root)
 
+    # `.gitignore` is project-owned, same as `config.md`/`BOARD.md` -- never in `managed_files()`,
+    # never hash-classified. Merged additively regardless of `--target`: the toolkit vendors
+    # Python either way, so the target's `.gitignore` needs these entries whether or not the
+    # project itself uses Python.
+    gitignore_path = root / ".gitignore"
+    gitignore_before = gitignore_path.read_text() if gitignore_path.is_file() else ""
+    gitignore_text, gitignore_added = merge_gitignore(gitignore_before)
+    if gitignore_added:
+        gitignore_path.write_text(gitignore_text)
+
     sync_dst = tasks_dir / "bin" / "sync"
     sync_result = subprocess.run([sys.executable, str(sync_dst)], cwd=root)
     if sync_result.returncode != 0:
@@ -529,7 +594,11 @@ def cmd_run(args: argparse.Namespace) -> int:
         files=files,
     )
 
-    print(f"init-project: scaffolded {tasks_dir} -- sync check is clean")
+    gitignore_note = (
+        f".gitignore: added {', '.join(gitignore_added)}" if gitignore_added
+        else ".gitignore: nothing needed"
+    )
+    print(f"init-project: scaffolded {tasks_dir} -- sync check is clean -- {gitignore_note}")
     return 0
 
 
@@ -586,10 +655,18 @@ def cmd_upgrade(args: argparse.Namespace) -> int:
                 return 2
             _, settings_hooks_would_add = merge_settings_hooks(project_settings, template_settings)
 
+        # `.gitignore`, like `.claude/settings.json`, is project-owned and never hash-classified
+        # -- additively merged on every `upgrade` too, so a project scaffolded before this merge
+        # existed (or one that later deleted the entries by hand) still ends up covered.
+        gitignore_path = root / ".gitignore"
+        gitignore_before = gitignore_path.read_text() if gitignore_path.is_file() else ""
+        _, gitignore_would_add = merge_gitignore(gitignore_before)
+
         if args.dry_run:
             print(json.dumps({
                 **{k: [str(p) for p in v] for k, v in classification.items()},
                 "settings_hooks_would_add": settings_hooks_would_add,
+                "gitignore_would_add": gitignore_would_add,
             }))
             return 0
 
@@ -610,6 +687,11 @@ def cmd_upgrade(args: argparse.Namespace) -> int:
             merged_settings, settings_hooks_added = merge_settings_hooks(project_settings, template_settings)
             settings_path.parent.mkdir(parents=True, exist_ok=True)
             settings_path.write_text(json.dumps(merged_settings, indent=2) + "\n")
+
+        gitignore_added: list[str] = []
+        if gitignore_would_add:
+            gitignore_text, gitignore_added = merge_gitignore(gitignore_before)
+            gitignore_path.write_text(gitignore_text)
 
         # Captured (unlike `run`'s equivalent calls): `upgrade`'s own stdout is JSON a caller
         # parses, so `sync`'s own chatter must not leak into it.
@@ -640,6 +722,7 @@ def cmd_upgrade(args: argparse.Namespace) -> int:
         "forced": [str(p) for p in classification["locally_modified"]] if args.force else [],
         "up_to_date": len(classification["up_to_date"]),
         "settings_hooks_added": settings_hooks_added,
+        "gitignore_added": gitignore_added,
     }))
     return 0
 

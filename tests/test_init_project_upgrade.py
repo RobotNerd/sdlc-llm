@@ -586,6 +586,70 @@ def test_upgrade_writes_no_settings_hooks_when_another_conflict_blocks_the_whole
 
 
 # ---------------------------------------------------------------------------
+# `.gitignore` merge (TASK-066) -- `target`'s own `.gitignore` already covers everything, since
+# `run` (used to scaffold the `target` fixture) writes it too; these tests reset it first to
+# exercise `upgrade`'s own additive merge.
+# ---------------------------------------------------------------------------
+
+
+def test_upgrade_gitignore_already_current_reports_nothing_added(target, toolkit_source):
+    before = (target / ".gitignore").read_bytes()
+
+    result = _run_upgrade(toolkit_source, target)
+
+    assert result.returncode == 0, result.stderr
+    output = json.loads(result.stdout)
+    assert output["gitignore_added"] == []
+    assert (target / ".gitignore").read_bytes() == before
+
+
+def test_upgrade_adds_missing_gitignore_entries_preserving_existing_content(target, toolkit_source):
+    (target / ".gitignore").write_text("node_modules/\n*.log\n")
+
+    result = _run_upgrade(toolkit_source, target)
+
+    assert result.returncode == 0, result.stderr
+    output = json.loads(result.stdout)
+    assert set(output["gitignore_added"]) == {"__pycache__/", "*.py[cod]", ".pytest_cache/"}
+    gitignore = (target / ".gitignore").read_text()
+    assert gitignore.startswith("node_modules/\n*.log\n")
+    assert "__pycache__/" in gitignore
+    assert "*.py[cod]" in gitignore
+    assert ".pytest_cache/" in gitignore
+
+
+def test_upgrade_dry_run_reports_gitignore_would_add_and_writes_nothing(target, toolkit_source):
+    (target / ".gitignore").write_text("node_modules/\n")
+    before = (target / ".gitignore").read_bytes()
+
+    result = _run_upgrade(toolkit_source, target, "--dry-run")
+
+    assert result.returncode == 0, result.stderr
+    output = json.loads(result.stdout)
+    assert set(output["gitignore_would_add"]) == {"__pycache__/", "*.py[cod]", ".pytest_cache/"}
+    assert (target / ".gitignore").read_bytes() == before
+
+
+def test_upgrade_writes_no_gitignore_changes_when_another_conflict_blocks_the_whole_upgrade(target, toolkit_source):
+    """Same posture as the settings.json case above: a `locally_modified` conflict elsewhere
+    refuses the whole `upgrade` and writes nothing at all, `.gitignore` included -- it's not a
+    partial apply."""
+    first = _run_upgrade(toolkit_source, target)
+    assert first.returncode == 0, first.stderr
+    _git(["add", "-A"], cwd=target)
+    _git(["commit", "-q", "-m", "upgrade"], cwd=target)
+
+    (target / ".gitignore").write_text("node_modules/\n")
+    local_path = target / ".claude" / "skills" / "add-task" / "SKILL.md"
+    local_path.write_text(local_path.read_text() + "\n# local edit\n")
+
+    result = _run_upgrade(toolkit_source, target)
+
+    assert result.returncode != 0
+    assert (target / ".gitignore").read_text() == "node_modules/\n"
+
+
+# ---------------------------------------------------------------------------
 # Data-loss guard (testing strategy step 4) -- the criterion that matters most
 # ---------------------------------------------------------------------------
 

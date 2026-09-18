@@ -99,7 +99,11 @@ actually ends up with the skills.
 This performs every mechanical step (directory creation, `config.md` rendering, the verbatim
 file copies, vendoring `sync`, running `sync` then `sync check` — all against `target` when given)
 and exits non-zero with a clear message if `.tasks/` already exists there, `target` doesn't exist
-or isn't a git repo, or an answer is missing.
+or isn't a git repo, or an answer is missing. It also additively merges the Python-artifact entries
+this toolkit's own vendored files produce (`__pycache__/`, etc.) into `target`'s `.gitignore` —
+creating it if it doesn't exist, only appending entries it lacks otherwise — since the toolkit
+vendors Python regardless of what language the target project itself uses; no STOP for this part,
+same posture as `run`/`upgrade`'s settings-hook merge below.
 
 If `target` already has a managed file that conflicts with the incoming source (e.g. it already
 has its own `.claude/skills/add-task/SKILL.md`), it exits non-zero and prints a diff for each
@@ -136,9 +140,16 @@ current toolkit ships that the project's file structurally lacks is inserted, an
 project already has (including a hook registration no template will ever ship) is left exactly
 alone. No STOP for this part; it can only add, never remove or overwrite.
 
+`.gitignore` is handled the same additive way, in the same `upgrade` run: any of the toolkit's
+Python-artifact entries the target's `.gitignore` still lacks (e.g. a project scaffolded before
+this merge existed, or one where the entries were later removed by hand) are appended, reported as
+`gitignore_added` (or `gitignore_would_add` under `--dry-run`) — no STOP for this part either; it
+can only add, never remove or reorder.
+
 - Exit `0` with no locally-modified files reported: show the human the JSON summary
-  (`new`/`updated`/`up_to_date` counts, plus `settings_hooks_added` — the hook registrations, if
-  any, `.claude/settings.json` just gained), then continue to **config.md migration** below.
+  (`new`/`updated`/`up_to_date` counts, plus `settings_hooks_added` and `gitignore_added` — what,
+  if anything, `.claude/settings.json` and `.gitignore` just gained), then continue to
+  **config.md migration** below.
 - Exit non-zero listing locally-modified files: it wrote nothing (`.claude/settings.json`
   included, even if it had something to add). Show the human the printed diffs — each one is a
   managed file edited by hand since the last `run`/`upgrade`, which a plain overwrite would
@@ -152,8 +163,9 @@ alone. No STOP for this part; it can only add, never remove or overwrite.
   as `run`, not something to paper over.
 
 Use `--dry-run` first if the human wants to preview the classification without committing to
-either path — it prints the same JSON (plus `settings_hooks_would_add`, the settings-merge
-preview) and writes nothing, `locally_modified` included, regardless of `--force`.
+either path — it prints the same JSON (plus `settings_hooks_would_add` and `gitignore_would_add`,
+the settings- and gitignore-merge previews) and writes nothing, `locally_modified` included,
+regardless of `--force`.
 
 ### config.md migration
 
