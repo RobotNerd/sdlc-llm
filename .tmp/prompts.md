@@ -253,7 +253,7 @@ I cleaned up--PR deleted, scratch branch deleted. -->
 
 One call out--I assume that the worker will be a long-running agent, but I need to verify that with you. The other possible workflow I can imagine is that the orchestrator would create a new instance of the worker for every task (sequentially). I'll defer to you to tell me which workflow is a more performant. -->
 
-/add-task Put at top of TODO list. No epic. This is an enhancement to the init-project skill due to a gap that I noticed while testing manually. The target project that I applied init-project to wasn't using python, and the .gitignore did not include a __pycache__ entry (nor other python-related exclusions). Update the init-project skill so that it updates the .gitignore in the target repo to exclude all python-related artifacts that shouldn't be commited to the repo, if these entries don't already exist in the target repo's .gitignore. Do this programmatically with code.
+<!-- /add-task Put at top of TODO list. No epic. This is an enhancement to the init-project skill due to a gap that I noticed while testing manually. The target project that I applied init-project to wasn't using python, and the .gitignore did not include a __pycache__ entry (nor other python-related exclusions). Update the init-project skill so that it updates the .gitignore in the target repo to exclude all python-related artifacts that shouldn't be commited to the repo, if these entries don't already exist in the target repo's .gitignore. Do this programmatically with code. -->
 
 ---
 

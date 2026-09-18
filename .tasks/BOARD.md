@@ -15,6 +15,7 @@ between `<!-- BEGIN -->` / `<!-- END -->` markers — change the task/epic file 
 
 ## TODO
 
+- TASK-066 — init-project: merge Python ignore entries into the target repo's .gitignore
 - TASK-039 — Batch selection + deterministic validation script  `EPIC-003`
 - TASK-040 — TDD mode for implement-task phase 2  `EPIC-003`
 - TASK-041 — Core autonomous loop: iterate a validated batch without manual re-invocation  `EPIC-003` ⛔ blocked_by TASK-039
