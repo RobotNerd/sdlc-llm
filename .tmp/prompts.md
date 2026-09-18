@@ -255,6 +255,10 @@ One call out--I assume that the worker will be a long-running agent, but I need 
 
 <!-- /add-task Put at top of TODO list. No epic. This is an enhancement to the init-project skill due to a gap that I noticed while testing manually. The target project that I applied init-project to wasn't using python, and the .gitignore did not include a __pycache__ entry (nor other python-related exclusions). Update the init-project skill so that it updates the .gitignore in the target repo to exclude all python-related artifacts that shouldn't be commited to the repo, if these entries don't already exist in the target repo's .gitignore. Do this programmatically with code. -->
 
+<!-- PR merged.
+
+Once you've finished the post-merge clean up, add a new task at the top of the board in EPIC-003. The range requirement I gave you for TASK-039 was wrong. The range doesn't account for the hand-ordered priority of the TODO list on the board. Change the behavior so that when I supply the starting and ending task ids, the range is taken from the existing ordering on the board starting with and ending with those tasks. -->
+
 ---
 
 Rewrite README to be more human-readable; right now it seems geared more towards AI, with some sections being too dense; focus on simplifying by removing technical details and focus on usage from a human user perspective; [TODO] provide examples to the LLM of good READMEs from other projects to use as a guide
