@@ -2,11 +2,11 @@
 id: TASK-041
 title: "Core autonomous loop: iterate a validated batch without manual re-invocation"
 type: feature
-status: in-progress
+status: in-review
 epic: EPIC-003
 created: 2026-09-14
 branch: task-041-core-autonomous-loop
-pr: null
+pr: "https://github.com/RobotNerd/sdlc-llm/pull/79"
 merge_commit: null
 blocked_by: [TASK-039]
 blocks: [TASK-042, TASK-043, TASK-044, TASK-045]
