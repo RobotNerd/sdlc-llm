@@ -7,6 +7,8 @@ Acceptance criteria this covers:
   violating `tool_input.command`, `allow` (no output) for everything else
 - the vendored copies of `guardrails.py` and the hook script stay byte-identical to their
   canonical sources, and `.claude/settings.json` stays identical to its portable template
+  modulo exactly one repo-only entry (TASK-036's portable-references scan hook, which must
+  never ship to another project)
 """
 
 import json
@@ -309,7 +311,30 @@ def test_vendored_hook_script_is_byte_identical_to_the_canonical_one():
     assert vendored.read_bytes() == HOOK_SCRIPT.read_bytes()
 
 
-def test_settings_json_template_is_byte_identical_to_this_repos_own():
-    template = REPO_ROOT / ".claude" / "skills" / "init-project" / "templates" / "settings.json"
-    canonical = REPO_ROOT / ".claude" / "settings.json"
-    assert template.read_bytes() == canonical.read_bytes()
+def test_settings_json_template_matches_this_repos_own_minus_the_repo_only_hook():
+    """These stay identical except for exactly one entry: this repo's own copy also registers
+    `.dev/hooks/check-portable-references.py` (TASK-036) under the `Bash` matcher -- a
+    repo-only guardrail that must never ship to another project (see that hook's own
+    docstring). Stripping that one entry back out of the canonical file's `Bash` hooks list
+    must leave the two structurally identical again.
+    """
+    template = json.loads(
+        (REPO_ROOT / ".claude" / "skills" / "init-project" / "templates" / "settings.json").read_text()
+    )
+    canonical = json.loads((REPO_ROOT / ".claude" / "settings.json").read_text())
+
+    repo_only_hook = {
+        "type": "command",
+        "command": "python3 $CLAUDE_PROJECT_DIR/.dev/hooks/check-portable-references.py",
+    }
+    canonical_bash_hooks = next(
+        e["hooks"] for e in canonical["hooks"]["PreToolUse"] if e["matcher"] == "Bash"
+    )
+    assert repo_only_hook in canonical_bash_hooks
+
+    stripped = json.loads(json.dumps(canonical))
+    stripped_bash_hooks = next(
+        e["hooks"] for e in stripped["hooks"]["PreToolUse"] if e["matcher"] == "Bash"
+    )
+    stripped_bash_hooks.remove(repo_only_hook)
+    assert stripped == template

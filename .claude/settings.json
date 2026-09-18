@@ -7,6 +7,10 @@
           {
             "type": "command",
             "command": "python3 $CLAUDE_PROJECT_DIR/.claude/hooks/pretooluse_bash.py"
+          },
+          {
+            "type": "command",
+            "command": "python3 $CLAUDE_PROJECT_DIR/.dev/hooks/check-portable-references.py"
           }
         ]
       },
