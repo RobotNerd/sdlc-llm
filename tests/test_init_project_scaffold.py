@@ -94,6 +94,95 @@ def test_init_project_missing_keys_reports_absent_ones():
 
 
 # ---------------------------------------------------------------------------
+# `merge_gitignore` (TASK-066) -- pure function, hand-built fixtures
+# ---------------------------------------------------------------------------
+
+
+def test_merge_gitignore_creates_the_block_when_the_file_is_absent():
+    merged, added = scaffold.merge_gitignore("")
+    assert added == ["__pycache__/", "*.py[cod]", ".pytest_cache/"]
+    assert merged == "# Python (added by init-project)\n__pycache__/\n*.py[cod]\n.pytest_cache/\n"
+
+
+def test_merge_gitignore_appends_after_a_projects_existing_entries():
+    merged, added = scaffold.merge_gitignore("node_modules/\n*.log\n")
+    assert added == ["__pycache__/", "*.py[cod]", ".pytest_cache/"]
+    assert merged == (
+        "node_modules/\n*.log\n\n"
+        "# Python (added by init-project)\n__pycache__/\n*.py[cod]\n.pytest_cache/\n"
+    )
+    assert "node_modules/\n*.log\n" in merged  # existing content untouched, not reordered
+
+
+def test_merge_gitignore_handles_a_missing_trailing_newline():
+    merged, added = scaffold.merge_gitignore("node_modules/")
+    assert added == ["__pycache__/", "*.py[cod]", ".pytest_cache/"]
+    assert merged.startswith("node_modules/\n\n# Python (added by init-project)\n")
+
+
+def test_merge_gitignore_noop_when_all_entries_already_present():
+    project = "__pycache__/\n*.py[cod]\n.pytest_cache/\n"
+    merged, added = scaffold.merge_gitignore(project)
+    assert added == []
+    assert merged == project
+
+
+@pytest.mark.parametrize(
+    "existing_line",
+    ["__pycache__", "__pycache__/", "**/__pycache__/", "**/__pycache__"],
+    ids=["bare", "trailing-slash", "double-star-prefixed", "double-star-prefixed-bare"],
+)
+def test_merge_gitignore_recognizes_pycache_spelling_variants(existing_line):
+    _, added = scaffold.merge_gitignore(existing_line + "\n")
+    assert "__pycache__/" not in added
+
+
+@pytest.mark.parametrize("existing_line", ["*.pyc", "*.py[cod]"], ids=["pyc-glob", "brace-glob"])
+def test_merge_gitignore_recognizes_pyc_spelling_variants(existing_line):
+    _, added = scaffold.merge_gitignore(existing_line + "\n")
+    assert "*.py[cod]" not in added
+
+
+@pytest.mark.parametrize(
+    "existing_line", [".pytest_cache", ".pytest_cache/"], ids=["bare", "trailing-slash"]
+)
+def test_merge_gitignore_recognizes_pytest_cache_spelling_variants(existing_line):
+    _, added = scaffold.merge_gitignore(existing_line + "\n")
+    assert ".pytest_cache/" not in added
+
+
+def test_merge_gitignore_ignores_comments_and_blank_lines_when_scanning():
+    merged, added = scaffold.merge_gitignore("# __pycache__/\n\n*.log\n")
+    assert added == ["__pycache__/", "*.py[cod]", ".pytest_cache/"]
+    # the commented-out line is left alone; a real, uncommented entry is still appended
+    assert merged.startswith("# __pycache__/\n\n*.log\n")
+    assert "\n__pycache__/\n" in merged
+
+
+def test_merge_gitignore_adds_only_the_genuinely_missing_subset():
+    merged, added = scaffold.merge_gitignore("__pycache__/\n*.log\n")
+    assert added == ["*.py[cod]", ".pytest_cache/"]
+    assert "__pycache__/\n*.log\n" in merged
+    assert merged.count("__pycache__/") == 1
+
+
+def test_merge_gitignore_is_idempotent():
+    once, added_once = scaffold.merge_gitignore("*.log\n")
+    twice, added_twice = scaffold.merge_gitignore(once)
+    assert added_once != []
+    assert added_twice == []
+    assert twice == once
+
+
+def test_merge_gitignore_does_not_mutate_a_missing_file_case_repeatedly():
+    # calling twice from "" both times (not chained) always yields the identical full block --
+    # confirms the function has no hidden state across calls.
+    first, _ = scaffold.merge_gitignore("")
+    second, _ = scaffold.merge_gitignore("")
+    assert first == second
+
+
+# ---------------------------------------------------------------------------
 # `run` subcommand, against real scratch git repos
 # ---------------------------------------------------------------------------
 
@@ -167,6 +256,56 @@ def test_run_scaffolds_a_fresh_repo_and_sync_check_is_clean(tmp_path):
 
     fields, _body, _order = sync_mod.parse_frontmatter((tmp_path / ".tasks" / "config.md").read_text())
     assert fields["ignored_paths"] == []
+
+
+# ---------------------------------------------------------------------------
+# `run`'s `.gitignore` merge (TASK-066)
+# ---------------------------------------------------------------------------
+
+
+def test_run_creates_gitignore_when_the_target_has_none(tmp_path):
+    _init_git_repo(tmp_path)
+    assert not (tmp_path / ".gitignore").exists()
+    answers_path = tmp_path / "answers.json"
+    answers_path.write_text(json.dumps(SAMPLE_ANSWERS))
+
+    result = _run_scaffold(tmp_path, answers_path)
+
+    assert result.returncode == 0, result.stderr
+    gitignore = (tmp_path / ".gitignore").read_text()
+    assert "__pycache__/" in gitignore
+    assert "*.py[cod]" in gitignore
+    assert ".pytest_cache/" in gitignore
+    assert "added" in result.stdout
+
+
+def test_run_preserves_an_existing_gitignore_and_adds_only_missing_entries(tmp_path):
+    _init_git_repo(tmp_path)
+    (tmp_path / ".gitignore").write_text("node_modules/\n__pycache__/\n")
+    answers_path = tmp_path / "answers.json"
+    answers_path.write_text(json.dumps(SAMPLE_ANSWERS))
+
+    result = _run_scaffold(tmp_path, answers_path)
+
+    assert result.returncode == 0, result.stderr
+    gitignore = (tmp_path / ".gitignore").read_text()
+    assert gitignore.startswith("node_modules/\n__pycache__/\n")
+    assert "*.py[cod]" in gitignore
+    assert ".pytest_cache/" in gitignore
+    assert gitignore.count("__pycache__/") == 1  # not duplicated
+
+
+def test_run_reports_nothing_needed_when_gitignore_already_covers_python(tmp_path):
+    _init_git_repo(tmp_path)
+    (tmp_path / ".gitignore").write_text("__pycache__/\n*.py[cod]\n.pytest_cache/\n")
+    answers_path = tmp_path / "answers.json"
+    answers_path.write_text(json.dumps(SAMPLE_ANSWERS))
+
+    result = _run_scaffold(tmp_path, answers_path)
+
+    assert result.returncode == 0, result.stderr
+    assert (tmp_path / ".gitignore").read_text() == "__pycache__/\n*.py[cod]\n.pytest_cache/\n"
+    assert "nothing needed" in result.stdout
 
 
 def test_run_scaffolds_a_fresh_repo_with_no_dangling_ids(tmp_path):
