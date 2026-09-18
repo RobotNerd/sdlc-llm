@@ -52,7 +52,7 @@ module with the skills' own scripts.
 | TASK-034 | done | Branch-name + dirty-tree gate hook |
 | TASK-035 | done | Pre-PR quality gate hook: sync check, test, lint, format |
 | TASK-036 | done | SPEC/TASK-reference scan hook (repo-only, never copied) |
-| TASK-037 | todo | SessionStart board-context hook |
+| TASK-037 | in-progress | SessionStart board-context hook |
 | TASK-038 | todo | Wire hooks into upgrade and config migration |
 | TASK-052 | done | Re-scope guidelines.md to the non-outsourceable core and add a skill-selection map |
 | TASK-053 | done | implement-task: delegate dirty_files to guardrails.dirty_tree_violation |

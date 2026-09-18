@@ -2,7 +2,7 @@
 id: TASK-037
 title: SessionStart board-context hook
 type: feature
-status: todo
+status: in-progress
 epic: EPIC-002
 created: 2026-09-14
 branch: task-037-sessionstart-board-context-hook
@@ -36,17 +36,17 @@ model in context at the start of every session.
 
 ## Acceptance criteria
 
-- [ ] A session start with no in-flight task injects the board's open columns (In Progress, In
+- [x] A session start with no in-flight task injects the board's open columns (In Progress, In
       Review) only.
-- [ ] A session start with an in-flight task also includes that task's id/title/status/`pr`.
-- [ ] `.tasks/guidelines.md`'s contents appear in the injected `additionalContext` alongside the
+- [x] A session start with an in-flight task also includes that task's id/title/status/`pr`.
+- [x] `.tasks/guidelines.md`'s contents appear in the injected `additionalContext` alongside the
       board state.
-- [ ] Output is silent (the hook skips cleanly) if `.tasks/` doesn't exist, so this hook is
+- [x] Output is silent (the hook skips cleanly) if `.tasks/` doesn't exist, so this hook is
       harmless in a non-workflow repo.
-- [ ] The hook still exits cleanly if `.tasks/` exists but `.tasks/guidelines.md` specifically is
+- [x] The hook still exits cleanly if `.tasks/` exists but `.tasks/guidelines.md` specifically is
       absent — it injects the board context it does have and simply omits the guidelines section,
       the same tolerant posture as the "`.tasks/` doesn't exist" case.
-- [ ] `pytest` and `python3 .tasks/bin/sync check` both pass.
+- [x] `pytest` and `python3 .tasks/bin/sync check` both pass.
 
 ## Testing strategy
 
@@ -62,7 +62,36 @@ model in context at the start of every session.
 
 ## Worklog
 
-_(empty — appended during implementation)_
+- Confirmed the exact `SessionStart` hook contract before writing any code (Claude Code's docs
+  hallucinate on a couple of fetches, so verified against the raw markdown source directly):
+  stdin carries `hook_event_name: "SessionStart"` and a `source` field
+  (`startup`/`resume`/`clear`/`compact`/`fork`); output is
+  `{"hookSpecificOutput": {"hookEventName": "SessionStart", "additionalContext": "<string>"}}`
+  on stdout with nothing else printed; `SessionStart` has no blocking/deny concept at all — any
+  exit code just proceeds, so there's never a reason to exit non-zero here.
+- Added `.claude/hooks/sessionstart_board_context.py`: `build_context(tasks_root)` extracts
+  `BOARD.md`'s rendered `in-progress`/`in-review` regions verbatim (via `sync.find_region`, so
+  it's always what's actually on the board, never re-derived), appends an explicit
+  id/title/status/`pr` summary via `sync.discover()` if any task is in-flight, and appends
+  `.tasks/guidelines.md`'s contents verbatim if the file exists. Returns `None` (hook prints
+  nothing) if `.tasks/` doesn't exist or is otherwise empty of board/guidelines content — never
+  an error path. `main()` reads the `SessionStart` payload, resolves `.tasks/` from the event's
+  own `cwd` (not a fixed location — this hook is portable, vendored into every project), and
+  prints the documented JSON shape only when there's something to report.
+- Mirrored the new hook to `.claude/skills/init-project/vendored-hooks/sessionstart_board_context.py`
+  (byte-identical, matching the existing `pretooluse_*` convention) and registered it in **both**
+  `.claude/settings.json` and `.claude/skills/init-project/templates/settings.json` under a new
+  `SessionStart` array — unlike TASK-036's repo-only hook, this one ships to every scaffolded
+  project.
+- Added `tests/test_sessionstart_board_context.py` (14 tests): `build_context` unit tests (no
+  `.tasks/`, board columns with no in-flight task, in-progress summary, in-review summary with a
+  real `pr` value, guidelines present/absent, an entirely empty `.tasks/`), hook-script subprocess
+  tests (silent when `.tasks/` absent, ignores non-`SessionStart` events, survives malformed
+  stdin, output shape matches the documented schema exactly), a test against this repo's own real
+  tree, and vendoring checks (vendored copy byte-identical to canonical; both `settings.json`
+  files register `SessionStart` identically).
+- Full suite: `.venv/bin/pytest -q` → 540 passed (526 existing + 14 new), no existing test edited.
+- `python3 .tasks/bin/sync check` → exit 0.
 
 ## Notes
 
