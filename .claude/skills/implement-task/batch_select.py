@@ -12,15 +12,17 @@ Four selection modes:
                 order -- the same order `sync` itself renders in that epic's own generated
                 children table (`sync.render_epic_children`), so "board order" here means exactly
                 what a human sees when they open that epic file.
-- "range"    -- a numeric task-id range `"TASK-A..TASK-B"`, inclusive, ascending id order; an id
-                in the range that doesn't exist, or exists but is already `done`/`wont-do`, is
-                silently skipped, not an error.
+- "range"    -- the slice of `.tasks/BOARD.md`'s hand-ordered TODO list from a given start task
+                id through a given end task id, `"TASK-A..TASK-B"`, inclusive, in real board
+                order -- not a numeric task-id range; priority order is a human judgement call
+                that lives only in that hand-ordered list, never in id numbering.
 - "list"     -- an explicit list of task ids, in exactly the order given (may not match TODO
                 order or id order at all); nothing is filtered here -- every id is validated for
                 real by the shared validation step, same as every other mode.
 - "stopping" -- `.tasks/BOARD.md`'s hand-ordered TODO list, top to bottom, through and including
-                the named stopping task, literally. The one mode whose natural order is not "how
-                `sync` would render it" but "how the human actually prioritized it".
+                the named stopping task, literally. Together with "range", the two modes whose
+                natural order is not "how `sync` would render it" but "how the human actually
+                prioritized it".
 
 Every mode reduces to the same two things: a candidate id list, and that same list read as the
 "natural order" for it. A single shared validation step (`validate_and_order`) then checks the
@@ -114,27 +116,40 @@ def resolve_epic(epic_id: str, tasks: dict) -> list[str]:
     return sorted((t.id for t in children), key=_task_number)
 
 
-def resolve_range(range_str: str, tasks: dict) -> list[str]:
-    """Every existing, non-`done`/`wont-do` task id in the inclusive numeric range described by
-    `range_str` (`"TASK-A..TASK-B"`), ascending order. A gap in numbering and an already-done
-    task are both silently skipped -- neither is an error.
+def resolve_range(range_str: str, board_text: str, sync_mod: ModuleType) -> list[str]:
+    """The slice of `.tasks/BOARD.md`'s hand-ordered TODO list from the start task id through the
+    end task id (both parsed out of `range_str`, `"TASK-A..TASK-B"`), inclusive, in real board
+    order -- deliberately *not* numeric task-id comparison, since priority order is a human
+    judgement call that lives only in that hand-ordered list (`.tasks/guidelines.md`), not in id
+    numbering.
+
+    Raises if `range_str` doesn't parse, if either endpoint isn't on the TODO list at all (wrong
+    id, not currently `todo`, or simply never prioritized), or if the start id appears *after* the
+    end id in real board order (the two arguments are backwards relative to it) -- refused, not
+    silently reversed.
     """
     match = _RANGE_RE.match(range_str.strip()) if isinstance(range_str, str) else None
     if not match:
         raise BatchSelectionError(f"malformed range {range_str!r} -- expected 'TASK-NNN..TASK-MMM'")
     start_id, end_id = match.group(1), match.group(2)
-    start, end = _task_number(start_id), _task_number(end_id)
-    if start > end:
-        raise BatchSelectionError(f"range is backwards: {start_id}..{end_id}")
 
-    ids = []
-    for n in range(start, end + 1):
-        task_id = f"TASK-{n:03d}"
-        task = tasks.get(task_id)
-        if task is None or task.fields.get("status") in _TERMINAL_STATUSES:
-            continue
-        ids.append(task_id)
-    return ids
+    todo_order = _todo_order(board_text, sync_mod)
+    try:
+        start_index = todo_order.index(start_id)
+    except ValueError:
+        raise BatchSelectionError(
+            f"{start_id} is not on the TODO list (not todo, or never prioritized)"
+        ) from None
+    try:
+        end_index = todo_order.index(end_id)
+    except ValueError:
+        raise BatchSelectionError(
+            f"{end_id} is not on the TODO list (not todo, or never prioritized)"
+        ) from None
+    if start_index > end_index:
+        raise BatchSelectionError(f"range is backwards on the board: {start_id} comes after {end_id}")
+
+    return todo_order[start_index:end_index + 1]
 
 
 def resolve_list(task_ids: list[str]) -> list[str]:
@@ -144,11 +159,11 @@ def resolve_list(task_ids: list[str]) -> list[str]:
     return list(task_ids)
 
 
-def resolve_stopping(stopping_id: str, board_text: str, sync_mod: ModuleType) -> list[str]:
-    """`.tasks/BOARD.md`'s hand-ordered TODO list, top to bottom, through and including
-    `stopping_id`. Raises if the TODO heading is missing, or `stopping_id` never appears in it
-    (not `todo`, doesn't exist, or was simply never prioritized) -- the TODO list only ever lists
-    `todo` tasks (`sync.merge_todo`), so this doubles as that status check for this one mode.
+def _todo_order(board_text: str, sync_mod: ModuleType) -> list[str]:
+    """Every task id on `.tasks/BOARD.md`'s hand-ordered TODO list, top to bottom, exactly as
+    written -- the shared BOARD.md-parsing step `resolve_range` and `resolve_stopping` both build
+    on (same `_TODO_HEADING`/`_TODO_LINE_RE` technique this skill's own `scaffold.py` already uses
+    for `pick_top_unblocked`). Raises if the `## TODO` heading itself is missing.
     """
     heading = sync_mod._TODO_HEADING
     if heading not in board_text:
@@ -157,14 +172,23 @@ def resolve_stopping(stopping_id: str, board_text: str, sync_mod: ModuleType) ->
     next_heading = board_text.find("\n## ", start - 1)
     end = len(board_text) if next_heading == -1 else next_heading + 1
     lines = [line for line in board_text[start:end].splitlines() if sync_mod._TODO_LINE_RE.match(line)]
+    return [sync_mod._TODO_LINE_RE.match(line).group(1) for line in lines]
 
-    ids = []
-    for line in lines:
-        task_id = sync_mod._TODO_LINE_RE.match(line).group(1)
-        ids.append(task_id)
-        if task_id == stopping_id:
-            return ids
-    raise BatchSelectionError(f"{stopping_id} is not on the TODO list (not todo, or never prioritized)")
+
+def resolve_stopping(stopping_id: str, board_text: str, sync_mod: ModuleType) -> list[str]:
+    """`.tasks/BOARD.md`'s hand-ordered TODO list, top to bottom, through and including
+    `stopping_id`. Raises if the TODO heading is missing, or `stopping_id` never appears in it
+    (not `todo`, doesn't exist, or was simply never prioritized) -- the TODO list only ever lists
+    `todo` tasks (`sync.merge_todo`), so this doubles as that status check for this one mode.
+    """
+    todo_order = _todo_order(board_text, sync_mod)
+    try:
+        stop_index = todo_order.index(stopping_id)
+    except ValueError:
+        raise BatchSelectionError(
+            f"{stopping_id} is not on the TODO list (not todo, or never prioritized)"
+        ) from None
+    return todo_order[:stop_index + 1]
 
 
 # ---------------------------------------------------------------------------
@@ -181,8 +205,9 @@ def validate_and_order(candidate_ids: list[str], tasks: dict, sync_mod: ModuleTy
     Checks, per id, in order:
     - it refers to a real task
     - that task's status is `todo`, `in-progress`, or `in-review` (a `blocked`/`done`/`wont-do`
-      task is never a valid batch member -- `resolve_epic`/`resolve_range` already filter
-      `done`/`wont-do` before this runs, but `list`/`stopping` don't, so it's still checked here)
+      task is never a valid batch member -- `resolve_epic` already filters `done`/`wont-do`
+      before this runs, and `range`/`stopping`'s BOARD.md TODO list can't contain one in the
+      first place, but `list` mode filters nothing, so it's still checked here)
     - every still-outstanding `blocked_by` entry (via `sync`'s own `_outstanding_blockers` --
       a blocker already `done`/`wont-do` is satisfied and never examined further) is either
       inside the selection and ordered before this task, or named in a refusal
@@ -226,7 +251,8 @@ def select_batch(params: dict, tasks: dict, board_text: str, sync_mod: ModuleTyp
     list via the matching `resolve_*` function, then validate+order it.
 
     - `"epic"`: `{"mode": "epic", "epic": "EPIC-NNN"}`
-    - `"range"`: `{"mode": "range", "range": "TASK-A..TASK-B"}`
+    - `"range"`: `{"mode": "range", "range": "TASK-A..TASK-B"}` -- the board-order TODO-list
+      slice from `TASK-A` through `TASK-B`, not a numeric id range; see `resolve_range`.
     - `"list"`: `{"mode": "list", "tasks": ["TASK-A", "TASK-B", ...]}`
     - `"stopping"`: `{"mode": "stopping", "stopping_task": "TASK-NNN"}`
 
@@ -238,7 +264,7 @@ def select_batch(params: dict, tasks: dict, board_text: str, sync_mod: ModuleTyp
     if mode == "epic":
         candidates = resolve_epic(params["epic"], tasks)
     elif mode == "range":
-        candidates = resolve_range(params["range"], tasks)
+        candidates = resolve_range(params["range"], board_text, sync_mod)
     elif mode == "list":
         candidates = resolve_list(params["tasks"])
     elif mode == "stopping":

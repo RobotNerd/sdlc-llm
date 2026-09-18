@@ -2,11 +2,11 @@
 id: TASK-067
 title: "batch_select range mode: use BOARD.md's hand-ordered TODO slice, not numeric task-id order"
 type: bug
-status: todo
+status: in-review
 epic: EPIC-003
 created: 2026-09-18
 branch: task-067-range-mode-board-order
-pr: null
+pr: "https://github.com/RobotNerd/sdlc-llm/pull/76"
 merge_commit: null
 blocked_by: []
 blocks: []
@@ -31,23 +31,23 @@ explicit start id instead of always starting at the top.
 
 ## Acceptance criteria
 
-- [ ] `resolve_range` resolves to the TODO list's slice from the start id through the end id,
+- [x] `resolve_range` resolves to the TODO list's slice from the start id through the end id,
       inclusive, in the list's literal board order — not by numeric task-id comparison.
-- [ ] If the start id appears *after* the end id in the TODO list (the two arguments are backwards
+- [x] If the start id appears *after* the end id in the TODO list (the two arguments are backwards
       relative to real board order), the selection is refused with a clear message — same posture
       as the old numeric mode's "range is backwards" case, not silently reversed.
-- [ ] If either endpoint isn't on the TODO list at all (wrong id, not currently `todo`, or simply
+- [x] If either endpoint isn't on the TODO list at all (wrong id, not currently `todo`, or simply
       never prioritized), the selection is refused with a clear message naming which endpoint.
-- [ ] A task in the slice that's marked `⛔ blocked_by` on the board (still `todo`, just currently
+- [x] A task in the slice that's marked `⛔ blocked_by` on the board (still `todo`, just currently
       blocked) is included in the resolved candidate list as-is — `validate_and_order`'s existing
       blocked_by check (inside-set-and-ordered vs. outside-and-unresolved) is what actually decides
       whether the overall selection is valid, same as every other mode; `resolve_range` itself
       doesn't special-case blocked entries.
-- [ ] The module docstring's description of `"range"` mode is corrected (currently describes
+- [x] The module docstring's description of `"range"` mode is corrected (currently describes
       numeric id order).
-- [ ] Existing numeric-range-order tests in `tests/test_batch_select.py` are replaced with
+- [x] Existing numeric-range-order tests in `tests/test_batch_select.py` are replaced with
       board-order equivalents; no test still asserts numeric id ordering for this mode.
-- [ ] `pytest` and `python3 .tasks/bin/sync check` both pass.
+- [x] `pytest` and `python3 .tasks/bin/sync check` both pass.
 
 ## Testing strategy
 
@@ -63,7 +63,21 @@ explicit start id instead of always starting at the top.
 
 ## Worklog
 
-_(empty — appended during implementation)_
+- 2026-09-18: Rewrote `resolve_range` to slice `.tasks/BOARD.md`'s hand-ordered TODO list (via a
+  new shared `_todo_order` helper, also refactored into `resolve_stopping`) between the two given
+  endpoints, inclusive, in board order — replacing the old numeric task-id range walk. Updated
+  `select_batch`'s dispatch call/docstring and the module's top-level docstring accordingly.
+- 2026-09-18: Step 1/2 — replaced the 4 numeric-order `resolve_range` unit tests in
+  `tests/test_batch_select.py` with 7 board-order equivalents (board-order-not-id-order slice,
+  single-task slice, a `⛔ blocked_by`-marked line passed through, backwards-relative-to-board
+  refusal, missing-endpoint refusal for each endpoint, malformed-syntax refusal), updated
+  `select_batch`'s range-mode dispatch test to use a diverging board order, and added a new CLI
+  subprocess test proving the same end to end.
+- 2026-09-18: Step 3 — `.venv/bin/pytest`: 619 passed, 0 failed. Also re-ran the
+  portable-surface guard tests specifically (`test_check_portable_references.py`/
+  `test_portable_surface.py`/`test_strip_project_references_scaffold.py`) since `batch_select.py`
+  lives under the portable skills surface — all clean, no leaked ids this time.
+- 2026-09-18: Step 4 — `python3 .tasks/bin/sync check` exits 0.
 
 ## Notes
 

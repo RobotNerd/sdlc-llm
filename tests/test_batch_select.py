@@ -92,32 +92,51 @@ def test_resolve_epic_wrong_kind_raises():
 # ---------------------------------------------------------------------------
 
 
-def test_resolve_range_ascending_inclusive():
-    tasks = {f"TASK-{n:03d}": make_task(f"TASK-{n:03d}", "todo") for n in (32, 33, 34)}
-    assert batch_select.resolve_range("TASK-032..TASK-034", tasks) == ["TASK-032", "TASK-033", "TASK-034"]
+def test_resolve_range_slices_the_board_order_not_numeric_id_order():
+    # TASK-034 is *higher* priority (listed first) than TASK-032 here -- board order, not id
+    # order, is what must win.
+    board_text = todo_board_text(["TASK-034", "TASK-005", "TASK-032"])
+    assert batch_select.resolve_range("TASK-034..TASK-032", board_text, sync_mod) == [
+        "TASK-034", "TASK-005", "TASK-032",
+    ]
 
 
-def test_resolve_range_silently_skips_done_and_wont_do():
-    tasks = {
-        "TASK-032": make_task("TASK-032", "done"),
-        "TASK-033": make_task("TASK-033", "todo"),
-        "TASK-034": make_task("TASK-034", "wont-do"),
-    }
-    assert batch_select.resolve_range("TASK-032..TASK-034", tasks) == ["TASK-033"]
+def test_resolve_range_single_task_slice_when_endpoints_are_equal():
+    board_text = todo_board_text(["TASK-001", "TASK-002", "TASK-003"])
+    assert batch_select.resolve_range("TASK-002..TASK-002", board_text, sync_mod) == ["TASK-002"]
 
 
-def test_resolve_range_silently_skips_a_numbering_gap():
-    tasks = {"TASK-032": make_task("TASK-032", "todo"), "TASK-034": make_task("TASK-034", "todo")}
-    assert batch_select.resolve_range("TASK-032..TASK-034", tasks) == ["TASK-032", "TASK-034"]
+def test_resolve_range_includes_a_blocked_marked_line_as_is():
+    board_text = "# Board\n\n## TODO\n\n- TASK-001 — a\n- TASK-002 — b ⛔ blocked_by TASK-999\n- TASK-003 — c\n"
+    assert batch_select.resolve_range("TASK-001..TASK-003", board_text, sync_mod) == [
+        "TASK-001", "TASK-002", "TASK-003",
+    ]
+
+
+def test_resolve_range_backwards_relative_to_board_order_raises():
+    # TASK-002 is listed *before* TASK-001 on the board -- calling it 001..002 is backwards.
+    board_text = todo_board_text(["TASK-002", "TASK-001"])
+    with pytest.raises(BatchSelectionError, match="backwards on the board"):
+        batch_select.resolve_range("TASK-001..TASK-002", board_text, sync_mod)
 
 
 @pytest.mark.parametrize(
-    "range_str", ["garbage", "TASK-005..TASK-002", "TASK-abc..TASK-005", "TASK-005"],
-    ids=["not-a-range", "backwards", "non-numeric", "single-id"],
+    "range_str,missing", [("TASK-999..TASK-002", "TASK-999"), ("TASK-001..TASK-999", "TASK-999")],
+    ids=["start-missing", "end-missing"],
 )
-def test_resolve_range_malformed_or_backwards_raises(range_str):
+def test_resolve_range_endpoint_not_on_todo_list_raises(range_str, missing):
+    board_text = todo_board_text(["TASK-001", "TASK-002"])
+    with pytest.raises(BatchSelectionError, match=f"{missing} is not on the TODO list"):
+        batch_select.resolve_range(range_str, board_text, sync_mod)
+
+
+@pytest.mark.parametrize(
+    "range_str", ["garbage", "TASK-abc..TASK-005", "TASK-005"],
+    ids=["not-a-range", "non-numeric", "single-id"],
+)
+def test_resolve_range_malformed_raises(range_str):
     with pytest.raises(BatchSelectionError):
-        batch_select.resolve_range(range_str, {})
+        batch_select.resolve_range(range_str, todo_board_text(["TASK-005"]), sync_mod)
 
 
 # ---------------------------------------------------------------------------
@@ -242,9 +261,12 @@ def test_select_batch_epic_mode():
 
 
 def test_select_batch_range_mode():
+    # Board order (TASK-003 listed before TASK-001) deliberately diverges from numeric id
+    # order here -- proves select_batch's range dispatch follows the board, not the ids.
     tasks = {f"TASK-{n:03d}": make_task(f"TASK-{n:03d}", "todo") for n in (1, 2, 3)}
-    order = batch_select.select_batch({"mode": "range", "range": "TASK-001..TASK-003"}, tasks, "", sync_mod)
-    assert order == ["TASK-001", "TASK-002", "TASK-003"]
+    board_text = todo_board_text(["TASK-003", "TASK-002", "TASK-001"])
+    order = batch_select.select_batch({"mode": "range", "range": "TASK-003..TASK-001"}, tasks, board_text, sync_mod)
+    assert order == ["TASK-003", "TASK-002", "TASK-001"]
 
 
 def test_select_batch_list_mode():
@@ -358,3 +380,16 @@ def test_cli_select_epic_mode_end_to_end(tmp_path):
 
     assert result.returncode == 0, result.stderr
     assert json.loads(result.stdout) == {"order": ["TASK-001"]}  # TASK-002 (done) excluded
+
+
+def test_cli_select_range_mode_follows_board_order_not_numeric_id_order(tmp_path):
+    work = _init_fixture_repo(tmp_path)
+    for task_id in ("TASK-001", "TASK-002", "TASK-003"):
+        _write_task(work, task_id, "todo")
+    # TASK-003 outranks TASK-001 on the board -- the opposite of numeric id order.
+    (work / ".tasks" / "BOARD.md").write_text(todo_board_text(["TASK-003", "TASK-002", "TASK-001"]))
+
+    result = _run_cli(work, {"mode": "range", "range": "TASK-003..TASK-001"})
+
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout) == {"order": ["TASK-003", "TASK-002", "TASK-001"]}

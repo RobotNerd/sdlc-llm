@@ -64,7 +64,7 @@ interrupting appropriately, while human review of merges stays the default.
 | TASK-043 | todo | Context/token usage safety-valve interrupt + usage reporting |
 | TASK-044 | todo | Follow-up task creation policy with a configurable per-batch limit |
 | TASK-045 | todo | Opt-in, critic-gated, per-batch-capped auto-merge |
-| TASK-067 | todo | batch_select range mode: use BOARD.md's hand-ordered TODO slice, not numeric task-id order |
+| TASK-067 | in-review | batch_select range mode: use BOARD.md's hand-ordered TODO slice, not numeric task-id order |
 
 Progress: 1/8 done
 <!-- END:children -->
