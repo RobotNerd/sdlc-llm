@@ -19,6 +19,16 @@
           }
         ]
       }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 $CLAUDE_PROJECT_DIR/.claude/hooks/sessionstart_board_context.py"
+          }
+        ]
+      }
     ]
   }
 }
