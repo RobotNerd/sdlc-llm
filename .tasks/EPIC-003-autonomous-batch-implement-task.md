@@ -58,7 +58,7 @@ interrupting appropriately, while human review of merges stays the default.
 | Task | Status | Title |
 |---|---|---|
 | TASK-039 | done | Batch selection + deterministic validation script |
-| TASK-040 | in-progress | TDD mode for implement-task phase 2 |
+| TASK-040 | in-review | TDD mode for implement-task phase 2 |
 | TASK-041 | todo | Core autonomous loop: iterate a validated batch without manual re-invocation |
 | TASK-042 | todo | Interrupt taxonomy: isolated skip-task vs. systemic halt-batch routing |
 | TASK-043 | todo | Context/token usage safety-valve interrupt + usage reporting |
