@@ -15,6 +15,7 @@ delete_branch_after_merge: true
 allow_auto_merge: false
 ci_checks: [sync-check, test]
 archive_done: true
+tdd_enforced: true
 ignored_paths: [.tmp/prompts.md]
 ---
 
@@ -53,6 +54,10 @@ describes: the skills' logic stays identical across projects, only this file cha
 - **`allow_auto_merge: false`** — reinforces the never-merge guardrail; not currently read by
   anything since the skill never attempts to merge regardless, but kept for parity with
   SPEC-001's schema and as a documented intent if that ever changes.
+- **`tdd_enforced: true`** — `implement-task` phase 2 writes each Testing strategy step's/
+  acceptance criterion's test(s) first, confirms they fail for the expected reason, then
+  implements until green — an explicit step order, not left to model discretion. `false` reverts
+  phase 2 to writing code and its tests together.
 - **`ignored_paths: [.tmp/prompts.md]`** — paths `implement-task` never treats as dirty-tree
   blockers (phase 1's start check, phase 3's pre-rebase stash). `.tmp/prompts.md` is the human's
   own prompt scratchpad, not part of any task's actual work — a fresh project scaffolded by

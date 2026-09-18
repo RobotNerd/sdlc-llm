@@ -72,6 +72,7 @@ REQUIRED_KEYS = (
     "delete_branch_after_merge",
     "ci_checks",
     "archive_done",
+    "tdd_enforced",
 )
 
 

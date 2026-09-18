@@ -41,6 +41,7 @@ SAMPLE_ANSWERS = {
     "delete_branch_after_merge": True,
     "ci_checks": [],
     "archive_done": True,
+    "tdd_enforced": True,
 }
 
 
@@ -75,6 +76,14 @@ def test_render_config_fills_every_placeholder():
     assert "docs_paths: [README.md]" in text
     assert "rebase_before_pr: true" in text
     assert "ci_checks: []" in text
+    assert "tdd_enforced: true" in text  # TASK-040: default proposed true, still an answer here
+
+
+def test_render_config_tdd_enforced_false_round_trips():
+    answers = dict(SAMPLE_ANSWERS, tdd_enforced=False)
+    text = scaffold.render_config(answers)
+    assert "tdd_enforced: false" in text
+    assert "tdd_enforced: true" not in text
 
 
 def test_render_config_drops_leading_comment():

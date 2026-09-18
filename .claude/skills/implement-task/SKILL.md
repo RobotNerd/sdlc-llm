@@ -77,8 +77,16 @@ any code.**
 
 ## 2. Implement + test
 
-1. Write the change and its tests.
-2. Run `test_command` (and `lint_command`, if not `null`) from `.tasks/config.md`.
+1. Check `tdd_enforced` in `.tasks/config.md` (default `true` if unset):
+   - **`true` (test-first):** for each Testing strategy step or acceptance criterion in turn,
+     write its test(s) first, run `test_command` and confirm they fail **for the expected
+     reason** — a real assertion/behavior failure, not an unrelated error (an import failure, a
+     syntax error, a missing fixture); fix the test itself first if it fails for the wrong
+     reason. Only then write the implementation and re-run until green, before moving to the next
+     criterion/step. This ordering is the explicit sub-step — not left to model discretion.
+   - **`false`:** write the change and its tests together, as before.
+2. Run `test_command` (and `lint_command`, if not `null`) from `.tasks/config.md` — the full
+   suite, one final time, regardless of mode.
 3. Walk the task's Testing strategy step by step. A step that can't be automated (real
    credentials, costs money, needs a human's hands) — **present it to the human to run**, record
    the result in the task's **Worklog**. Never skip one silently.
