@@ -2,7 +2,7 @@
 id: TASK-039
 title: Batch selection + deterministic validation script
 type: feature
-status: todo
+status: in-progress
 epic: EPIC-003
 created: 2026-09-14
 branch: task-039-batch-selection-validation
@@ -42,15 +42,15 @@ for the explicit list, ID order for the range).
 
 ## Acceptance criteria
 
-- [ ] All four selection modes resolve to a concrete, ordered task-id list from real `.tasks/`
+- [x] All four selection modes resolve to a concrete, ordered task-id list from real `.tasks/`
       state.
-- [ ] A selection containing a task blocked by something outside the set and not yet
+- [x] A selection containing a task blocked by something outside the set and not yet
       `done`/`wont-do` is refused with a clear message.
-- [ ] A selection whose members have a real ordering conflict (a task before a blocker also in the
+- [x] A selection whose members have a real ordering conflict (a task before a blocker also in the
       set) is refused with a clear message.
-- [ ] Tasks in a range/epic that are already `done`/`wont-do` are silently excluded, not errors.
-- [ ] The script writes nothing and exits non-zero on any invalid selection.
-- [ ] `pytest` and `python3 .tasks/bin/sync check` both pass.
+- [x] Tasks in a range/epic that are already `done`/`wont-do` are silently excluded, not errors.
+- [x] The script writes nothing and exits non-zero on any invalid selection.
+- [x] `pytest` and `python3 .tasks/bin/sync check` both pass.
 
 ## Testing strategy
 
@@ -63,7 +63,31 @@ for the explicit list, ID order for the range).
 
 ## Worklog
 
-_(empty — appended during implementation)_
+- 2026-09-17: Added `.claude/skills/implement-task/batch_select.py` -- a standalone stdlib
+  script (not a new `sync` subcommand, not folded into `scaffold.py`, per the task description)
+  implementing the four selection modes (`epic`, `range`, `list`, `stopping`) plus a shared
+  `validate_and_order` step that reuses `sync.discover()`/`sync._outstanding_blockers()`. Design
+  choice worth recording: the "natural order" for each mode is validated, not resorted --
+  `validate_and_order` refuses a selection whose given order doesn't already respect a real
+  intra-set `blocked_by` edge, rather than silently reordering it, matching the task description's
+  "refused with a clear message" wording for that case. "Board order" for `epic` mode is defined
+  as ascending task-id order (the same order `sync.render_epic_children` renders in that epic's
+  own file); `stopping` mode's natural order is literally `.tasks/BOARD.md`'s hand-ordered TODO
+  section text.
+- 2026-09-17: Step 1/2 — added 37 unit tests to `tests/test_batch_select.py`: one per selection
+  mode's happy path plus its invalid-input cases (no such epic, malformed/backwards range,
+  stopping task absent from TODO), `validate_and_order`'s full matrix (nonexistent task,
+  ineligible status, satisfied/inside-set/outside-set/missing blockers, ordering violation, empty
+  selection), `select_batch`'s mode dispatch, and 3 real-subprocess CLI tests against a
+  hand-authored `.tasks/` tree in a scratch git repo (list-mode happy path, an external-blocker
+  refusal, and epic mode end to end).
+- 2026-09-17: Step 3 — `.venv/bin/pytest` (this repo's `test_command`): 616 passed, 0 failed.
+- 2026-09-17: Step 4 — `python3 .tasks/bin/sync check` exits 0.
+- 2026-09-17: A first pass leaked this task's own id (and `EPIC-003`/`SPEC-003`/`TASK-041`) into
+  `batch_select.py`'s module docstring, caught by the existing portable-surface test suite
+  (`test_check_portable_references.py`/`test_portable_surface.py`/
+  `test_strip_project_references_scaffold.py`) since this script lives under the portable skills
+  surface — reworded to stay id-free before re-running the suite.
 
 ## Notes
 
