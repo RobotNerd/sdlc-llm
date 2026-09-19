@@ -67,6 +67,7 @@ interrupting appropriately, while human review of merges stays the default.
 | TASK-067 | done | batch_select range mode: use BOARD.md's hand-ordered TODO slice, not numeric task-id order |
 | TASK-068 | done | Exact token-usage tracking for implement-task's batch safety valve |
 | TASK-070 | done | Persistent batch state: recover batch progress from repo state after a lost session |
+| TASK-072 | todo | Report malformed task/epic/spec frontmatter as a clear error, not a traceback |
 
-Progress: 8/10 done
+Progress: 8/11 done
 <!-- END:children -->
