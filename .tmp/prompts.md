@@ -274,11 +274,11 @@ is an open gap, not required by this task and not claimed by any of TASK-042/043
 
 The new task ensures that batch progress can be recovered from the repo state alone when starting a fresh session. -->
 
-/add-task Analyze the content of @.claude/skills/implement-task/SKILL.md to determine if it can be simplified.
+<!-- /add-task Analyze the content of @.claude/skills/implement-task/SKILL.md to determine if it can be simplified.
 - Remove historical decisions that are unnecessary for the skill behavior, e.g. using phrasing like "unchanged".
 - Remove steps that have been encoded in the python scripts associated with the skill.
 - Determine if and steps can be merged.
-- Determine if the wording of any steps can be simplified to improve clarity and reduce context without losing the meaning.
+- Determine if the wording of any steps can be simplified to improve clarity and reduce context without losing the meaning. -->
 
 ---
 

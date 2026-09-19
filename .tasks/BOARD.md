@@ -31,6 +31,7 @@ between `<!-- BEGIN -->` / `<!-- END -->` markers — change the task/epic file 
 - TASK-062 — Worker scope fence: SubagentStop hook denying out-of-scope diffs  `EPIC-004` ⛔ blocked_by TASK-054
 - TASK-063 — orchestrate-batch skill: wire orchestrator/worker/critic into implement-task's loop  `EPIC-004` ⛔ blocked_by TASK-056, TASK-057, TASK-058, TASK-059, TASK-060, TASK-061, TASK-062, TASK-064
 - TASK-064 — Context compaction/reset: proactive orchestrator checkpoint-clear + worker mid-task guard  `EPIC-004` ⛔ blocked_by TASK-054, TASK-060
+- TASK-071 — Simplify implement-task/SKILL.md: cut stale/duplicated/over-explained content
 
 ## In Progress
 
