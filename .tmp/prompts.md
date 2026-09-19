@@ -263,6 +263,23 @@ Once you've finished the post-merge clean up, add a new task at the top of the b
 - run /review-docs next
 - Is there any way to programmatically enforce TDD with hooks? Right now it's prose-only and relies on the LLM model's decision. See recent implementation details in @.tasks/archive/TASK-040-tdd-mode.md -->
 
+<!-- /add-task Add to EPIC-003 and place at the top of the TODO list. Address this note on @.tasks/archive/TASK-041-core-autonomous-loop.md:
+
+```
+No persistent batch-state file: ScheduleWakeup resumes the same session/conversation rather
+than starting a fresh process, so the remaining task order and the outcomes accumulator survive
+in context across a wait. Recovering batch progress from repo state alone after a lost session
+is an open gap, not required by this task and not claimed by any of TASK-042/043/044/045 either.
+```
+
+The new task ensures that batch progress can be recovered from the repo state alone when starting a fresh session. -->
+
+<!-- /add-task Analyze the content of @.claude/skills/implement-task/SKILL.md to determine if it can be simplified.
+- Remove historical decisions that are unnecessary for the skill behavior, e.g. using phrasing like "unchanged".
+- Remove steps that have been encoded in the python scripts associated with the skill.
+- Determine if and steps can be merged.
+- Determine if the wording of any steps can be simplified to improve clarity and reduce context without losing the meaning. -->
+
 ---
 
 Rewrite README to be more human-readable; right now it seems geared more towards AI, with some sections being too dense; focus on simplifying by removing technical details and focus on usage from a human user perspective; [TODO] provide examples to the LLM of good READMEs from other projects to use as a guide

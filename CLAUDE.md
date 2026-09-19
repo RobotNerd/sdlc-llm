@@ -40,8 +40,10 @@ the mechanics.
 
 ## Guardrails
 
-- Never push to `main`. Never `gh pr merge` — the human merges. **Hook-enforced**
-  (`.claude/settings.json`'s `PreToolUse`/`Bash` hook, `.tasks/bin/guardrails.py`).
+- Never push to `main`, except `implement-task`'s own phase-4 bookkeeping commit (recording an
+  already-reviewed merge) — a deliberate, narrow carve-out, not something to extend by hand. Never
+  `gh pr merge` — the human merges. **Hook-enforced** (`.claude/settings.json`'s `PreToolUse`/
+  `Bash` hook, `.tasks/bin/guardrails.py`).
 - Force-push only as `--force-with-lease`, only on the current task's branch, only after a
   rebase. **Hook-enforced.**
 - Never touch files outside the current task's scope.
