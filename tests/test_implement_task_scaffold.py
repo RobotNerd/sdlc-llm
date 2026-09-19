@@ -1336,3 +1336,121 @@ def test_batch_state_file_never_blocks_start_or_resume_even_when_not_gitignored(
     started = _run_start(repo, task_id="TASK-001", batch_mode=True)
     assert started.returncode == 0, started.stderr
     assert _batch_state_file(repo).exists()  # start/checkout left it alone
+
+
+# ---------------------------------------------------------------------------
+# compute_session_token_usage / `session-token-usage` (TASK-068): an exact `tokens_used` summed
+# from the session's own transcript JSONL, reproducing ccstatusline's dedup-then-sum algorithm.
+# ---------------------------------------------------------------------------
+
+
+def _usage_line(stop_reason, *, inp=0, out=0, cache_read=0, cache_create=0, kind="assistant"):
+    return json.dumps({"type": kind, "message": {"stop_reason": stop_reason, "usage": {
+        "input_tokens": inp, "output_tokens": out,
+        "cache_read_input_tokens": cache_read, "cache_creation_input_tokens": cache_create,
+    }}})
+
+
+def _write_transcript(path, lines):
+    path.write_text("\n".join(lines) + "\n")
+    return path
+
+
+def test_compute_session_token_usage_sums_all_four_fields(tmp_path):
+    transcript = _write_transcript(tmp_path / "t.jsonl", [
+        _usage_line("tool_use", inp=2, out=100, cache_read=0, cache_create=5000),
+        _usage_line("end_turn", inp=3, out=50, cache_read=5000, cache_create=200),
+    ])
+
+    result = implement_task_scaffold.compute_session_token_usage(transcript)
+
+    assert result == {
+        "tokens_used": 2 + 100 + 5000 + 3 + 50 + 5000 + 200 + 0,
+        "input_tokens": 5, "output_tokens": 150,
+        "cache_read_input_tokens": 5000, "cache_creation_input_tokens": 5200,
+    }
+
+
+def test_compute_session_token_usage_drops_streaming_partials(tmp_path):
+    # A streaming partial (no stop_reason) followed by the final entry for the same message:
+    # only the final one counts.
+    transcript = _write_transcript(tmp_path / "t.jsonl", [
+        _usage_line(None, inp=1, out=10),
+        _usage_line("end_turn", inp=1, out=40),
+        _usage_line("tool_use", inp=2, out=5),
+    ])
+
+    result = implement_task_scaffold.compute_session_token_usage(transcript)
+
+    assert result["tokens_used"] == (1 + 40) + (2 + 5)
+
+
+def test_compute_session_token_usage_keeps_a_trailing_unfinished_entry(tmp_path):
+    transcript = _write_transcript(tmp_path / "t.jsonl", [
+        _usage_line("end_turn", inp=1, out=40),
+        _usage_line(None, inp=2, out=7),  # the turn still in progress
+    ])
+
+    result = implement_task_scaffold.compute_session_token_usage(transcript)
+
+    assert result["tokens_used"] == (1 + 40) + (2 + 7)
+
+
+def test_compute_session_token_usage_skips_lines_without_usage_and_blank_lines(tmp_path):
+    transcript = _write_transcript(tmp_path / "t.jsonl", [
+        json.dumps({"type": "user", "message": {"role": "user", "content": "hi"}}),
+        "",
+        json.dumps({"type": "summary"}),
+        _usage_line("end_turn", inp=1, out=2),
+    ])
+
+    assert implement_task_scaffold.compute_session_token_usage(transcript)["tokens_used"] == 3
+
+
+def test_compute_session_token_usage_raises_on_missing_file(tmp_path):
+    with pytest.raises(implement_task_scaffold.TranscriptError, match="not found"):
+        implement_task_scaffold.compute_session_token_usage(tmp_path / "nope.jsonl")
+
+
+def test_compute_session_token_usage_raises_on_malformed_json_naming_the_line(tmp_path):
+    transcript = _write_transcript(tmp_path / "t.jsonl", [_usage_line("end_turn", inp=1), "{not json"])
+
+    with pytest.raises(implement_task_scaffold.TranscriptError, match="line 2"):
+        implement_task_scaffold.compute_session_token_usage(transcript)
+
+
+def test_compute_session_token_usage_raises_when_no_usage_entries_at_all(tmp_path):
+    # e.g. a future transcript-format change: parseable, but nothing recognisable inside.
+    transcript = _write_transcript(tmp_path / "t.jsonl", [json.dumps({"type": "user"})])
+
+    with pytest.raises(implement_task_scaffold.TranscriptError, match="usage"):
+        implement_task_scaffold.compute_session_token_usage(transcript)
+
+
+def test_cmd_session_token_usage_returns_total(tmp_path):
+    transcript = _write_transcript(tmp_path / "t.jsonl", [_usage_line("end_turn", inp=1, out=2, cache_read=3, cache_create=4)])
+
+    result = _run_scaffold(tmp_path, "session-token-usage", {"transcript_path": str(transcript)})
+
+    assert result.returncode == 0, result.stderr
+    output = json.loads(result.stdout)
+    assert output["tokens_used"] == 10
+    assert output["cache_read_input_tokens"] == 3
+
+
+def test_cmd_session_token_usage_fails_cleanly_on_a_missing_file(tmp_path):
+    result = _run_scaffold(tmp_path, "session-token-usage", {"transcript_path": str(tmp_path / "nope.jsonl")})
+
+    assert result.returncode != 0
+    assert "not found" in result.stderr
+    assert "Traceback" not in result.stderr
+
+
+def test_cmd_session_token_usage_fails_cleanly_on_a_malformed_file(tmp_path):
+    transcript = _write_transcript(tmp_path / "t.jsonl", ["{not json"])
+
+    result = _run_scaffold(tmp_path, "session-token-usage", {"transcript_path": str(transcript)})
+
+    assert result.returncode != 0
+    assert "line 1" in result.stderr
+    assert "Traceback" not in result.stderr

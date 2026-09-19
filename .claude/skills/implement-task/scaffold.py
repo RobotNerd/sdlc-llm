@@ -350,6 +350,59 @@ def check_usage_thresholds(
     return {"halt": False, "kind": None, "message": None}
 
 
+class TranscriptError(Exception):
+    """A session transcript couldn't be read or understood -- missing file, unparseable line, or
+    nothing recognisable inside. Expected whenever Claude Code's own (undocumented) transcript
+    format changes, so callers report it plainly rather than treating it as a bug.
+    """
+
+
+_TOKEN_FIELDS = (
+    "input_tokens", "output_tokens", "cache_read_input_tokens", "cache_creation_input_tokens",
+)
+
+
+def compute_session_token_usage(transcript_path: Path) -> dict:
+    """Exact cumulative token usage for a Claude Code session, summed from its transcript JSONL
+    (`~/.claude/projects/<escaped-cwd>/<session-id>.jsonl`) -- ccstatusline's own
+    `getTokenMetrics` algorithm: keep lines carrying `message.usage`; drop streaming partials (an
+    entry with no `stop_reason` is an intermediate snapshot of a message whose final entry
+    follows), except a trailing one, which is the turn still in progress; sum
+    `input_tokens` + `output_tokens` + `cache_read_input_tokens` + `cache_creation_input_tokens`.
+
+    Returns `{"tokens_used": total, <each field>: its sum}`. Lines without `message.usage`
+    (user turns, summaries, blank lines) are normal and skipped; a line that isn't valid JSON, or
+    a transcript with no usage entries at all, raises `TranscriptError` -- both signal a format
+    change rather than routine noise.
+    """
+    try:
+        text = Path(transcript_path).read_text()
+    except FileNotFoundError:
+        raise TranscriptError(f"transcript not found: {transcript_path}") from None
+    except OSError as exc:
+        raise TranscriptError(f"transcript unreadable: {transcript_path}: {exc}") from None
+
+    entries: list[dict] = []
+    for lineno, line in enumerate(text.splitlines(), start=1):
+        if not line.strip():
+            continue
+        try:
+            record = json.loads(line)
+        except ValueError as exc:
+            raise TranscriptError(f"transcript line {lineno} is not valid JSON: {exc}") from None
+        message = record.get("message") if isinstance(record, dict) else None
+        if isinstance(message, dict) and isinstance(message.get("usage"), dict):
+            entries.append(message)
+    if not entries:
+        raise TranscriptError(
+            f"no message.usage entries found in {transcript_path} -- transcript format changed?"
+        )
+
+    kept = [m for m in entries[:-1] if m.get("stop_reason")] + [entries[-1]]
+    totals = {field: sum(int(m["usage"].get(field) or 0) for m in kept) for field in _TOKEN_FIELDS}
+    return {"tokens_used": sum(totals.values()), **totals}
+
+
 def render_usage_summary(*, context_pct: float, tokens_used: int, token_budget: int | None) -> str:
     """A one-line usage report for the end-of-batch summary -- printed every time, regardless of
     whether either threshold was ever crossed, so a human can judge whether an opt-in
@@ -995,6 +1048,17 @@ def cmd_render_usage_summary(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_session_token_usage(args: argparse.Namespace) -> int:
+    answers = json.loads(Path(args.answers).read_text())
+    try:
+        result = compute_session_token_usage(Path(answers["transcript_path"]))
+    except TranscriptError as exc:
+        print(f"implement-task: {exc}", file=sys.stderr)
+        return 2
+    print(json.dumps(result))
+    return 0
+
+
 def cmd_gh_auth_status(args: argparse.Namespace) -> int:
     result = subprocess.run(["gh", "auth", "status"], capture_output=True, text=True)
     print(result.stdout)
@@ -1021,6 +1085,7 @@ def main(argv: list[str]) -> int:
         ("render-outcome-table", "batch mode: render the end-of-batch outcome table"),
         ("classify-interrupt", "batch mode: route an interrupt kind to isolated/systemic"),
         ("check-usage-thresholds", "batch mode: check context/token usage against config thresholds"),
+        ("session-token-usage", "batch mode: exact token total from the session's transcript file"),
         ("render-usage-summary", "batch mode: render the end-of-batch usage report"),
     ):
         sub = subparsers.add_parser(name, help=help_text)
@@ -1041,6 +1106,7 @@ def main(argv: list[str]) -> int:
         "render-outcome-table": cmd_render_outcome_table,
         "classify-interrupt": cmd_classify_interrupt,
         "check-usage-thresholds": cmd_check_usage_thresholds,
+        "session-token-usage": cmd_session_token_usage,
         "render-usage-summary": cmd_render_usage_summary,
     }
     return dispatch[args.command](args)
