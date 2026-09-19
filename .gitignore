@@ -8,3 +8,6 @@ __pycache__/
 *.egg-info/
 .venv/
 venv/
+
+# implement-task batch mode: local runtime state, never committed
+.tmp/batch-state.json

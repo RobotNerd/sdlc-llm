@@ -1100,3 +1100,239 @@ def test_cmd_render_usage_summary(tmp_path):
     summary = json.loads(result.stdout)["summary"]
     assert "42" in summary
     assert "12345" in summary
+
+
+# ---------------------------------------------------------------------------
+# Persistent batch state (TASK-070): a local, untracked `.tmp/batch-state.json` so a lost
+# session can pick a batch back up from repo state. Pure helpers first (path-in, no git), then
+# the CLI subcommands and `resume-state` integration against a real scratch repo.
+# ---------------------------------------------------------------------------
+
+_SELECTION = {"mode": "list", "tasks": ["TASK-001", "TASK-002", "TASK-003"]}
+_ORDER = ["TASK-001", "TASK-002", "TASK-003"]
+
+
+def _entry(task_id, status="done", link="abc"):
+    return {"task_id": task_id, "title": f"Title {task_id}", "status": status, "link": link}
+
+
+def test_batch_state_path_is_under_dot_tmp(tmp_path):
+    assert implement_task_scaffold.batch_state_path(tmp_path) == tmp_path / ".tmp" / "batch-state.json"
+
+
+def test_new_batch_state_records_selection_order_and_empty_progress():
+    state = implement_task_scaffold.new_batch_state(_SELECTION, _ORDER)
+
+    assert state == {"selection": _SELECTION, "order": _ORDER, "accounted": [], "outcomes": []}
+
+
+def test_batch_state_round_trips_through_the_file(tmp_path):
+    path = implement_task_scaffold.batch_state_path(tmp_path)
+    state = implement_task_scaffold.new_batch_state(_SELECTION, _ORDER)
+
+    implement_task_scaffold.write_batch_state(path, state)  # creates .tmp/ as needed
+
+    assert implement_task_scaffold.read_batch_state(path) == state
+
+
+def test_read_batch_state_is_none_when_missing_or_unreadable(tmp_path):
+    path = implement_task_scaffold.batch_state_path(tmp_path)
+    assert implement_task_scaffold.read_batch_state(path) is None
+
+    path.parent.mkdir()
+    path.write_text("{not json")
+    assert implement_task_scaffold.read_batch_state(path) is None
+
+    path.write_text(json.dumps({"order": ["TASK-001"]}))  # missing required keys
+    assert implement_task_scaffold.read_batch_state(path) is None
+
+
+def test_advance_batch_state_appends_outcome_and_marks_accounted_without_mutating():
+    state = implement_task_scaffold.new_batch_state(_SELECTION, _ORDER)
+
+    advanced = implement_task_scaffold.advance_batch_state(state, _entry("TASK-001"), accounted=True)
+
+    assert advanced["accounted"] == ["TASK-001"]
+    assert advanced["outcomes"] == [_entry("TASK-001")]
+    assert state["accounted"] == [] and state["outcomes"] == []
+
+
+def test_advance_batch_state_provisional_outcome_is_not_accounted_then_replaced_in_place():
+    state = implement_task_scaffold.new_batch_state(_SELECTION, _ORDER)
+    state = implement_task_scaffold.advance_batch_state(
+        state, _entry("TASK-001", status="in-review", link="pr-url"), accounted=False
+    )
+    assert state["accounted"] == []
+
+    state = implement_task_scaffold.advance_batch_state(state, _entry("TASK-001"), accounted=True)
+
+    assert state["accounted"] == ["TASK-001"]
+    assert state["outcomes"] == [_entry("TASK-001")]  # replaced, not duplicated
+
+
+def test_advance_batch_state_rejects_a_task_outside_the_order():
+    state = implement_task_scaffold.new_batch_state(_SELECTION, _ORDER)
+
+    with pytest.raises(ValueError, match="TASK-099"):
+        implement_task_scaffold.advance_batch_state(state, _entry("TASK-099"), accounted=True)
+
+
+def test_batch_progress_names_next_task_and_remaining():
+    state = implement_task_scaffold.new_batch_state(_SELECTION, _ORDER)
+    state = implement_task_scaffold.advance_batch_state(state, _entry("TASK-001"), accounted=True)
+
+    progress = implement_task_scaffold.batch_progress(state)
+
+    assert progress["next_task_id"] == "TASK-002"
+    assert progress["remaining"] == ["TASK-002", "TASK-003"]
+    assert progress["accounted"] == ["TASK-001"]
+    assert progress["order"] == _ORDER
+    assert progress["selection"] == _SELECTION
+    assert progress["outcomes"] == [_entry("TASK-001")]
+
+
+def test_batch_progress_next_task_skips_accounted_tasks_out_of_order():
+    state = implement_task_scaffold.new_batch_state(_SELECTION, _ORDER)
+    state = implement_task_scaffold.advance_batch_state(state, _entry("TASK-002", status="todo"), accounted=True)
+
+    assert implement_task_scaffold.batch_progress(state)["next_task_id"] == "TASK-001"
+
+
+def test_batch_is_complete_once_every_task_is_accounted():
+    state = implement_task_scaffold.new_batch_state(_SELECTION, _ORDER)
+    assert not implement_task_scaffold.batch_is_complete(state)
+    for task_id in _ORDER:
+        state = implement_task_scaffold.advance_batch_state(state, _entry(task_id), accounted=True)
+    assert implement_task_scaffold.batch_is_complete(state)
+    assert implement_task_scaffold.batch_progress(state)["next_task_id"] is None
+
+
+def test_clear_batch_state_removes_the_file_and_tolerates_absence(tmp_path):
+    path = implement_task_scaffold.batch_state_path(tmp_path)
+    implement_task_scaffold.write_batch_state(path, implement_task_scaffold.new_batch_state(_SELECTION, _ORDER))
+
+    assert implement_task_scaffold.clear_batch_state(path) is True
+    assert not path.exists()
+    assert implement_task_scaffold.clear_batch_state(path) is False
+
+
+def _run_batch(repo, command, answers):
+    """Like `_run_scaffold`, but the answers file lives outside the repo so it never dirties it."""
+    answers_path = repo.parent / f"{command}-answers.json"
+    answers_path.write_text(json.dumps(answers))
+    return subprocess.run(
+        [sys.executable, str(SCRIPT_PATH), command, str(answers_path)], cwd=repo, capture_output=True, text=True
+    )
+
+
+def _batch_state_file(repo):
+    return repo / ".tmp" / "batch-state.json"
+
+
+def _resume_state(repo):
+    result = subprocess.run(
+        [sys.executable, str(SCRIPT_PATH), "resume-state"], cwd=repo, capture_output=True, text=True
+    )
+    assert result.returncode == 0, result.stderr
+    return json.loads(result.stdout)
+
+
+def test_cmd_batch_init_writes_the_state_file(repo):
+    result = _run_batch(repo, "batch-init", {"selection": _SELECTION, "order": _ORDER})
+
+    assert result.returncode == 0, result.stderr
+    on_disk = json.loads(_batch_state_file(repo).read_text())
+    assert on_disk == {"selection": _SELECTION, "order": _ORDER, "accounted": [], "outcomes": []}
+    assert json.loads(result.stdout)["next_task_id"] == "TASK-001"
+
+
+def test_cmd_batch_update_records_progress_and_keeps_file(repo):
+    _run_batch(repo, "batch-init", {"selection": _SELECTION, "order": _ORDER})
+
+    result = _run_batch(repo, "batch-update", {"entry": _entry("TASK-001"), "accounted": True})
+
+    assert result.returncode == 0, result.stderr
+    output = json.loads(result.stdout)
+    assert output["complete"] is False
+    assert output["next_task_id"] == "TASK-002"
+    assert json.loads(_batch_state_file(repo).read_text())["accounted"] == ["TASK-001"]
+
+
+def test_cmd_batch_update_deletes_file_when_last_task_accounted(repo):
+    _run_batch(repo, "batch-init", {"selection": {"mode": "list", "tasks": ["TASK-001"]}, "order": ["TASK-001"]})
+
+    result = _run_batch(repo, "batch-update", {"entry": _entry("TASK-001"), "accounted": True})
+
+    assert result.returncode == 0, result.stderr
+    output = json.loads(result.stdout)
+    assert output["complete"] is True
+    assert output["outcomes"] == [_entry("TASK-001")]
+    assert not _batch_state_file(repo).exists()
+
+
+def test_cmd_batch_update_refuses_without_an_active_batch(repo):
+    result = _run_batch(repo, "batch-update", {"entry": _entry("TASK-001"), "accounted": True})
+
+    assert result.returncode != 0
+    assert "batch" in result.stderr
+
+
+def test_cmd_batch_clear_removes_the_file_on_a_systemic_halt(repo):
+    _run_batch(repo, "batch-init", {"selection": _SELECTION, "order": _ORDER})
+
+    result = _run_batch(repo, "batch-clear", {})
+
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout) == {"cleared": True}
+    assert not _batch_state_file(repo).exists()
+    assert "batch" not in _resume_state(repo)
+
+
+def test_resume_state_has_no_batch_key_without_a_state_file(repo):
+    _add_task(repo, "First task")
+    _push_tasks(repo)
+
+    assert _resume_state(repo) == {"phase": "phase1"}
+
+
+def test_resume_state_reports_active_batch_at_phase1_with_next_task(repo):
+    _add_task(repo, "First task")
+    _push_tasks(repo)
+    _run_batch(repo, "batch-init", {"selection": _SELECTION, "order": _ORDER})
+    _run_batch(repo, "batch-update", {"entry": _entry("TASK-001"), "accounted": True})
+
+    state = _resume_state(repo)
+
+    assert state["phase"] == "phase1"
+    assert state["batch"]["next_task_id"] == "TASK-002"
+    assert state["batch"]["remaining"] == ["TASK-002", "TASK-003"]
+    assert state["batch"]["order"] == _ORDER
+    assert state["batch"]["outcomes"] == [_entry("TASK-001")]
+
+
+def test_resume_state_keeps_task_phase_and_adds_batch_info_for_an_in_flight_task(repo):
+    _add_task(repo, "First task")
+    _push_tasks(repo)
+    started = _run_start(repo, task_id="TASK-001", batch_mode=True)
+    assert started.returncode == 0, started.stderr
+    _git(["add", "-A"], cwd=repo)
+    _git(["commit", "-q", "-m", "wip"], cwd=repo)
+    _run_batch(repo, "batch-init", {"selection": _SELECTION, "order": _ORDER})
+
+    state = _resume_state(repo)
+
+    assert state["phase"] == "phase3"
+    assert state["task_id"] == "TASK-001"
+    assert state["batch"]["next_task_id"] == "TASK-001"
+
+
+def test_batch_state_file_never_blocks_start_or_resume_even_when_not_gitignored(repo):
+    _add_task(repo, "First task")
+    _push_tasks(repo)
+    _run_batch(repo, "batch-init", {"selection": _SELECTION, "order": _ORDER})
+    assert ".tmp/batch-state.json" in implement_task_scaffold.dirty_files(repo)  # genuinely untracked here
+
+    assert _resume_state(repo)["phase"] == "phase1"  # not phase2
+    started = _run_start(repo, task_id="TASK-001", batch_mode=True)
+    assert started.returncode == 0, started.stderr
+    assert _batch_state_file(repo).exists()  # start/checkout left it alone

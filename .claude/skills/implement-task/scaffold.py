@@ -211,6 +211,95 @@ def render_outcome_table(outcomes: list[dict]) -> str:
     return "\n".join(lines)
 
 
+BATCH_STATE_RELPATH = ".tmp/batch-state.json"
+_BATCH_STATE_KEYS = ("selection", "order", "accounted", "outcomes")
+
+
+def batch_state_path(root: Path) -> Path:
+    """Where a batch's local, untracked state lives: `.tmp/batch-state.json` under the repo root.
+    Pure runtime state (never committed or reviewed), so `.tmp/` -- not `.tasks/`.
+    """
+    return root / BATCH_STATE_RELPATH
+
+
+def new_batch_state(selection: dict, order: list[str]) -> dict:
+    """A fresh batch's state: the original selection, its resolved `order`, and no progress yet.
+    `accounted` lists task ids whose batch turn is over (merged, or bailed out by an isolated
+    interrupt); `outcomes` is the same accumulator `record-outcome` builds.
+    """
+    return {"selection": selection, "order": list(order), "accounted": [], "outcomes": []}
+
+
+def write_batch_state(path: Path, state: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(state, indent=2) + "\n")
+
+
+def read_batch_state(path: Path) -> dict | None:
+    """The batch state at `path`, or `None` if it's absent, unparseable, or missing required keys
+    -- a corrupt file is treated as "no batch" rather than crashing every later invocation.
+    """
+    try:
+        state = json.loads(path.read_text())
+    except (OSError, ValueError):
+        return None
+    if not isinstance(state, dict) or any(key not in state for key in _BATCH_STATE_KEYS):
+        return None
+    return state
+
+
+def clear_batch_state(path: Path) -> bool:
+    """Delete the state file; returns whether there was one to delete."""
+    try:
+        path.unlink()
+    except FileNotFoundError:
+        return False
+    return True
+
+
+def advance_batch_state(state: dict, entry: dict, *, accounted: bool) -> dict:
+    """Record one task's outcome in `state` (returns a new dict; `state` is never mutated). An
+    entry for a task that already has one replaces it in place -- a task's provisional `in-review`
+    row becomes its final `done` row rather than a duplicate. `accounted=True` marks the task's
+    turn in the batch as over. Raises `ValueError` if `entry`'s task isn't in `order`, or on an
+    incomplete entry (same rule as `record_outcome`).
+    """
+    task_id = entry.get("task_id")
+    if task_id not in state["order"]:
+        raise ValueError(f"{task_id!r} is not part of this batch's order")
+    if any(o["task_id"] == task_id for o in state["outcomes"]):
+        outcomes = [dict(entry) if o["task_id"] == task_id else o for o in state["outcomes"]]
+    else:
+        outcomes = record_outcome(state["outcomes"], entry)
+    marked = list(state["accounted"])
+    if accounted and task_id not in marked:
+        marked.append(task_id)
+    return {**state, "accounted": marked, "outcomes": outcomes}
+
+
+def batch_is_complete(state: dict) -> bool:
+    return all(task_id in state["accounted"] for task_id in state["order"])
+
+
+def batch_progress(state: dict) -> dict:
+    """What a resuming session needs: the batch as recorded plus `remaining` (tasks in `order`
+    not yet accounted for) and `next_task_id` (the first of them, or `None` if none are left).
+    """
+    remaining = [t for t in state["order"] if t not in state["accounted"]]
+    return {
+        "selection": state["selection"], "order": state["order"], "accounted": state["accounted"],
+        "remaining": remaining, "next_task_id": remaining[0] if remaining else None,
+        "outcomes": state["outcomes"],
+    }
+
+
+def effective_ignored_paths(config: dict) -> tuple[str, ...]:
+    """`ignored_paths` from config plus the batch-state file, which never counts as dirty
+    whether or not the project's `.gitignore` covers it.
+    """
+    return (*(config.get("ignored_paths") or []), BATCH_STATE_RELPATH)
+
+
 _ISOLATED_INTERRUPT_KINDS = frozenset({
     "needs_clarification", "unexpected_blocker", "quality_gate_failure", "guardrail_denial",
 })
@@ -353,7 +442,7 @@ def cmd_resume_state(args: argparse.Namespace) -> int:
     sync_mod = load_sync_module(tasks_root)
     config = sync_mod.load_config(tasks_root)
     remote = config.get("remote", "origin")
-    ignored_paths = tuple(config.get("ignored_paths") or [])
+    ignored_paths = effective_ignored_paths(config)
 
     artifacts = sync_mod.discover(tasks_root)
     in_flight_tasks = [
@@ -399,6 +488,9 @@ def cmd_resume_state(args: argparse.Namespace) -> int:
         gh_pr_state = json.loads(view.stdout)["state"]
 
     result = resume_phase(in_flight=in_flight, working_tree_dirty=working_dirty, gh_pr_state=gh_pr_state)
+    batch = read_batch_state(batch_state_path(root))
+    if batch is not None:
+        result = {**result, "batch": batch_progress(batch)}
     print(json.dumps(result))
     return 0
 
@@ -415,7 +507,7 @@ def cmd_start(args: argparse.Namespace) -> int:
     remote = config.get("remote", "origin")
     default_branch = config.get("default_branch", "main")
     branch_prefix = config.get("branch_prefix", "task-")
-    ignored_paths = tuple(config.get("ignored_paths") or [])
+    ignored_paths = effective_ignored_paths(config)
 
     dirty = dirty_files(root, ignore=ignored_paths)
     if dirty:
@@ -515,7 +607,7 @@ def cmd_wrap_up(args: argparse.Namespace) -> int:
     remote = config.get("remote", "origin")
     default_branch = config.get("default_branch", "main")
     rebase_before_pr = config.get("rebase_before_pr", True)
-    ignored_paths = tuple(config.get("ignored_paths") or [])
+    ignored_paths = effective_ignored_paths(config)
     format_command = config.get("format_command")
 
     add_result = subprocess.run(["git", "add", "-A", "--", *paths], cwd=root, capture_output=True, text=True)
@@ -831,6 +923,40 @@ def cmd_record_outcome(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_batch_init(args: argparse.Namespace) -> int:
+    answers = json.loads(Path(args.answers).read_text())
+    state = new_batch_state(answers["selection"], answers["order"])
+    write_batch_state(batch_state_path(repo_root()), state)
+    print(json.dumps(batch_progress(state)))
+    return 0
+
+
+def cmd_batch_update(args: argparse.Namespace) -> int:
+    answers = json.loads(Path(args.answers).read_text())
+    path = batch_state_path(repo_root())
+    state = read_batch_state(path)
+    if state is None:
+        print("implement-task: no active batch state to update", file=sys.stderr)
+        return 2
+    try:
+        state = advance_batch_state(state, answers["entry"], accounted=bool(answers.get("accounted", False)))
+    except ValueError as exc:
+        print(f"implement-task: {exc}", file=sys.stderr)
+        return 2
+    if batch_is_complete(state):
+        clear_batch_state(path)
+        print(json.dumps({"complete": True, "outcomes": state["outcomes"]}))
+        return 0
+    write_batch_state(path, state)
+    print(json.dumps({"complete": False, **batch_progress(state)}))
+    return 0
+
+
+def cmd_batch_clear(args: argparse.Namespace) -> int:
+    print(json.dumps({"cleared": clear_batch_state(batch_state_path(repo_root()))}))
+    return 0
+
+
 def cmd_render_outcome_table(args: argparse.Namespace) -> int:
     answers = json.loads(Path(args.answers).read_text())
     table = render_outcome_table(answers.get("outcomes") or [])
@@ -889,6 +1015,9 @@ def main(argv: list[str]) -> int:
         ("finish-merge", "phase 4: observe the merge, record it, archive, clean up branches"),
         ("bail-out", "set status back to todo/blocked and run sync"),
         ("record-outcome", "batch mode: append one task's outcome to the accumulator"),
+        ("batch-init", "batch mode: write the local batch-state file for a freshly selected batch"),
+        ("batch-update", "batch mode: record one task's outcome/progress in the batch-state file"),
+        ("batch-clear", "batch mode: delete the batch-state file (batch halted)"),
         ("render-outcome-table", "batch mode: render the end-of-batch outcome table"),
         ("classify-interrupt", "batch mode: route an interrupt kind to isolated/systemic"),
         ("check-usage-thresholds", "batch mode: check context/token usage against config thresholds"),
@@ -906,6 +1035,9 @@ def main(argv: list[str]) -> int:
         "finish-merge": cmd_finish_merge,
         "bail-out": cmd_bail_out,
         "record-outcome": cmd_record_outcome,
+        "batch-init": cmd_batch_init,
+        "batch-update": cmd_batch_update,
+        "batch-clear": cmd_batch_clear,
         "render-outcome-table": cmd_render_outcome_table,
         "classify-interrupt": cmd_classify_interrupt,
         "check-usage-thresholds": cmd_check_usage_thresholds,

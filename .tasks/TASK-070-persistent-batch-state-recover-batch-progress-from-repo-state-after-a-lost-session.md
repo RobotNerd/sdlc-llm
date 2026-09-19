@@ -2,7 +2,7 @@
 id: TASK-070
 title: "Persistent batch state: recover batch progress from repo state after a lost session"
 type: feature
-status: todo
+status: in-progress
 epic: EPIC-003
 created: 2026-09-19
 branch: task-070-persistent-batch-state-recover-batch-progress-from-repo-state-after-a-lost-session
@@ -45,17 +45,17 @@ since the state file is intentionally local and untracked.
 
 ## Acceptance criteria
 
-- [ ] A batch-state file records the original batch selection, the resolved `order`, per-task
+- [x] A batch-state file records the original batch selection, the resolved `order`, per-task
       completion state, and the accumulated outcomes — updated at each step of the batch loop
       (`SKILL.md`'s "Batch mode"), not only at the end.
-- [ ] The file is git-ignored / never committed, and never counts as a dirty-tree blocker for
+- [x] The file is git-ignored / never committed, and never counts as a dirty-tree blocker for
       `start`'s phase-1 check (same posture as `ignored_paths` already gives `.tmp/prompts.md`).
-- [ ] A fresh session invoking `/implement-task` with no parameters, when this file names an active
+- [x] A fresh session invoking `/implement-task` with no parameters, when this file names an active
       batch, resumes that batch — at the correct task and phase — instead of auto-picking the top
       of TODO or reporting single-task `resume-state`'s narrower view.
-- [ ] The file is removed once the batch completes (every task in `order` accounted for) or halts
+- [x] The file is removed once the batch completes (every task in `order` accounted for) or halts
       (a systemic interrupt fires) — a later plain invocation never sees stale batch state.
-- [ ] `pytest` and `python3 .tasks/bin/sync check` both pass.
+- [x] `pytest` and `python3 .tasks/bin/sync check` both pass.
 
 ## Testing strategy
 
@@ -70,7 +70,13 @@ since the state file is intentionally local and untracked.
 
 ## Worklog
 
-_(empty — appended during implementation)_
+- Tests first (18 failing for the expected reason: helpers/subcommands absent), then implemented; full suite 676 passed, `sync check` exit 0.
+- State file: `.tmp/batch-state.json` = `{selection, order, accounted, outcomes}`. New `scaffold.py` helpers (`new_batch_state`/`read_batch_state`/`write_batch_state`/`advance_batch_state`/`batch_progress`/`batch_is_complete`/`clear_batch_state`) and subcommands `batch-init`/`batch-update`/`batch-clear`. `batch-update` deletes the file itself when the last task is accounted for; `batch-clear` handles a systemic halt.
+- `resume-state` adds a `batch` key (`next_task_id`, `remaining`, `outcomes`, ...) whenever the file is valid; phase detection itself is unchanged. A corrupt/incomplete file reads as "no batch".
+- Never-dirty posture: the path is added to `.gitignore` *and* always appended to the dirty-tree ignore list (`effective_ignored_paths`) in `resume-state`/`start`/`wrap-up`, so it holds even in a vendored project whose `.gitignore` lacks it.
+- A task's provisional `in-review` outcome is replaced in place by its final `done` row rather than duplicated.
+- Design note: a systemic halt clears the file (per the ACs), so the rest of `order` isn't remembered after one -- the interrupted task resumes as a plain single-task `resume-state`.
+- Testing strategy steps 1-5 all automated; nothing needed the human's hands.
 
 ## Notes
 

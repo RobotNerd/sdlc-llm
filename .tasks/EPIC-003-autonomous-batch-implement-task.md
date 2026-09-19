@@ -66,7 +66,7 @@ interrupting appropriately, while human review of merges stays the default.
 | TASK-045 | todo | Opt-in, critic-gated, per-batch-capped auto-merge |
 | TASK-067 | done | batch_select range mode: use BOARD.md's hand-ordered TODO slice, not numeric task-id order |
 | TASK-068 | todo | Exact token-usage tracking for implement-task's batch safety valve |
-| TASK-070 | todo | Persistent batch state: recover batch progress from repo state after a lost session |
+| TASK-070 | in-progress | Persistent batch state: recover batch progress from repo state after a lost session |
 
 Progress: 6/10 done
 <!-- END:children -->

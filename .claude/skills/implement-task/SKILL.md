@@ -56,7 +56,8 @@ tree's dirtiness (ignoring `.tasks/config.md`'s `ignored_paths`), finds the one 
 whose `status` is `in-progress`/`in-review` with a `branch:` that still exists locally or on the
 remote, and — when that task is `in-review` with a `pr` set — queries `gh pr view` for its live
 state. It returns
-`{"phase": ..., "task_id": ..., "detail": ...}`:
+`{"phase": ..., "task_id": ..., "detail": ...}` — plus a `"batch"` key when a batch is active
+(see "Resuming a batch" below):
 
 | `phase` | Resume at |
 |---|---|
@@ -67,6 +68,16 @@ state. It returns
 | `phase4_merged` | Phase 4 — record + clean up |
 | `phase4_closed_not_merged` | **STOP** — surface to the human; don't guess whether it was declined or needs rework |
 | `ambiguous` | **STOP**, show `detail`, ask rather than guess |
+
+**Resuming a batch:** if the result carries `"batch"`, a batch-mode run was in flight in this
+working directory and its session was lost. Don't treat this as a plain single-task invocation —
+`batch` holds `{"selection", "order", "accounted", "remaining", "next_task_id", "outcomes"}`, read
+from the local `.tmp/batch-state.json` (never committed; see "Batch mode"). Pick the batch back up
+in "Batch mode" step 3 with that `outcomes` as the accumulator: at `phase1`, the next task is
+`batch.next_task_id` (run `start` with that id and `"batch_mode": true` — **not** an auto-pick of
+TODO's top); at any other phase, resume `task_id` at that phase exactly as the table below says
+(in batch mode), then continue at the following task in `remaining`. Tell the human the batch is
+being resumed and from where.
 
 ## 1. Start
 
@@ -167,8 +178,11 @@ always halting the batch, as is crossing either usage threshold (steps 3.1/3.4).
    given batch parameter as-is. It refuses (non-zero, nothing changed) on any invalid selection —
    **STOP**, show the human its message, don't guess at a fix. On success it prints
    `{"order": [task-ids...]}`: the tasks to work, in the order to work them.
-2. Start an empty outcomes accumulator (`[]`) and a running best-effort tally of tokens spent so
-   far in this batch (`0` at the start) for the whole run.
+2. Run `scaffold.py batch-init` with `{"selection": <the batch parameter>, "order": [...]}` to
+   write the local, git-ignored `.tmp/batch-state.json` — the record a fresh session recovers the
+   batch from if this one is lost (see §0). Start an empty outcomes accumulator (`[]`) and a
+   running best-effort tally of tokens spent so far in this batch (`0` at the start) for the whole
+   run; the state file carries the accumulator from here on.
 3. For each `task_id` in `order`, in turn:
    1. **Usage checkpoint, before this task starts:** read `context_usage_halt_pct`/
       `token_budget_per_batch` from `.tasks/config.md`, estimate your own current context-window
@@ -192,7 +206,8 @@ always halting the batch, as is crossing either usage threshold (steps 3.1/3.4).
       is also routed through "Interrupts"). Once it succeeds, append this task's provisional
       outcome — `{"task_id", "title", "status": "in-review", "link": pr_url}` — to the accumulator
       via `record-outcome` (`{"outcomes", "entry"}`, returns the updated list; hold onto it for the
-      next step).
+      next step), and mirror it into the state file with `batch-update`
+      (`{"entry", "accounted": false}`).
    6. Instead of phase 3's hard STOP: call this harness's `ScheduleWakeup` rather than stopping —
       pick a delay proportionate to how quickly this project's CI/review actually completes (its
       own guidance applies: don't tight-poll), and give it a `prompt` that's self-sufficient even
@@ -206,14 +221,18 @@ always halting the batch, as is crossing either usage threshold (steps 3.1/3.4).
       - `merged: false`: **not** a STOP — call `ScheduleWakeup` again the same way and end the
         turn, same as step 4.
       - `merged: true`: update this task's outcome entry to `{"status": "done", "link":
-        merge_commit}` via `record-outcome`, then continue this loop at the next `task_id` in
-        `order` (or fall through to step 4 below if this was the last one).
+        merge_commit}` via `record-outcome`, then run `batch-update`
+        (`{"entry", "accounted": true}`) and continue this loop at the next `task_id` in `order`.
+        `batch-update` deletes the state file itself and returns `{"complete": true, "outcomes"}`
+        once every task in `order` is accounted for — fall through to step 4 below then.
       - `phase4_closed_not_merged` or `ambiguous` (single-task mode's own STOP conditions here):
         routed through "Interrupts" below, same as any other decision point in this loop.
 4. Once every task in `order` is accounted for (merged or the batch halted early), run
    `render-outcome-table` with the accumulated outcomes and `render-usage-summary` with your final
    usage estimate — regardless of whether either threshold was ever crossed — and print both as the
-   batch's summary. **STOP.**
+   batch's summary. The state file is already gone by now (`batch-update` removed it on the last
+   task); if the batch ended any other way, run `batch-clear` — a finished run must never leave
+   batch state behind for a later plain invocation to find. **STOP.**
 
 ### Interrupts
 
@@ -241,15 +260,18 @@ conditions it matches, then run
 interrupted task's Worklog and/or Notes yourself first (content-authoring, exactly what `bail-out`
 already expects), run `bail-out` with `{"task_id", "status": "todo"|"blocked"}`, append its
 outcome via `record-outcome` — `{"task_id", "title", "status"}` describing the interrupt (e.g.
-`"todo (needs clarification)"`), `"link": null` — then continue the loop at the next `task_id` in
-`order`. This task's own STOP-worthy problem doesn't stop the batch.
+`"todo (needs clarification)"`), `"link": null` — and record it in the state file with
+`batch-update` (`{"entry", "accounted": true}`; this task's turn is over), then continue the loop
+at the next `task_id` in `order`. This task's own STOP-worthy problem doesn't stop the batch.
 
 **`routing: "systemic"`** (`infra_failure`/`context_usage_exceeded`/`token_budget_exceeded` —
 `continue_batch: false`): don't touch the interrupted task's status — none of these three are the
 task's fault, so it's left exactly as-is for a normal single-task `resume-state` later (once
 `git`/`gh` works again, or in a fresh session with more budget). Append its outcome noting the
-interruption, run `render-outcome-table` and `render-usage-summary` with everything accumulated so
-far, and **STOP** — nothing else in `order` starts.
+interruption (`batch-update` with `"accounted": false`, so its outcomes list is current), run
+`render-outcome-table` and `render-usage-summary` with everything accumulated so far, then run
+`batch-clear` — the batch is over, so a later invocation must not resume it — and **STOP**;
+nothing else in `order` starts.
 
 ## Bail-out
 
