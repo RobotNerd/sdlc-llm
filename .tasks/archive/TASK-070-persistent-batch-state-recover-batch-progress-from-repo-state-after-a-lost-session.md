@@ -2,12 +2,12 @@
 id: TASK-070
 title: "Persistent batch state: recover batch progress from repo state after a lost session"
 type: feature
-status: in-review
+status: done
 epic: EPIC-003
 created: 2026-09-19
 branch: task-070-persistent-batch-state-recover-batch-progress-from-repo-state-after-a-lost-session
 pr: "https://github.com/RobotNerd/sdlc-llm/pull/84"
-merge_commit: null
+merge_commit: 53c43c860d6333dee8728ed2c2dabdd72d1e43ae
 blocked_by: []
 blocks: []
 ---
