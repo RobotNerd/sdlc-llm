@@ -157,8 +157,11 @@ On the next invocation (or when told the PR merged), run
 ## Batch mode
 
 Given the batch parameter instead of a single task id, work through the whole batch with minimal
-human interaction — a human still reviews and merges every PR, and every STOP in this file besides
-phase 1's and phase 3's still fires exactly as written and halts the batch.
+human interaction — a human still reviews and merges every PR. Phase 1's STOP is replaced by an
+announcement (step 3.1) and phase 3's by a self-scheduled wait (step 3.4); everything else that
+would stop single-task mode — a phase 2 decision, a `start` refusal, a rebase/format-command
+failure, `phase4_closed_not_merged`, `ambiguous` — is routed through "Interrupts" below instead of
+always halting the batch.
 
 1. Run `python3 .claude/skills/implement-task/batch_select.py select <answers.json>` with the
    given batch parameter as-is. It refuses (non-zero, nothing changed) on any invalid selection —
@@ -170,13 +173,16 @@ phase 1's and phase 3's still fires exactly as written and halts the batch.
       (Description, Acceptance criteria, Testing strategy, implementation approach) exactly as
       single-task mode does — but its result carries `"stop_required": false`, so print the plan
       as an announcement and go straight into phase 2 without waiting for approval; the batch
-      selection itself was that approval.
-   2. **Phase 2:** unchanged. A decision that would stop single-task mode stops the batch here too
-      — don't skip past it to keep the batch moving.
-   3. **Phase 3:** unchanged through `wrap-up` opening the PR. Once it succeeds, append this task's
-      provisional outcome — `{"task_id", "title", "status": "in-review", "link": pr_url}` — to the
-      accumulator via `record-outcome` (`{"outcomes", "entry"}`, returns the updated list; hold
-      onto it for the next step).
+      selection itself was that approval. If `start` itself refuses (this task is unexpectedly
+      still blocked, most likely by an earlier batch task this run skipped rather than completed),
+      that's the `unexpected_blocker` interrupt below, not a crash.
+   2. **Phase 2:** unchanged, except a decision that would stop single-task mode is routed through
+      "Interrupts" below instead of always stopping the batch outright.
+   3. **Phase 3:** unchanged through `wrap-up` opening the PR (a rebase/format-command failure here
+      is also routed through "Interrupts"). Once it succeeds, append this task's provisional
+      outcome — `{"task_id", "title", "status": "in-review", "link": pr_url}` — to the accumulator
+      via `record-outcome` (`{"outcomes", "entry"}`, returns the updated list; hold onto it for the
+      next step).
    4. Instead of phase 3's hard STOP: call this harness's `ScheduleWakeup` rather than stopping —
       pick a delay proportionate to how quickly this project's CI/review actually completes (its
       own guidance applies: don't tight-poll), and give it a `prompt` that's self-sufficient even
@@ -192,14 +198,44 @@ phase 1's and phase 3's still fires exactly as written and halts the batch.
       - `merged: true`: update this task's outcome entry to `{"status": "done", "link":
         merge_commit}` via `record-outcome`, then continue this loop at the next `task_id` in
         `order` (or fall through to step 4 below if this was the last one).
-      - Anything else `resume-state`/`finish-merge` would treat as `phase4_closed_not_merged` or
-        `ambiguous` for single-task mode: **STOP** the same way single-task mode does — this halts
-        the whole batch, it doesn't skip to the next task. (Routing an isolated failure to
-        "skip this task, keep going" instead of halting is a distinct, more deliberate policy this
-        skill doesn't yet implement.)
+      - `phase4_closed_not_merged` or `ambiguous` (single-task mode's own STOP conditions here):
+        routed through "Interrupts" below, same as any other decision point in this loop.
 4. Once every task in `order` is accounted for (merged or the batch halted early), run
    `render-outcome-table` with the accumulated outcomes and print the table it returns as the
    batch's summary. **STOP.**
+
+### Interrupts
+
+Whenever a point in the loop above would stop single-task mode, decide which of these five
+conditions it matches, then run
+`python3 .claude/skills/implement-task/scaffold.py classify-interrupt <answers.json>` with
+`{"kind": "..."}`. It returns `{"routing": "isolated"|"systemic", "continue_batch": true|false}`
+(refusing on any other `kind` — don't invent a sixth):
+
+- `needs_clarification` — the task is ambiguous, or its acceptance criteria contradict something
+  discovered mid-implementation (today's existing bail-out reason).
+- `unexpected_blocker` — something task-specific blocks progress: a dependency assumed satisfied
+  turns out not to be, a precondition specific to this task is missing, or `start` itself refused
+  for this task (see step 3.1).
+- `quality_gate_failure` — `test_command`/`lint_command`/`format_command`/`sync check` fails for
+  the same reason 3 times in a row on this task — a bounded number of fix attempts, not indefinite
+  iteration.
+- `guardrail_denial` — the same `PreToolUse` hook denies a retry on this task 3 times in a row.
+- `infra_failure` — `git`/`gh` itself is broken (auth expired, network failure, rate-limited),
+  distinct from "the code is wrong" — every remaining task would hit the same wall.
+
+**`routing: "isolated"`** (the first four — `continue_batch: true`): write findings into the
+interrupted task's Worklog and/or Notes yourself first (content-authoring, exactly what `bail-out`
+already expects), run `bail-out` with `{"task_id", "status": "todo"|"blocked"}`, append its
+outcome via `record-outcome` — `{"task_id", "title", "status"}` describing the interrupt (e.g.
+`"todo (needs clarification)"`), `"link": null` — then continue the loop at the next `task_id` in
+`order`. This task's own STOP-worthy problem doesn't stop the batch.
+
+**`routing: "systemic"`** (`infra_failure` — `continue_batch: false`): don't touch the interrupted
+task's status — the tooling failed, not the task, so it's left exactly as-is for a normal
+single-task `resume-state` once `git`/`gh` works again. Append its outcome noting the
+interruption, run `render-outcome-table` with everything accumulated so far, and **STOP** — nothing
+else in `order` starts.
 
 ## Bail-out
 

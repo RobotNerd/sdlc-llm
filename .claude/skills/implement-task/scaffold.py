@@ -211,6 +211,27 @@ def render_outcome_table(outcomes: list[dict]) -> str:
     return "\n".join(lines)
 
 
+_ISOLATED_INTERRUPT_KINDS = frozenset({
+    "needs_clarification", "unexpected_blocker", "quality_gate_failure", "guardrail_denial",
+})
+_SYSTEMIC_INTERRUPT_KINDS = frozenset({"infra_failure"})
+
+
+def interrupt_routing(kind: str) -> dict:
+    """Route one of batch mode's five interrupt conditions: `needs_clarification`/
+    `unexpected_blocker`/`quality_gate_failure`/`guardrail_denial` are isolated -- bail out this
+    one task and continue the batch at its next task; `infra_failure` is systemic -- halt the
+    whole batch before starting anything else, since the tooling itself (not this task's code) is
+    broken and every remaining task would hit the same wall. Raises `ValueError` on any other
+    `kind`.
+    """
+    if kind in _ISOLATED_INTERRUPT_KINDS:
+        return {"routing": "isolated", "continue_batch": True}
+    if kind in _SYSTEMIC_INTERRUPT_KINDS:
+        return {"routing": "systemic", "continue_batch": False}
+    raise ValueError(f"unknown interrupt kind: {kind!r}")
+
+
 def resume_phase(*, in_flight: dict | None, working_tree_dirty: bool, gh_pr_state: str | None) -> dict:
     """The resume-detection table, as a pure function of already-gathered
     state (no git/gh calls in here -- see `cmd_resume_state` for the real gathering).
@@ -779,6 +800,17 @@ def cmd_render_outcome_table(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_classify_interrupt(args: argparse.Namespace) -> int:
+    answers = json.loads(Path(args.answers).read_text())
+    try:
+        result = interrupt_routing(answers["kind"])
+    except ValueError as exc:
+        print(f"implement-task: {exc}", file=sys.stderr)
+        return 2
+    print(json.dumps(result))
+    return 0
+
+
 def cmd_gh_auth_status(args: argparse.Namespace) -> int:
     result = subprocess.run(["gh", "auth", "status"], capture_output=True, text=True)
     print(result.stdout)
@@ -800,6 +832,7 @@ def main(argv: list[str]) -> int:
         ("bail-out", "set status back to todo/blocked and run sync"),
         ("record-outcome", "batch mode: append one task's outcome to the accumulator"),
         ("render-outcome-table", "batch mode: render the end-of-batch outcome table"),
+        ("classify-interrupt", "batch mode: route an interrupt kind to isolated/systemic"),
     ):
         sub = subparsers.add_parser(name, help=help_text)
         sub.add_argument("answers", help="path to a JSON file with this subcommand's inputs")
@@ -814,6 +847,7 @@ def main(argv: list[str]) -> int:
         "bail-out": cmd_bail_out,
         "record-outcome": cmd_record_outcome,
         "render-outcome-table": cmd_render_outcome_table,
+        "classify-interrupt": cmd_classify_interrupt,
     }
     return dispatch[args.command](args)
 
