@@ -8,7 +8,7 @@
   by editing config.md directly. `context_usage_halt_pct`/
   `token_budget_per_batch` always start at the conservative defaults below
   too — implement-task batch mode's usage safety valve, not something
-  init-time asks about.
+  init-time asks about. `autonomous_new_task_limit` likewise.
   Placeholders:
     {{test_command}}               e.g. `pytest`, `npm test`, or `null`
     {{lint_command}}                 e.g. `ruff check .`, or `null`
@@ -44,6 +44,7 @@ archive_done: {{archive_done}}
 tdd_enforced: {{tdd_enforced}}
 context_usage_halt_pct: 85
 token_budget_per_batch: null
+autonomous_new_task_limit: 3
 ignored_paths: []
 ---
 
@@ -87,3 +88,8 @@ skills' logic identical across projects — only this file changes.
   (`session-token-usage`); context is still an estimate (no file records the context-window size).
   `token_budget_per_batch: null` means no cap. Conservative fixed defaults, same posture as
   `allow_auto_merge` — not something init-time asks about.
+- **`autonomous_new_task_limit`** — how many follow-up tasks `implement-task` batch mode may create
+  on its own in one batch run (e.g. splitting off a task that turned out oversized) before it
+  flags further ones in the end-of-batch summary instead, for a human to handle. Default `3`;
+  `0` disables autonomous creation; `null` removes the cap. Reaching the limit never halts the
+  batch. Fixed default, not something init-time asks about.

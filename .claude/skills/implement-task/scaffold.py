@@ -252,9 +252,11 @@ def batch_state_path(root: Path) -> Path:
 def new_batch_state(selection: dict, order: list[str]) -> dict:
     """A fresh batch's state: the original selection, its resolved `order`, and no progress yet.
     `accounted` lists task ids whose batch turn is over (merged, or bailed out by an isolated
-    interrupt); `outcomes` is the same accumulator `record-outcome` builds.
+    interrupt); `outcomes` is the same accumulator `record-outcome` builds; `follow_ups` is the
+    ledger of follow-up tasks the batch created (or flagged past the limit) -- see
+    `record_follow_up`.
     """
-    return {"selection": selection, "order": list(order), "accounted": [], "outcomes": []}
+    return {"selection": selection, "order": list(order), "accounted": [], "outcomes": [], "follow_ups": []}
 
 
 def write_batch_state(path: Path, state: dict) -> None:
@@ -272,6 +274,7 @@ def read_batch_state(path: Path) -> dict | None:
         return None
     if not isinstance(state, dict) or any(key not in state for key in _BATCH_STATE_KEYS):
         return None
+    state.setdefault("follow_ups", [])  # absent in a file written before follow-ups existed
     return state
 
 
@@ -316,8 +319,74 @@ def batch_progress(state: dict) -> dict:
     return {
         "selection": state["selection"], "order": state["order"], "accounted": state["accounted"],
         "remaining": remaining, "next_task_id": remaining[0] if remaining else None,
-        "outcomes": state["outcomes"],
+        "outcomes": state["outcomes"], "follow_ups": state.get("follow_ups", []),
     }
+
+
+DEFAULT_FOLLOW_UP_LIMIT = 3
+
+
+def check_follow_up_limit(*, created: int, limit: int | None) -> dict:
+    """Whether the batch may autonomously create one more follow-up task, given how many it has
+    already created (`created`) and `autonomous_new_task_limit` from `.tasks/config.md` (`limit`).
+    `None` means unlimited and never refuses; `0` disables autonomous creation outright. Returns
+    `{"allowed": bool, "message": str | None}` -- `message` names the count and the limit, for
+    the flagged entry and the summary. Raises `ValueError` on a limit that isn't `None` or a
+    non-negative integer: a mistyped config value should fail loudly, not silently uncap or
+    disable the batch.
+    """
+    if limit is not None and (isinstance(limit, bool) or not isinstance(limit, int) or limit < 0):
+        raise ValueError(
+            f"autonomous_new_task_limit must be null or a non-negative integer, got {limit!r}"
+        )
+    if limit is None or created < limit:
+        return {"allowed": True, "message": None}
+    return {
+        "allowed": False,
+        "message": f"follow-up limit reached: {created} created, autonomous_new_task_limit is {limit}",
+    }
+
+
+def record_follow_up(state: dict, entry: dict) -> dict:
+    """Append one follow-up record -- `{task_id, title, why, parent_task_id, created, ...}` -- to
+    the batch state's ledger (returns a new dict). `created: False` marks a need that was flagged
+    rather than created because the limit was reached.
+    """
+    return {**state, "follow_ups": [*state.get("follow_ups", []), dict(entry)]}
+
+
+def count_created_follow_ups(state: dict) -> int:
+    return sum(1 for f in state.get("follow_ups", []) if f.get("created"))
+
+
+def render_follow_up_summary(follow_ups: list[dict]) -> str:
+    """The follow-up section of the end-of-batch summary: a table of every task the batch created
+    (with why and which task it came from), then a list of the needs it flagged instead because
+    the limit was reached, for the human to handle. Both printed even when empty, so a reader
+    never has to wonder whether follow-ups were considered.
+    """
+    created = [f for f in follow_ups if f.get("created")]
+    flagged = [f for f in follow_ups if not f.get("created")]
+    if not created and not flagged:
+        return "Follow-up tasks: none"
+    lines = []
+    if created:
+        lines += [
+            f"Follow-up tasks created ({len(created)}):", "",
+            "| Task | Title | Why | From |", "|---|---|---|---|",
+        ]
+        lines += [
+            f"| {f['task_id']} | {f['title']} | {f['why']} | {f.get('parent_task_id') or '—'} |"
+            for f in created
+        ]
+    else:
+        lines.append("Follow-up tasks created: none")
+    if flagged:
+        lines += ["", f"Not created -- limit reached, needs a human ({len(flagged)}):", ""]
+        lines += [
+            f"- {f['title']} -- {f['why']} (from {f.get('parent_task_id') or '—'})" for f in flagged
+        ]
+    return "\n".join(lines)
 
 
 def effective_ignored_paths(config: dict) -> tuple[str, ...]:
@@ -1025,10 +1094,95 @@ def cmd_batch_update(args: argparse.Namespace) -> int:
         return 2
     if batch_is_complete(state):
         clear_batch_state(path)
-        print(json.dumps({"complete": True, "outcomes": state["outcomes"]}))
+        print(json.dumps({
+            "complete": True, "outcomes": state["outcomes"], "follow_ups": state["follow_ups"],
+        }))
         return 0
     write_batch_state(path, state)
     print(json.dumps({"complete": False, **batch_progress(state)}))
+    return 0
+
+
+_FOLLOW_UP_REQUIRED = ("title", "type", "why", "parent_task_id")
+
+
+def cmd_create_follow_up(args: argparse.Namespace) -> int:
+    """Create one follow-up task mid-batch via `add-task`'s own `run` (id allocation, task file,
+    `sync`, TODO placement, `sync check`) -- or, once `autonomous_new_task_limit` is reached,
+    create nothing and flag the need in the batch state instead. Reaching the limit is an
+    isolated condition: exit 0, the batch keeps going.
+    """
+    answers = json.loads(Path(args.answers).read_text())
+    missing = [key for key in _FOLLOW_UP_REQUIRED if not answers.get(key)]
+    if missing:
+        print(f"implement-task: create-follow-up missing required answer(s): {', '.join(missing)}", file=sys.stderr)
+        return 2
+
+    root = repo_root()
+    tasks_root = root / ".tasks"
+    state_path = batch_state_path(root)
+    state = read_batch_state(state_path)
+    if state is None:
+        print("implement-task: create-follow-up needs an active batch (no batch state found)", file=sys.stderr)
+        return 2
+
+    sync_mod = load_sync_module(tasks_root)
+    limit = sync_mod.load_config(tasks_root).get("autonomous_new_task_limit", DEFAULT_FOLLOW_UP_LIMIT)
+    try:
+        verdict = check_follow_up_limit(created=count_created_follow_ups(state), limit=limit)
+    except ValueError as exc:
+        print(f"implement-task: {exc}", file=sys.stderr)
+        return 2
+
+    entry = {
+        "task_id": None, "title": answers["title"], "why": answers["why"],
+        "parent_task_id": answers["parent_task_id"], "created": False,
+    }
+    if not verdict["allowed"]:
+        write_batch_state(state_path, record_follow_up(state, entry))
+        print(json.dumps({"created": False, "flagged": True, "message": verdict["message"]}))
+        return 0
+
+    add_task_script = Path(__file__).resolve().parents[1] / "add-task" / "scaffold.py"
+    if not add_task_script.is_file():
+        raise SystemExit(f"implement-task: {add_task_script} not found -- the add-task skill is required")
+    task_id = sync_mod.next_id(tasks_root, "task")
+    add_answers = {
+        "title": answers["title"], "type": answers["type"], "epic": answers.get("epic"),
+        "blocked_by": answers.get("blocked_by") or [], "priority_mode": answers.get("priority_mode") or "end",
+    }
+    for optional in ("priority_after", "slug"):
+        if answers.get(optional):
+            add_answers[optional] = answers[optional]
+    with tempfile.TemporaryDirectory() as tmp:
+        add_answers_path = Path(tmp) / "add-task-answers.json"
+        add_answers_path.write_text(json.dumps(add_answers))
+        result = subprocess.run(
+            [sys.executable, str(add_task_script), "run", str(add_answers_path)],
+            cwd=root, capture_output=True, text=True,
+        )
+    if result.returncode != 0:
+        print(result.stdout)
+        print(result.stderr, file=sys.stderr)
+        return result.returncode
+    written = sorted(tasks_root.glob(f"{task_id}-*.md"))
+    if len(written) != 1:
+        print(f"implement-task: add-task reported success but {task_id} was not written", file=sys.stderr)
+        return 1
+
+    rel_path = str(written[0].relative_to(root))
+    state = record_follow_up(state, {**entry, "task_id": task_id, "created": True, "path": rel_path})
+    write_batch_state(state_path, state)
+    print(json.dumps({
+        "created": True, "task_id": task_id, "path": rel_path,
+        "follow_ups_created": count_created_follow_ups(state), "limit": limit,
+    }))
+    return 0
+
+
+def cmd_render_follow_up_summary(args: argparse.Namespace) -> int:
+    answers = json.loads(Path(args.answers).read_text())
+    print(json.dumps({"summary": render_follow_up_summary(answers.get("follow_ups") or [])}))
     return 0
 
 
@@ -1109,6 +1263,8 @@ def main(argv: list[str]) -> int:
         ("batch-init", "batch mode: write the local batch-state file for a freshly selected batch"),
         ("batch-update", "batch mode: record one task's outcome/progress in the batch-state file"),
         ("batch-clear", "batch mode: delete the batch-state file (batch halted)"),
+        ("create-follow-up", "batch mode: create a follow-up task via add-task, up to the per-batch limit"),
+        ("render-follow-up-summary", "batch mode: render the follow-up-tasks part of the end-of-batch summary"),
         ("render-outcome-table", "batch mode: render the end-of-batch outcome table"),
         ("classify-interrupt", "batch mode: route an interrupt kind to isolated/systemic"),
         ("check-usage-thresholds", "batch mode: check context/token usage against config thresholds"),
@@ -1130,6 +1286,8 @@ def main(argv: list[str]) -> int:
         "batch-init": cmd_batch_init,
         "batch-update": cmd_batch_update,
         "batch-clear": cmd_batch_clear,
+        "create-follow-up": cmd_create_follow_up,
+        "render-follow-up-summary": cmd_render_follow_up_summary,
         "render-outcome-table": cmd_render_outcome_table,
         "classify-interrupt": cmd_classify_interrupt,
         "check-usage-thresholds": cmd_check_usage_thresholds,

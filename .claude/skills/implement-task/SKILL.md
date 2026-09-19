@@ -239,10 +239,38 @@ always halting the batch, as is crossing either usage threshold (steps 3.1/3.4).
 4. Once every task in `order` is accounted for (merged or the batch halted early), run
    `render-outcome-table` with the accumulated outcomes and `render-usage-summary` with final
    usage (a fresh `session-token-usage` total, if it works, and your context estimate) —
-   regardless of whether either threshold was ever crossed — and print both as the batch's
-   summary. The state file is already gone by now (`batch-update` removed it on the last
+   regardless of whether either threshold was ever crossed — and `render-follow-up-summary` with
+   the batch's `follow_ups` (from `batch-update`'s completion result, or the last `batch-update`
+   before an early halt), and print all three as the batch's summary. The state file is already gone by now (`batch-update` removed it on the last
    task); if the batch ended any other way, run `batch-clear` — a finished run must never leave
    batch state behind for a later plain invocation to find. **STOP.**
+
+### Follow-up tasks
+
+If, mid-task, you conclude the task is too big and needs splitting, or you discover a genuinely new
+piece of follow-up work, create the task yourself rather than stopping to ask — up to
+`.tasks/config.md`'s `autonomous_new_task_limit` per batch run (default `3`; `0` disables it,
+`null` removes the cap). Run `scaffold.py create-follow-up` with `{"title", "type", "why",
+"parent_task_id"}` — `why` is the one-line reason it exists, and `parent_task_id` the batch task
+you were on. Optional keys: `epic`, `blocked_by`, `priority_mode`/`priority_after`, `slug`.
+Defaults: **epic unassigned** (`null`) — set `epic` only if the work clearly belongs to an
+existing one — and **the bottom of TODO** (`priority_mode: "end"`); the human prioritizes new tasks
+after the batch. Set `blocked_by` only for a real dependency.
+
+It runs `add-task`'s own `run` (id allocation, task file, `sync`, placement, `sync check`) and
+returns `{"created": true, "task_id", "path", ...}`, recording the task in
+`.tmp/batch-state.json`. Then, like `add-task`, fill in the new file's Description / Acceptance
+criteria / Testing strategy / Notes — the script leaves them as placeholders. **The new task file
+belongs in the current task's own PR:** it is created on the current task's branch, so add its
+`path` to that task's `wrap-up` `paths` and list it in the PR body — it then lands through the same
+review as everything else, and never sits half-committed or on `default_branch`.
+
+At the limit it creates nothing and returns `{"created": false, "flagged": true, "message"}` with
+exit `0`: this is an isolated condition, not an interrupt — note the need in the task's Worklog,
+carry on with the rest of the current task and the batch, and don't call it again for the same
+need. Created and flagged follow-ups are all recorded, and `render-follow-up-summary` (with the
+`follow_ups` list `batch-update` returns) prints them in the end-of-batch summary — created tasks
+with why and origin, flagged ones under "needs a human".
 
 ### Interrupts
 
@@ -279,7 +307,8 @@ at the next `task_id` in `order`. This task's own STOP-worthy problem doesn't st
 task's fault, so it's left exactly as-is for a normal single-task `resume-state` later (once
 `git`/`gh` works again, or in a fresh session with more budget). Append its outcome noting the
 interruption (`batch-update` with `"accounted": false`, so its outcomes list is current), run
-`render-outcome-table` and `render-usage-summary` with everything accumulated so far, then run
+`render-outcome-table`, `render-usage-summary` and `render-follow-up-summary` with everything
+accumulated so far, then run
 `batch-clear` — the batch is over, so a later invocation must not resume it — and **STOP**;
 nothing else in `order` starts.
 

@@ -18,6 +18,7 @@ archive_done: true
 tdd_enforced: true
 context_usage_halt_pct: 85
 token_budget_per_batch: null
+autonomous_new_task_limit: 3
 ignored_paths: [.tmp/prompts.md]
 ---
 
@@ -70,3 +71,7 @@ describes: the skills' logic stays identical across projects, only this file cha
   transcript file (`session-token-usage`), not an estimate. Context usage is still the model's own
   best-effort estimate — no file records the context-window size, so it can't be made exact — a
   deliberately cheap stopgap, not a precise measurement. `null` token budget means no cap.
+- **`autonomous_new_task_limit: 3`** — how many follow-up tasks `implement-task` batch mode may
+  create on its own in one batch run (e.g. splitting off a task that turned out oversized) before
+  it flags further ones in the end-of-batch summary instead, for a human to handle. `0` disables
+  autonomous creation; `null` removes the cap. Reaching the limit never halts the batch.

@@ -1127,7 +1127,7 @@ def test_batch_state_path_is_under_dot_tmp(tmp_path):
 def test_new_batch_state_records_selection_order_and_empty_progress():
     state = implement_task_scaffold.new_batch_state(_SELECTION, _ORDER)
 
-    assert state == {"selection": _SELECTION, "order": _ORDER, "accounted": [], "outcomes": []}
+    assert state == {"selection": _SELECTION, "order": _ORDER, "accounted": [], "outcomes": [], "follow_ups": []}
 
 
 def test_batch_state_round_trips_through_the_file(tmp_path):
@@ -1246,7 +1246,9 @@ def test_cmd_batch_init_writes_the_state_file(repo):
 
     assert result.returncode == 0, result.stderr
     on_disk = json.loads(_batch_state_file(repo).read_text())
-    assert on_disk == {"selection": _SELECTION, "order": _ORDER, "accounted": [], "outcomes": []}
+    assert on_disk == {
+        "selection": _SELECTION, "order": _ORDER, "accounted": [], "outcomes": [], "follow_ups": [],
+    }
     assert json.loads(result.stdout)["next_task_id"] == "TASK-001"
 
 
@@ -1563,3 +1565,252 @@ def test_finish_merge_bookkeeping_commit_leaves_a_stray_untracked_tasks_file_alo
     _git(["fetch", "origin"], cwd=repo)
     remote_files = _git(["ls-tree", "-r", "--name-only", "origin/main"], cwd=repo).stdout.split()
     assert str(_STRAY) not in remote_files
+
+
+# ---------------------------------------------------------------------------
+# Autonomous follow-up task creation (TASK-044): a per-batch limit
+# (`autonomous_new_task_limit`), the follow-up ledger in the batch-state file, and the
+# `create-follow-up` / `render-follow-up-summary` subcommands.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("created,limit,allowed", [
+    (0, 3, True), (2, 3, True), (3, 3, False), (5, 3, False),
+    (0, 0, False),                       # 0 disables autonomous creation outright
+    (0, None, True), (1000, None, True),  # null = unlimited
+])
+def test_check_follow_up_limit(created, limit, allowed):
+    result = implement_task_scaffold.check_follow_up_limit(created=created, limit=limit)
+
+    assert result["allowed"] is allowed
+    if allowed:
+        assert result["message"] is None
+    else:
+        assert str(limit) in result["message"] and str(created) in result["message"]
+
+
+@pytest.mark.parametrize("bad", ["3", -1, 2.5, True])
+def test_check_follow_up_limit_rejects_a_non_integer_or_negative_limit(bad):
+    with pytest.raises(ValueError, match="autonomous_new_task_limit"):
+        implement_task_scaffold.check_follow_up_limit(created=0, limit=bad)
+
+
+def _follow_up(task_id="TASK-050", created=True, title="Split-off piece", why="original was oversized"):
+    return {"task_id": task_id if created else None, "title": title, "why": why,
+            "parent_task_id": "TASK-001", "created": created}
+
+
+def test_record_follow_up_appends_without_mutating_and_counts_only_created():
+    state = implement_task_scaffold.new_batch_state(_SELECTION, _ORDER)
+
+    state2 = implement_task_scaffold.record_follow_up(state, _follow_up("TASK-050"))
+    state3 = implement_task_scaffold.record_follow_up(state2, _follow_up(created=False))
+
+    assert state["follow_ups"] == []
+    assert len(state3["follow_ups"]) == 2
+    assert implement_task_scaffold.count_created_follow_ups(state3) == 1
+
+
+def test_read_batch_state_tolerates_a_state_file_written_before_follow_ups_existed(tmp_path):
+    path = implement_task_scaffold.batch_state_path(tmp_path)
+    legacy = {"selection": _SELECTION, "order": _ORDER, "accounted": [], "outcomes": []}
+    path.parent.mkdir()
+    path.write_text(json.dumps(legacy))
+
+    state = implement_task_scaffold.read_batch_state(path)
+
+    assert state["follow_ups"] == []
+
+
+def test_batch_progress_includes_follow_ups():
+    state = implement_task_scaffold.new_batch_state(_SELECTION, _ORDER)
+    state = implement_task_scaffold.record_follow_up(state, _follow_up())
+
+    assert implement_task_scaffold.batch_progress(state)["follow_ups"] == [_follow_up()]
+
+
+def test_render_follow_up_summary_lists_created_with_why_and_flags_the_rest():
+    text = implement_task_scaffold.render_follow_up_summary([
+        _follow_up("TASK-050", title="Piece A", why="oversized"),
+        _follow_up(created=False, title="Piece B", why="also oversized"),
+    ])
+
+    assert "| TASK-050 | Piece A | oversized | TASK-001 |" in text
+    assert "Piece B" in text and "also oversized" in text
+    assert text.index("Piece A") < text.index("Piece B")
+    assert "not created" in text.lower()
+
+
+def test_render_follow_up_summary_when_none():
+    assert "none" in implement_task_scaffold.render_follow_up_summary([]).lower()
+
+
+def _set_config_line(repo, key, value):
+    """Set (or add, or -- with `None` as the *string* sentinel "__drop__" -- remove) a config key."""
+    config_path = repo / ".tasks" / "config.md"
+    lines = config_path.read_text().splitlines()
+    out = []
+    replaced = False
+    for line in lines:
+        if line.startswith(f"{key}:"):
+            replaced = True
+            if value != "__drop__":
+                out.append(f"{key}: {value}")
+        else:
+            out.append(line)
+    if not replaced and value != "__drop__":
+        out.insert(out.index("---", 1), f"{key}: {value}")
+    config_path.write_text("\n".join(out) + "\n")
+
+
+def _follow_up_answers(title="Split-off piece", **overrides):
+    answers = {"title": title, "type": "chore", "why": "the original task was oversized", "parent_task_id": "TASK-001"}
+    answers.update(overrides)
+    return answers
+
+
+def _repo_in_a_batch(repo):
+    _add_task(repo, "First task")
+    _push_tasks(repo)
+    _run_batch(repo, "batch-init", {"selection": _SELECTION, "order": ["TASK-001"]})
+    return repo
+
+
+def _todo_ids(repo):
+    board = (repo / ".tasks" / "BOARD.md").read_text()
+    todo = board.split("## TODO", 1)[1]
+    return [line.split()[1] for line in todo.splitlines() if line.startswith("- TASK-")]
+
+
+def test_cmd_create_follow_up_creates_a_well_formed_task_at_the_bottom_of_todo(repo):
+    _repo_in_a_batch(repo)
+
+    result = _run_batch(repo, "create-follow-up", _follow_up_answers())
+
+    assert result.returncode == 0, result.stderr
+    output = json.loads(result.stdout)
+    assert output["created"] is True
+    assert output["task_id"] == "TASK-002"
+    task_path = repo / output["path"]
+    assert task_path.is_file() and task_path.name.startswith("TASK-002-")
+    assert "epic: null" in task_path.read_text()  # unassigned unless the caller says otherwise
+    assert _todo_ids(repo) == ["TASK-001", "TASK-002"]  # bottom of TODO, after the existing task
+    assert _sync_check(repo).returncode == 0
+
+
+def test_cmd_create_follow_up_records_it_in_the_batch_state(repo):
+    _repo_in_a_batch(repo)
+
+    _run_batch(repo, "create-follow-up", _follow_up_answers(title="Piece A", why="oversized"))
+
+    state = json.loads(_batch_state_file(repo).read_text())
+    assert state["follow_ups"] == [{
+        "task_id": "TASK-002", "title": "Piece A", "why": "oversized",
+        "parent_task_id": "TASK-001", "created": True,
+        "path": ".tasks/" + next(p.name for p in (repo / ".tasks").glob("TASK-002-*.md")),
+    }]
+
+
+def test_cmd_create_follow_up_honours_the_caller_epic_blocked_by_and_priority(repo):
+    _repo_in_a_batch(repo)
+
+    result = _run_batch(repo, "create-follow-up", _follow_up_answers(
+        blocked_by=["TASK-001"], priority_mode="top",
+    ))
+
+    assert result.returncode == 0, result.stderr
+    assert _todo_ids(repo)[0] == "TASK-002"
+    assert "blocked_by: [TASK-001]" in (repo / json.loads(result.stdout)["path"]).read_text()
+
+
+def test_cmd_create_follow_up_stops_at_the_limit_flags_and_does_not_fail(repo):
+    _repo_in_a_batch(repo)
+    _set_config_line(repo, "autonomous_new_task_limit", "2")
+
+    outputs = [
+        _run_batch(repo, "create-follow-up", _follow_up_answers(title=f"Piece {n}", why=f"reason {n}"))
+        for n in (1, 2, 3)
+    ]
+
+    assert [r.returncode for r in outputs] == [0, 0, 0]  # reaching the limit never halts the batch
+    parsed = [json.loads(r.stdout) for r in outputs]
+    assert [p["created"] for p in parsed] == [True, True, False]
+    assert parsed[2]["flagged"] is True and "2" in parsed[2]["message"]
+    assert len(list((repo / ".tasks").glob("TASK-*.md"))) == 3  # TASK-001 + two follow-ups, no third
+    state = json.loads(_batch_state_file(repo).read_text())
+    assert [f["created"] for f in state["follow_ups"]] == [True, True, False]
+    assert state["follow_ups"][2]["title"] == "Piece 3" and state["follow_ups"][2]["why"] == "reason 3"
+    assert _sync_check(repo).returncode == 0
+
+
+def test_cmd_create_follow_up_null_limit_never_refuses(repo):
+    _repo_in_a_batch(repo)
+    _set_config_line(repo, "autonomous_new_task_limit", "null")
+
+    results = [json.loads(_run_batch(repo, "create-follow-up", _follow_up_answers(title=f"Piece {n}")).stdout)
+               for n in range(5)]
+
+    assert all(r["created"] for r in results)
+
+
+def test_cmd_create_follow_up_defaults_the_limit_to_three_when_the_key_is_absent(repo):
+    _repo_in_a_batch(repo)
+    _set_config_line(repo, "autonomous_new_task_limit", "__drop__")
+
+    results = [json.loads(_run_batch(repo, "create-follow-up", _follow_up_answers(title=f"Piece {n}")).stdout)
+               for n in range(4)]
+
+    assert [r["created"] for r in results] == [True, True, True, False]
+
+
+def test_cmd_create_follow_up_refuses_outside_a_batch(repo):
+    _add_task(repo, "First task")
+    _push_tasks(repo)
+
+    result = _run_batch(repo, "create-follow-up", _follow_up_answers())
+
+    assert result.returncode != 0
+    assert "batch" in result.stderr
+    assert len(list((repo / ".tasks").glob("TASK-*.md"))) == 1
+
+
+def test_cmd_create_follow_up_surfaces_an_add_task_failure_and_records_nothing(repo):
+    _repo_in_a_batch(repo)
+
+    result = _run_batch(repo, "create-follow-up", _follow_up_answers(epic="EPIC-999"))
+
+    assert result.returncode != 0
+    assert "EPIC-999" in result.stderr
+    assert json.loads(_batch_state_file(repo).read_text())["follow_ups"] == []
+    assert len(list((repo / ".tasks").glob("TASK-*.md"))) == 1
+
+
+@pytest.mark.parametrize("missing", ["title", "type", "why", "parent_task_id"])
+def test_cmd_create_follow_up_requires_its_core_answers(repo, missing):
+    _repo_in_a_batch(repo)
+    answers = _follow_up_answers()
+    del answers[missing]
+
+    result = _run_batch(repo, "create-follow-up", answers)
+
+    assert result.returncode != 0
+    assert missing in result.stderr
+
+
+def test_cmd_batch_update_completion_hands_back_the_follow_ups_for_the_summary(repo):
+    _repo_in_a_batch(repo)
+    _run_batch(repo, "create-follow-up", _follow_up_answers(title="Piece A"))
+
+    result = _run_batch(repo, "batch-update", {"entry": _entry("TASK-001"), "accounted": True})
+
+    output = json.loads(result.stdout)
+    assert output["complete"] is True
+    assert [f["title"] for f in output["follow_ups"]] == ["Piece A"]
+    assert not _batch_state_file(repo).exists()
+
+
+def test_cmd_render_follow_up_summary(tmp_path):
+    result = _run_scaffold(tmp_path, "render-follow-up-summary", {"follow_ups": [_follow_up("TASK-050", title="Piece A")]})
+
+    assert result.returncode == 0, result.stderr
+    assert "| TASK-050 | Piece A |" in json.loads(result.stdout)["summary"]
