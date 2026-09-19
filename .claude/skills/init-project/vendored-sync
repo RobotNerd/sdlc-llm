@@ -1085,6 +1085,20 @@ def run_sync(tasks_root: Path) -> list[Path]:
 
 
 def main(argv: list[str]) -> int:
+    """Entry point. A malformed task/epic/spec file (`FrontmatterError`, raised by `discover()` and
+    already naming the file and the problem) is reported as one `sync: <message>` line on stderr
+    instead of a traceback -- exit 1 for `check` (the same code as "drift found": the check
+    failed), 2 otherwise, matching the other usage/input errors below. The bad file is never
+    skipped: every mode still fails while it exists.
+    """
+    try:
+        return _main(argv)
+    except FrontmatterError as exc:
+        print(f"sync: {exc}", file=sys.stderr)
+        return 1 if argv == ["check"] else 2
+
+
+def _main(argv: list[str]) -> int:
     tasks_root = Path(__file__).resolve().parent.parent
     if not argv:
         changed = run_sync(tasks_root)

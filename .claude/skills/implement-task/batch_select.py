@@ -76,6 +76,17 @@ def repo_root() -> Path:
     return Path(result.stdout.strip())
 
 
+def discover_or_exit(sync_mod: ModuleType, tasks_root: Path) -> dict:
+    """`sync_mod.discover(tasks_root)`, but a malformed task/epic/spec file (`FrontmatterError`,
+    whose message already names the file and the problem) becomes a one-line error and a non-zero
+    exit instead of a traceback. Never skips the bad file -- it still fails the command.
+    """
+    try:
+        return sync_mod.discover(tasks_root)
+    except sync_mod.FrontmatterError as exc:
+        raise SystemExit(f"batch_select: {exc}") from None
+
+
 def load_sync_module(tasks_root: Path) -> ModuleType:
     sync_path = tasks_root / "bin" / "sync"
     if not sync_path.is_file():
@@ -278,7 +289,7 @@ def cmd_select(args: argparse.Namespace) -> int:
     root = repo_root()
     tasks_root = root / ".tasks"
     sync_mod = load_sync_module(tasks_root)
-    tasks = sync_mod.discover(tasks_root)
+    tasks = discover_or_exit(sync_mod, tasks_root)
     board_text = (tasks_root / "BOARD.md").read_text()
 
     params = json.loads(Path(args.answers).read_text())

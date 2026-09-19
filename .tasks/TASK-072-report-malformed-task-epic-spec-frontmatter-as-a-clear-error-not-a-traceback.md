@@ -1,8 +1,8 @@
 ---
 id: TASK-072
-title: "Report malformed task/epic/spec frontmatter as a clear error, not a traceback"
+title: Report malformed task/epic/spec frontmatter as a clear error, not a traceback
 type: bug
-status: todo
+status: in-progress
 epic: EPIC-003
 created: 2026-09-19
 branch: task-072-report-malformed-task-epic-spec-frontmatter-as-a-clear-error-not-a-traceback
@@ -40,16 +40,16 @@ the *presentation* of the error, never about tolerating or skipping the bad file
 
 ## Acceptance criteria
 
-- [ ] A bare `sync`, `sync check`, and `sync archive` run against a `.tasks/` containing a
+- [x] A bare `sync`, `sync check`, and `sync archive` run against a `.tasks/` containing a
       malformed `TASK-*.md` (no frontmatter block, unclosed block, or missing `id`) print a
       one-line message naming the offending file and problem to stderr, exit non-zero, and emit no
       traceback.
-- [ ] The same holds for each skill script that calls `discover()` directly (`implement-task`'s
+- [x] The same holds for each skill script that calls `discover()` directly (`implement-task`'s
       `scaffold.py` subcommands and `batch_select.py`, `add-task`, `refine-backlog`).
-- [ ] The malformed file is still never silently skipped -- every one of those entry points still
+- [x] The malformed file is still never silently skipped -- every one of those entry points still
       exits non-zero (`sync check` in particular can't report clean while a bad file exists).
-- [ ] No behavior change for a well-formed `.tasks/` (existing tests unchanged and green).
-- [ ] `pytest` and `python3 .tasks/bin/sync check` both pass.
+- [x] No behavior change for a well-formed `.tasks/` (existing tests unchanged and green).
+- [x] `pytest` and `python3 .tasks/bin/sync check` both pass.
 
 ## Testing strategy
 
@@ -66,7 +66,12 @@ the *presentation* of the error, never about tolerating or skipping the bad file
 
 ## Worklog
 
-_(empty — appended during implementation)_
+- Tests first: new `tests/test_malformed_frontmatter.py` (25 cases) -- 24 failed with the traceback for the expected reason (the 25th, a well-formed `.tasks/`, passed as the no-regression control). One test fix on the way: `start` with `task_id: null` exits at "no unblocked TODO task" before ever reaching `discover()`, so that case now passes an explicit id.
+- `sync`: `main()` now wraps a new `_main()` and turns `FrontmatterError` into one `sync: <message>` stderr line -- exit 1 for `check` (same code as "drift found"), 2 for bare `sync`/`archive`/other. `.claude/skills/init-project/vendored-sync` updated byte-identically.
+- Skill scripts: a local `discover_or_exit(sync_mod, tasks_root)` in each of `implement-task/scaffold.py` (5 call sites), `add-task/scaffold.py` (2), `refine-backlog/scaffold.py` (3), `implement-task/batch_select.py` (1) raises `SystemExit("<tool>: <message>")` (exit 1, each script's existing fatal-error style). No shared module -- they stay standalone/vendorable. `guardrails.py` left alone: its `discover()` call already swallows exceptions, correct for a fail-open hook.
+- Covered shapes: no frontmatter, unclosed `---` block, missing `id`; malformed TASK in `.tasks/`, EPIC, SPEC, and an archived TASK; all 12 script entry points (every subcommand that reaches `discover()`, incl. `wrap-up`/`finish-merge`/`bail-out`). Each asserts non-zero exit, offending filename on stderr, exactly one stderr line, no `Traceback`.
+- Exit-code decision (per human): keep each tool's own convention rather than unify.
+- Full suite 714 passed; `sync check` exit 0.
 
 ## Notes
 
