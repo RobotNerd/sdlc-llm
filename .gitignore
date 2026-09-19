@@ -11,3 +11,4 @@ venv/
 
 # implement-task batch mode: local runtime state, never committed
 .tmp/batch-state.json
+.tmp/auto-merge-marker.json

@@ -2,7 +2,7 @@
 id: TASK-045
 title: Opt-in, critic-gated, per-batch-capped auto-merge
 type: feature
-status: todo
+status: in-progress
 epic: EPIC-003
 created: 2026-09-14
 branch: task-045-critic-gated-capped-auto-merge
@@ -45,18 +45,18 @@ When enabled:
 
 ## Acceptance criteria
 
-- [ ] `allow_auto_merge` defaults to `false`; auto-merge never happens unless a project explicitly
+- [x] `allow_auto_merge` defaults to `false`; auto-merge never happens unless a project explicitly
       sets it `true`.
-- [ ] The critic pass runs on a distinctly cheaper/faster model than the implementer, scoped to
+- [x] The critic pass runs on a distinctly cheaper/faster model than the implementer, scoped to
       the checklist above — not an open-ended review.
-- [ ] A critic rejection skips auto-merge for that task only (isolated interrupt) and leaves the
+- [x] A critic rejection skips auto-merge for that task only (isolated interrupt) and leaves the
       PR open for a human, without halting the batch.
-- [ ] `autonomous_merge_cap` halts the batch once reached, regardless of further approvals.
-- [ ] `gh pr merge` is only ever invoked through this path when enabled, and TASK-032's guardrail
+- [x] `autonomous_merge_cap` halts the batch once reached, regardless of further approvals.
+- [x] `gh pr merge` is only ever invoked through this path when enabled, and TASK-032's guardrail
       hook's marker check actually allows it in that case (verified against the real hook, not
       just this task's own code).
-- [ ] The end-of-batch summary includes critic findings per reviewed task.
-- [ ] `pytest` and `python3 .tasks/bin/sync check` both pass.
+- [x] The end-of-batch summary includes critic findings per reviewed task.
+- [x] `pytest` and `python3 .tasks/bin/sync check` both pass.
 
 ## Testing strategy
 
@@ -74,7 +74,16 @@ When enabled:
 
 ## Worklog
 
-_(empty — appended during implementation)_
+- Tests first (guardrail/marker: 27 failing; pure logic: 58 failing; CLI: 17 failing -- each for the expected reason: functions/subcommands absent), then implemented until green. Full suite 858 passed, `sync check` exit 0.
+- **Merge path.** `scaffold.py auto-merge` is the only code that runs the merge. Gates in fixed order: `allow_auto_merge` is `true` -> `autonomous_merge_cap` not reached (a halt, regardless of critic/CI) -> PR still `OPEN` -> live head equals the head the critic reviewed (`--match-head-commit` pins the merge to it) -> `gh pr checks` green (pending waits; no CI is *not* green) -> changed files within `scope_paths` or `.tasks/` (a deterministic backstop for the critic's own scope check) -> critic approval. Every refusal exits 0 with `{merged:false, reason, halt, interrupt, findings}`.
+- **Critic.** The script cannot call a model, so `SKILL.md` has the LLM launch a subagent on `haiku` with the script-built prompt (`critic-prompt`: four checklist items -- criteria met / in scope / gates passed / nothing alarming -- plus acceptance criteria, changed files, gates, diff, explicitly NOT a general code review; diff capped at 60k chars, and the critic is told to reject what it can't verify). `evaluate_critic_verdict` **fails closed**: approval needs a parseable object with `approve` and all four items exactly `true` and `findings` a list of strings; a false item alongside `approve: true`, a string `"true"`, prose, or `{}` are all rejections.
+- **Marker + hook (verified against the real hook).** `guardrails.py`: `write_auto_merge_marker`/`clear_auto_merge_marker`/`auto_merge_marker_valid`; `evaluate_bash_command` now passes `marker_present=auto_merge_marker_valid(...)` into the unchanged-shape `check_gh_pr_merge`. A Bash merge is allowed only if `allow_auto_merge: true` AND a marker exists for exactly that PR AND the command carries `--match-head-commit <the marker's sha>` AND it hasn't expired (5 min TTL). `auto-merge` writes the marker, asks the real `evaluate_bash_command` about its own exact command before running it, and removes the marker in a `finally`. Tests run the actual hook scripts over stdin (allowed with the marker, denied without / wrong PR / wrong head / expired / opt-in off), and the CLI test's fake `gh` asserts the marker existed at the moment of the merge and is gone afterwards.
+- **Tamper hardening.** Any Bash command naming the marker file, and any Edit/Write targeting it, is denied. Honest limit: it's a speed bump for a cooperative agent, not a security boundary (same posture as every other guardrail). Side effect worth knowing: *any* dev command mentioning that filename is denied too -- it blocked one of this task's own commands mid-implementation, working as intended (test code was written via the Write tool instead).
+- **Human decision at plan approval -- critic rejection bails out and ENDS the batch** (changed from the originally proposed "skip and continue"): new routing `bail_out_halt` for `critic_rejection` (`continue_batch: false`): bail-out the task (`todo`), record it, print the summary, `batch-clear` (removes the batch state and any marker). The PR is deliberately left open on GitHub for the human -- closing a PR/branch is an outward-facing action left to them; the Worklog note tells them so. `auto_merge_cap_reached` is a new *systemic* kind (task untouched, PR open).
+- **Summary** now opens with `render-batch-result`: tasks selected, tasks completed, which task (and interrupt kind/reason) ended it early, and which never started; plus `render-critic-summary` (findings per reviewed task, approvals included) fed by a new `critic_reviews` ledger in the batch state (optional key, old files read back with `[]`).
+- Config: `autonomous_merge_cap: 5` (`null` unlimited, `0` never) in `templates/config.md` and this repo's `.tasks/config.md`; `allow_auto_merge` stays `false` here and in every scaffolded project; Key notes rewritten (they said "not currently read by anything"). `init-project`'s generic `migrate-config` adds the new key to existing projects and preserves their `allow_auto_merge`. `README.md`/`CLAUDE.md` guardrail text now names the one opt-in exception. `vendored-guardrails` mirrored byte-for-byte; the marker path is also in `.gitignore` and in every dirty-tree ignore list.
+- Known limitation (pre-existing, not introduced here): non-critic refusals (`checks_not_green`, `scope_violation`, `head_moved`, `pr_not_open`) fall back to the ordinary human-merge wait; if a batch is ever left with two in-flight tasks, `resume-state` reports `ambiguous` and asks a human.
+- **Testing strategy step 6 (real critic-approved auto-merge on a scratch project) is NOT run -- pending, human-run, per the human's decision to list it in the PR body.** It needs a scratch GitHub repo with `allow_auto_merge: true`: run a trivial task through a one-task batch to a real critic-approved merge, then confirm (a) the merge landed with `--match-head-commit`, (b) the marker file is gone, (c) `critic_reviews`/summary show it. I never ran a real `gh pr merge` in this session.
 
 ## Notes
 

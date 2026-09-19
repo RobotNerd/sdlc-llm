@@ -1127,7 +1127,10 @@ def test_batch_state_path_is_under_dot_tmp(tmp_path):
 def test_new_batch_state_records_selection_order_and_empty_progress():
     state = implement_task_scaffold.new_batch_state(_SELECTION, _ORDER)
 
-    assert state == {"selection": _SELECTION, "order": _ORDER, "accounted": [], "outcomes": [], "follow_ups": []}
+    assert state == {
+        "selection": _SELECTION, "order": _ORDER, "accounted": [], "outcomes": [], "follow_ups": [],
+        "critic_reviews": [],
+    }
 
 
 def test_batch_state_round_trips_through_the_file(tmp_path):
@@ -1248,6 +1251,7 @@ def test_cmd_batch_init_writes_the_state_file(repo):
     on_disk = json.loads(_batch_state_file(repo).read_text())
     assert on_disk == {
         "selection": _SELECTION, "order": _ORDER, "accounted": [], "outcomes": [], "follow_ups": [],
+        "critic_reviews": [],
     }
     assert json.loads(result.stdout)["next_task_id"] == "TASK-001"
 
@@ -1814,3 +1818,351 @@ def test_cmd_render_follow_up_summary(tmp_path):
 
     assert result.returncode == 0, result.stderr
     assert "| TASK-050 | Piece A |" in json.loads(result.stdout)["summary"]
+
+
+# ---------------------------------------------------------------------------
+# Critic-gated, capped auto-merge (TASK-045): `critic-prompt`, `auto-merge`, the two renderers, and
+# `batch-clear` cleaning up the marker. The pure logic is in `test_auto_merge.py`, the marker/hook
+# in `test_auto_merge_guardrail.py`; here it's the real subprocess wiring against a scratch repo
+# and a configurable `gh` stub that logs every call (and whether the marker existed at that moment).
+# ---------------------------------------------------------------------------
+
+_AM_SHA = "a" * 40
+_MARKER_REL = ".tmp/auto-merge-marker.json"
+_FAKE_GH_AM = r"""#!/usr/bin/env python3
+import json, os, sys
+args = sys.argv[1:]
+state_path = os.environ.get("FAKE_GH_STATE")
+state = json.load(open(state_path)) if state_path and os.path.exists(state_path) else {}
+log_path = os.environ.get("FAKE_GH_LOG")
+if log_path:
+    with open(log_path, "a") as f:
+        f.write(json.dumps({"args": args, "marker_present": os.path.exists(".tmp/auto-merge-marker.json")}) + "\n")
+if args[:2] == ["pr", "create"]:
+    print("https://example.invalid/pr/1"); sys.exit(0)
+if args[:2] == ["pr", "view"]:
+    print(json.dumps({"headRefOid": state.get("head_sha", "a" * 40), "state": state.get("pr_state", "OPEN"),
+                      "mergeCommit": {"oid": "abc1234"}})); sys.exit(0)
+if args[:2] == ["pr", "checks"]:
+    print(state.get("checks_out", "all checks passed")); sys.exit(state.get("checks_rc", 0))
+if args[:2] == ["pr", "diff"]:
+    if "--name-only" in args:
+        print("\n".join(state.get("diff_names", [])))
+    else:
+        print(state.get("diff", "diff --git a/feature.txt b/feature.txt\n+the change\n"))
+    sys.exit(0)
+if args[:2] == ["pr", "merge"]:
+    sys.exit(state.get("merge_rc", 0))
+sys.exit(0)
+"""
+
+
+class _FakeGh:
+    def __init__(self, root):
+        self.dir = root / "bin"
+        self.dir.mkdir()
+        (self.dir / "gh").write_text(_FAKE_GH_AM)
+        (self.dir / "gh").chmod(0o755)
+        self.state_path = root / "fake-gh-state.json"
+        self.log_path = root / "fake-gh-log.jsonl"
+        self.set()
+
+    def set(self, **state):
+        base = {"head_sha": _AM_SHA, "checks_rc": 0, "merge_rc": 0,
+                "diff_names": ["feature.txt", ".tasks/TASK-001-first-task.md", ".tasks/BOARD.md"]}
+        self.state_path.write_text(json.dumps({**base, **state}))
+
+    def env(self):
+        env = os.environ.copy()
+        env["PATH"] = f"{self.dir}{os.pathsep}{env['PATH']}"
+        env["FAKE_GH_STATE"] = str(self.state_path)
+        env["FAKE_GH_LOG"] = str(self.log_path)
+        return env
+
+    def calls(self):
+        if not self.log_path.exists():
+            return []
+        return [json.loads(line) for line in self.log_path.read_text().splitlines()]
+
+    def merges(self):
+        return [c for c in self.calls() if c["args"][:2] == ["pr", "merge"]]
+
+
+@pytest.fixture
+def fake_gh_am(tmp_path_factory):
+    return _FakeGh(tmp_path_factory.mktemp("fake-gh-am"))
+
+
+def _run_am(repo, fake, command, answers):
+    answers_path = repo.parent / f"{command}-answers.json"
+    answers_path.write_text(json.dumps(answers))
+    return subprocess.run(
+        [sys.executable, str(SCRIPT_PATH), command, str(answers_path)],
+        cwd=repo, capture_output=True, text=True, env=fake.env(),
+    )
+
+
+_APPROVE = json.dumps({
+    "approve": True, "criteria_met": True, "scope_ok": True, "gates_passed": True,
+    "nothing_alarming": True, "findings": ["all criteria met"],
+})
+_REJECT = json.dumps({
+    "approve": False, "criteria_met": False, "scope_ok": True, "gates_passed": True,
+    "nothing_alarming": True, "findings": ["second criterion is not met"],
+})
+
+
+def _auto_merge_answers(verdict=_APPROVE, **overrides):
+    answers = {"task_id": "TASK-001", "verdict": verdict, "head_sha": _AM_SHA, "scope_paths": ["feature.txt"]}
+    answers.update(overrides)
+    return answers
+
+
+def _am_repo(repo, fake, *, allow="true", cap="5"):
+    """TASK-001 wrapped up (PR "open", status in-review) inside an active one-task batch."""
+    result = _wrapped_up_task(repo, fake.dir)
+    assert result.returncode == 0, result.stderr
+    _run_batch(repo, "batch-init", {"selection": _SELECTION, "order": ["TASK-001"]})
+    _set_config_line(repo, "allow_auto_merge", allow)
+    _set_config_line(repo, "autonomous_merge_cap", cap)
+    fake.log_path.unlink(missing_ok=True)
+    return repo
+
+
+def _reviews(repo):
+    return json.loads(_batch_state_file(repo).read_text())["critic_reviews"]
+
+
+def test_auto_merge_merges_after_every_gate_passes_under_the_real_hook(repo, fake_gh_am):
+    _am_repo(repo, fake_gh_am)
+
+    result = _run_am(repo, fake_gh_am, "auto-merge", _auto_merge_answers())
+
+    assert result.returncode == 0, result.stderr
+    output = json.loads(result.stdout)
+    assert output["merged"] is True and output["pr"] == 1
+    (merge,) = fake_gh_am.merges()
+    assert merge["args"][:3] == ["pr", "merge", "1"]
+    assert "--squash" in merge["args"]  # `merge_strategy: squash` from config
+    assert merge["args"][merge["args"].index("--match-head-commit") + 1] == _AM_SHA
+    assert merge["marker_present"] is True  # the marker existed at the moment of the merge...
+    assert not (repo / _MARKER_REL).exists()  # ...and is gone afterwards
+    (review,) = _reviews(repo)
+    assert review["task_id"] == "TASK-001" and review["outcome"] == "auto_merged"
+    assert review["findings"] == ["all criteria met"] and review["approve"] is True
+
+
+def test_auto_merge_uses_the_configured_merge_strategy(repo, fake_gh_am):
+    _am_repo(repo, fake_gh_am)
+    _set_config_line(repo, "merge_strategy", "rebase")
+
+    result = _run_am(repo, fake_gh_am, "auto-merge", _auto_merge_answers())
+
+    assert result.returncode == 0, result.stderr
+    assert "--rebase" in fake_gh_am.merges()[0]["args"]
+
+
+def test_auto_merge_is_refused_unless_the_project_opted_in(repo, fake_gh_am):
+    _am_repo(repo, fake_gh_am, allow="false")
+
+    result = _run_am(repo, fake_gh_am, "auto-merge", _auto_merge_answers())
+
+    assert result.returncode == 0, result.stderr
+    output = json.loads(result.stdout)
+    assert output["merged"] is False and output["reason"] == "disabled"
+    assert output["interrupt"] is None
+    assert fake_gh_am.merges() == []
+    assert _reviews(repo) == []
+
+
+def test_a_critic_rejection_does_not_merge_and_names_the_bail_out_interrupt(repo, fake_gh_am):
+    _am_repo(repo, fake_gh_am)
+
+    result = _run_am(repo, fake_gh_am, "auto-merge", _auto_merge_answers(verdict=_REJECT))
+
+    assert result.returncode == 0, result.stderr
+    output = json.loads(result.stdout)
+    assert output["merged"] is False and output["reason"] == "critic_rejected"
+    assert output["interrupt"] == "critic_rejection"
+    assert output["findings"] == ["second criterion is not met"]
+    assert fake_gh_am.merges() == []
+    (review,) = _reviews(repo)
+    assert review["outcome"] == "critic_rejected" and review["approve"] is False
+
+
+@pytest.mark.parametrize("verdict", ["looks good!", "{}", json.dumps({"approve": True})])
+def test_an_unusable_critic_answer_is_a_rejection_never_an_approval(repo, fake_gh_am, verdict):
+    _am_repo(repo, fake_gh_am)
+
+    output = json.loads(_run_am(repo, fake_gh_am, "auto-merge", _auto_merge_answers(verdict=verdict)).stdout)
+
+    assert output["merged"] is False and output["interrupt"] == "critic_rejection"
+    assert fake_gh_am.merges() == []
+
+
+def _seed_auto_merged(repo, count):
+    path = _batch_state_file(repo)
+    state = json.loads(path.read_text())
+    state["critic_reviews"] = [
+        {"task_id": f"TASK-9{n}", "pr": n, "head_sha": "x", "approve": True, "findings": [],
+         "checklist": {}, "outcome": "auto_merged"} for n in range(count)
+    ]
+    path.write_text(json.dumps(state))
+
+
+def test_the_cap_halts_the_batch_regardless_of_an_approving_critic(repo, fake_gh_am):
+    _am_repo(repo, fake_gh_am, cap="2")
+    _seed_auto_merged(repo, 2)
+
+    result = _run_am(repo, fake_gh_am, "auto-merge", _auto_merge_answers())
+
+    assert result.returncode == 0, result.stderr
+    output = json.loads(result.stdout)
+    assert output["merged"] is False and output["reason"] == "cap_reached"
+    assert output["halt"] is True and output["interrupt"] == "auto_merge_cap_reached"
+    assert fake_gh_am.merges() == []
+    assert _reviews(repo)[-1]["outcome"] == "skipped:cap_reached"
+
+
+def test_under_the_cap_it_still_merges(repo, fake_gh_am):
+    _am_repo(repo, fake_gh_am, cap="2")
+    _seed_auto_merged(repo, 1)
+
+    output = json.loads(_run_am(repo, fake_gh_am, "auto-merge", _auto_merge_answers()).stdout)
+
+    assert output["merged"] is True
+
+
+def test_a_null_cap_never_halts(repo, fake_gh_am):
+    _am_repo(repo, fake_gh_am, cap="null")
+    _seed_auto_merged(repo, 50)
+
+    assert json.loads(_run_am(repo, fake_gh_am, "auto-merge", _auto_merge_answers()).stdout)["merged"] is True
+
+
+def test_the_cap_defaults_to_five_when_the_key_is_absent(repo, fake_gh_am):
+    _am_repo(repo, fake_gh_am)
+    _set_config_line(repo, "autonomous_merge_cap", "__drop__")
+    _seed_auto_merged(repo, 5)
+
+    output = json.loads(_run_am(repo, fake_gh_am, "auto-merge", _auto_merge_answers()).stdout)
+
+    assert output["reason"] == "cap_reached"
+
+
+def test_pending_checks_wait_without_recording_a_review(repo, fake_gh_am):
+    _am_repo(repo, fake_gh_am)
+    fake_gh_am.set(checks_rc=8)
+
+    output = json.loads(_run_am(repo, fake_gh_am, "auto-merge", _auto_merge_answers()).stdout)
+
+    assert output["merged"] is False and output["reason"] == "checks_pending" and output["interrupt"] is None
+    assert fake_gh_am.merges() == [] and _reviews(repo) == []
+
+
+@pytest.mark.parametrize("state,reason", [
+    ({"checks_rc": 1}, "checks_not_green"),
+    ({"diff_names": ["feature.txt", "unrelated/other.py"]}, "scope_violation"),
+    ({"head_sha": "b" * 40}, "head_moved"),
+    ({"pr_state": "MERGED"}, "pr_not_open"),
+])
+def test_other_refusals_skip_the_merge_and_are_recorded_but_do_not_end_the_batch(repo, fake_gh_am, state, reason):
+    _am_repo(repo, fake_gh_am)
+    fake_gh_am.set(**state)
+
+    output = json.loads(_run_am(repo, fake_gh_am, "auto-merge", _auto_merge_answers()).stdout)
+
+    assert output["merged"] is False and output["reason"] == reason
+    assert output["interrupt"] is None and output["halt"] is False
+    assert fake_gh_am.merges() == []
+    assert _reviews(repo)[-1]["outcome"] == f"skipped:{reason}"
+
+
+def test_a_failed_merge_call_surfaces_the_error_and_still_removes_the_marker(repo, fake_gh_am):
+    _am_repo(repo, fake_gh_am)
+    fake_gh_am.set(merge_rc=1)
+
+    result = _run_am(repo, fake_gh_am, "auto-merge", _auto_merge_answers())
+
+    assert result.returncode != 0
+    assert not (repo / _MARKER_REL).exists()
+    assert all(r["outcome"] != "auto_merged" for r in _reviews(repo))
+
+
+def test_auto_merge_refuses_outside_a_batch_and_for_a_task_not_in_review(repo, fake_gh_am):
+    _add_task(repo, "First task")
+    _push_tasks(repo)
+    no_batch = _run_am(repo, fake_gh_am, "auto-merge", _auto_merge_answers())
+    assert no_batch.returncode != 0 and "batch" in no_batch.stderr
+
+    _run_batch(repo, "batch-init", {"selection": _SELECTION, "order": ["TASK-001"]})
+    _set_config_line(repo, "allow_auto_merge", "true")
+    not_in_review = _run_am(repo, fake_gh_am, "auto-merge", _auto_merge_answers())
+    assert not_in_review.returncode != 0 and "in-review" in not_in_review.stderr
+    assert fake_gh_am.merges() == []
+
+
+def test_critic_prompt_is_built_from_the_task_file_and_the_pr(repo, fake_gh_am):
+    _am_repo(repo, fake_gh_am)
+    fake_gh_am.set(head_sha=_AM_SHA, diff_names=["feature.txt", ".tasks/BOARD.md"], diff="diff --git a/feature.txt\n+the change\n")
+
+    result = _run_am(repo, fake_gh_am, "critic-prompt", {
+        "task_id": "TASK-001", "scope_paths": ["feature.txt"], "gates": "pytest: pass\nsync check: exit 0",
+    })
+
+    assert result.returncode == 0, result.stderr
+    output = json.loads(result.stdout)
+    assert output["head_sha"] == _AM_SHA
+    assert output["changed_files"] == ["feature.txt", ".tasks/BOARD.md"]
+    prompt = output["prompt"]
+    assert "TASK-001" in prompt and "First task" in prompt
+    assert "{{criterion}}" in prompt  # the task file's own acceptance-criteria section, verbatim
+    assert "feature.txt" in prompt and "+the change" in prompt and "pytest: pass" in prompt
+    assert "criteria_met" in prompt
+
+
+def test_cmd_render_critic_summary_and_batch_result(tmp_path):
+    reviews = [{"task_id": "TASK-001", "outcome": "auto_merged", "findings": ["clean"]}]
+    summary = json.loads(_run_scaffold(tmp_path, "render-critic-summary", {"critic_reviews": reviews}).stdout)["summary"]
+    assert "| TASK-001 | auto_merged | clean |" in summary
+
+    result = json.loads(_run_scaffold(tmp_path, "render-batch-result", {
+        "order": ["TASK-001", "TASK-002"],
+        "outcomes": [{"task_id": "TASK-001", "title": "t", "status": "done", "link": None}],
+        "halt": {"task_id": "TASK-002", "kind": "critic_rejection", "reason": "criteria_met failed"},
+    }).stdout)["summary"]
+    assert "2 tasks" in result and "1 completed" in result and "TASK-002" in result and "critic_rejection" in result
+
+
+def test_batch_clear_also_removes_a_leftover_auto_merge_marker(repo):
+    _run_batch(repo, "batch-init", {"selection": _SELECTION, "order": _ORDER})
+    marker = repo / _MARKER_REL
+    marker.write_text("{}")
+
+    result = _run_batch(repo, "batch-clear", {})
+
+    assert result.returncode == 0, result.stderr
+    assert not marker.exists() and not _batch_state_file(repo).exists()
+
+
+def test_batch_update_completion_hands_back_the_critic_reviews_for_the_summary(repo):
+    _run_batch(repo, "batch-init", {"selection": {"mode": "list", "tasks": ["TASK-001"]}, "order": ["TASK-001"]})
+    state = json.loads(_batch_state_file(repo).read_text())
+    state["critic_reviews"] = [{"task_id": "TASK-001", "outcome": "auto_merged", "findings": []}]
+    _batch_state_file(repo).write_text(json.dumps(state))
+
+    output = json.loads(_run_batch(repo, "batch-update", {"entry": _entry("TASK-001"), "accounted": True}).stdout)
+
+    assert output["complete"] is True
+    assert [r["task_id"] for r in output["critic_reviews"]] == ["TASK-001"]
+
+
+def test_the_auto_merge_marker_never_counts_as_a_dirty_tree(repo):
+    _add_task(repo, "First task")
+    _push_tasks(repo)
+    marker = repo / _MARKER_REL
+    marker.parent.mkdir(exist_ok=True)
+    marker.write_text("{}")
+
+    assert _resume_state(repo)["phase"] == "phase1"
+    assert _run_start(repo, task_id="TASK-001").returncode == 0

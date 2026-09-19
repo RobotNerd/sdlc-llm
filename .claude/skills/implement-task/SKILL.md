@@ -217,7 +217,9 @@ always halting the batch, as is crossing either usage threshold (steps 3.1/3.4).
       via `record-outcome` (`{"outcomes", "entry"}`, returns the updated list; hold onto it for the
       next step), and mirror it into the state file with `batch-update`
       (`{"entry", "accounted": false}`).
-   6. Instead of phase 3's hard STOP: call this harness's `ScheduleWakeup` rather than stopping —
+   6. **If `.tasks/config.md` has `allow_auto_merge: true`, follow "Auto-merge" below instead of
+      this step's wait.** Otherwise — the default, and always in a project that hasn't opted in — instead
+      of phase 3's hard STOP: call this harness's `ScheduleWakeup` rather than stopping —
       pick a delay proportionate to how quickly this project's CI/review actually completes (its
       own guidance applies: don't tight-poll), and give it a `prompt` that's self-sufficient even
       if later context gets summarized — name `task_id`, its PR url, and that the next step is
@@ -241,9 +243,50 @@ always halting the batch, as is crossing either usage threshold (steps 3.1/3.4).
    usage (a fresh `session-token-usage` total, if it works, and your context estimate) —
    regardless of whether either threshold was ever crossed — and `render-follow-up-summary` with
    the batch's `follow_ups` (from `batch-update`'s completion result, or the last `batch-update`
-   before an early halt), and print all three as the batch's summary. The state file is already gone by now (`batch-update` removed it on the last
+   before an early halt), and `render-batch-result` with `{"order", "outcomes", "halt"}` (`halt`
+   is `null` for a batch that ran to completion, else `{"task_id", "kind", "reason"}` naming the
+   task and interrupt kind that ended it) — that headline says how many tasks the batch started
+   with, how many completed, and which one ended it early — and, if `allow_auto_merge` was on,
+   `render-critic-summary` with the batch's `critic_reviews`. Print them all as the batch's
+   summary. The state file is already gone by now (`batch-update` removed it on the last
    task); if the batch ended any other way, run `batch-clear` — a finished run must never leave
    batch state behind for a later plain invocation to find. **STOP.**
+
+### Auto-merge (opt-in; only when `allow_auto_merge: true`)
+
+The one deliberate exception to "a human reviews and merges", closed by three independent gates
+and off by default — and off in any project that hasn't set `allow_auto_merge: true` in
+`.tasks/config.md`. Once `wrap-up` has opened the PR (step 3.5), instead of waiting for a human:
+
+1. **Critic prompt.** Run `scaffold.py critic-prompt` with `{"task_id", "scope_paths" (the same
+   list you passed `wrap-up`), "gates" (what you ran and what it reported — `test_command`,
+   `lint_command`, `sync check`, one line each)}`. It returns `{"prompt", "head_sha",
+   "changed_files"}` built from the task file's acceptance criteria, the live PR diff and CI.
+2. **Critic.** Launch a subagent with the Agent tool, `model: "haiku"` (a distinctly cheaper,
+   faster model than you), passing `prompt` verbatim — it's a narrow four-item checklist (criteria
+   met, changes in scope, quality gates passed, nothing alarming), not an open-ended review. Take
+   its reply exactly as given; never edit, summarise or "fix up" it.
+3. **Merge attempt.** Run `scaffold.py auto-merge` with `{"task_id", "verdict" (the critic's raw
+   reply), "head_sha" (from step 1), "scope_paths"}`. It checks, in order: opted in, the batch's
+   `autonomous_merge_cap` not reached, PR still open at the reviewed head, CI green, changed files
+   within scope, critic approval (fail-closed: anything unparseable is a rejection). Only if all
+   pass does it write the guardrail's short-lived marker, run the merge itself, and remove the
+   marker. **You never run the merge command yourself** — the hook denies it, and no command or
+   edit may touch the marker.
+4. **Result** (`{"merged", "reason", "halt", "interrupt", "findings"}`; it also records every
+   review in `.tmp/batch-state.json`):
+   - `merged: true` — run `finish-merge` right away (the PR is already `MERGED`, so it records the
+     merge and archives), then continue at step 3.7's `merged: true` branch.
+   - `reason: "checks_pending"` — CI hasn't finished: `ScheduleWakeup` and re-run from step 3
+     (same critic reply, same `head_sha`).
+   - `interrupt: "critic_rejection"` — route it through "Interrupts" as `critic_rejection`: the
+     task is bailed out and **the batch ends**.
+   - `interrupt: "auto_merge_cap_reached"` — route it through "Interrupts" as
+     `auto_merge_cap_reached`: a forced human checkpoint; the batch halts with the PR left open.
+   - any other reason (`disabled`, `checks_not_green`, `scope_violation`, `head_moved`,
+     `pr_not_open`) — no merge happened and nothing is wrong with the batch: fall back to the
+     ordinary human-merge path, step 3.6's `ScheduleWakeup` wait. The refusal is recorded and
+     appears in the critic summary.
 
 ### Follow-up tasks
 
@@ -274,11 +317,12 @@ with why and origin, flagged ones under "needs a human".
 
 ### Interrupts
 
-Whenever a point in the loop above would stop single-task mode, decide which of these five
+Whenever a point in the loop above would stop single-task mode, decide which of these
 conditions it matches, then run
 `python3 .claude/skills/implement-task/scaffold.py classify-interrupt <answers.json>` with
-`{"kind": "..."}`. It returns `{"routing": "isolated"|"systemic", "continue_batch": true|false}`
-(refusing on any other `kind` — don't invent a sixth):
+`{"kind": "..."}`. It returns
+`{"routing": "isolated"|"systemic"|"bail_out_halt", "continue_batch": true|false}` (refusing on
+any other `kind` — don't invent more):
 
 - `needs_clarification` — the task is ambiguous, or its acceptance criteria contradict something
   discovered mid-implementation (today's existing bail-out reason).
@@ -293,6 +337,9 @@ conditions it matches, then run
   distinct from "the code is wrong" — every remaining task would hit the same wall.
 - `context_usage_exceeded` / `token_budget_exceeded` — `check-usage-thresholds` (steps 3.1/3.4)
   already names which one in its `kind`; use that directly rather than judging it yourself.
+- `critic_rejection` — `auto-merge`'s critic did not approve (its result's `interrupt` says so).
+- `auto_merge_cap_reached` — `auto-merge` hit `autonomous_merge_cap` (its result's `interrupt`
+  says so); a forced human checkpoint.
 
 **`routing: "isolated"`** (the first four kinds — `continue_batch: true`): write findings into the
 interrupted task's Worklog and/or Notes yourself first (content-authoring, exactly what `bail-out`
@@ -302,13 +349,27 @@ outcome via `record-outcome` — `{"task_id", "title", "status"}` describing the
 `batch-update` (`{"entry", "accounted": true}`; this task's turn is over), then continue the loop
 at the next `task_id` in `order`. This task's own STOP-worthy problem doesn't stop the batch.
 
-**`routing: "systemic"`** (`infra_failure`/`context_usage_exceeded`/`token_budget_exceeded` —
-`continue_batch: false`): don't touch the interrupted task's status — none of these three are the
+**`routing: "bail_out_halt"`** (`critic_rejection` — `continue_batch: false`): the rejected task
+is bailed out, and the batch ends there. Write the critic's `findings` and `detail` into the task's
+Worklog/Notes first (content-authoring), and note that its PR is left open on GitHub for a human
+to review or close — never close it or touch its branch yourself. Then run `bail-out` with
+`{"task_id", "status": "todo"}`, append its outcome via `record-outcome` —
+`{"task_id", "title", "status": "todo (critic rejected)"}`, `"link": null` — and `batch-update`
+(`{"entry", "accounted": true}`; keep the `order`, `outcomes` and `critic_reviews` it returns).
+Then print the batch's summary (step 4): `render-batch-result` with `halt: {"task_id", "kind":
+"critic_rejection", "reason": <the critic's detail/findings>}` — so it states how many tasks the
+batch started with, how many completed, and which one ended it — plus the outcome table, usage,
+follow-up and critic summaries. Finally run `batch-clear` (removes the batch state and any marker —
+no artifacts are left behind) and **STOP**; nothing else in `order` starts.
+
+**`routing: "systemic"`** (`infra_failure`/`context_usage_exceeded`/`token_budget_exceeded`/
+`auto_merge_cap_reached` — `continue_batch: false`): don't touch the interrupted task's status — none of these three are the
 task's fault, so it's left exactly as-is for a normal single-task `resume-state` later (once
 `git`/`gh` works again, or in a fresh session with more budget). Append its outcome noting the
 interruption (`batch-update` with `"accounted": false`, so its outcomes list is current), run
-`render-outcome-table`, `render-usage-summary` and `render-follow-up-summary` with everything
-accumulated so far, then run
+`render-outcome-table`, `render-usage-summary`, `render-follow-up-summary`, `render-batch-result`
+(with `halt: {"task_id", "kind", "reason"}`) and — if auto-merge was on — `render-critic-summary`
+with everything accumulated so far, then run
 `batch-clear` — the batch is over, so a later invocation must not resume it — and **STOP**;
 nothing else in `order` starts.
 
@@ -328,8 +389,10 @@ Enforced *in the script*, not only documented here:
 - Never push *task work* to `default_branch`. The one exception is `finish-merge`'s own
   bookkeeping commit, and only once it has independently confirmed the PR is `MERGED` and the
   current branch actually is `default_branch`.
-- **Never run `gh pr merge`.** The human always does the squash-merge on GitHub — no subcommand
-  here does this.
+- **Never run `gh pr merge` yourself.** The human always does the squash-merge on GitHub — the sole
+  exception is `auto-merge` (see "Auto-merge"), which only ever runs when the project has set
+  `allow_auto_merge: true`, and only after every one of its gates passes; it is the one code path
+  that can merge, and the hook denies any other merge. No other subcommand does this.
 - `wrap-up`'s push refuses outright (raises before running any `git` command) if the current
   branch isn't the task's own branch, or if that branch is `default_branch`; `--force-with-lease`
   only fires when a rebase actually rewrote already-pushed history.

@@ -42,8 +42,10 @@ the mechanics.
 
 - Never push to `main`, except `implement-task`'s own phase-4 bookkeeping commit (recording an
   already-reviewed merge) — a deliberate, narrow carve-out, not something to extend by hand. Never
-  `gh pr merge` — the human merges. **Hook-enforced** (`.claude/settings.json`'s `PreToolUse`/
-  `Bash` hook, `.tasks/bin/guardrails.py`).
+  `gh pr merge` — the human merges (the sole exception is batch mode's opt-in critic-gated
+  auto-merge, `allow_auto_merge: true`, which this repo leaves `false`; only that scripted step
+  can ever merge, and no command or edit may touch its marker file). **Hook-enforced**
+  (`.claude/settings.json`'s `PreToolUse`/`Bash` hook, `.tasks/bin/guardrails.py`).
 - Force-push only as `--force-with-lease`, only on the current task's branch, only after a
   rebase. **Hook-enforced.**
 - Never touch files outside the current task's scope.

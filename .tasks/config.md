@@ -19,6 +19,7 @@ tdd_enforced: true
 context_usage_halt_pct: 85
 token_budget_per_batch: null
 autonomous_new_task_limit: 3
+autonomous_merge_cap: 5
 ignored_paths: [.tmp/prompts.md]
 ---
 
@@ -54,9 +55,16 @@ describes: the skills' logic stays identical across projects, only this file cha
   `sync-check` runs `.tasks/bin/sync check` (drift detection, stdlib only), `test` runs the
   `test_command` suite. `implement-task` phase 4 (and a human eyeballing `gh pr checks`) gates
   merge on both being green.
-- **`allow_auto_merge: false`** — reinforces the never-merge guardrail; not currently read by
-  anything since the skill never attempts to merge regardless, but kept for parity with
-  SPEC-001's schema and as a documented intent if that ever changes.
+- **`allow_auto_merge: false`** — the opt-in for `implement-task` batch mode's critic-gated,
+  capped auto-merge (default `false`; nothing ever merges unless a project sets it `true`). When
+  `true`, once a PR's checks are green a cheap-model critic runs a narrow checklist over the diff
+  and must approve; only then does the scripted `auto-merge` step run `gh pr merge`, and the
+  guardrail hook allows that one merge only while its short-lived marker exists. The standing
+  "a human reviews and merges" rule applies unchanged when this is `false`, and this repo keeps it
+  `false`.
+- **`autonomous_merge_cap: 5`** — the most tasks one batch run may auto-merge. Once reached, the
+  batch halts for a human checkpoint regardless of further critic approvals. `0` never
+  auto-merges; `null` removes the cap. Only read when `allow_auto_merge` is `true`.
 - **`tdd_enforced: true`** — `implement-task` phase 2 writes each Testing strategy step's/
   acceptance criterion's test(s) first, confirms they fail for the expected reason, then
   implements until green — an explicit step order, not left to model discretion. `false` reverts

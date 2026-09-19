@@ -11,8 +11,10 @@ once.
 
 Covers, today:
 
-- `gh pr merge` — denied unless a future critic-gated marker is present (none can exist yet;
-  see `check_gh_pr_merge`'s docstring).
+- `gh pr merge` — denied unless the project has opted in (`allow_auto_merge: true`) AND a valid
+  auto-merge marker for exactly that PR and head commit exists (see `auto_merge_marker_valid`);
+  the marker is written only by `implement-task`'s scripted, critic-gated `auto-merge` path.
+  Any Bash command or `Edit`/`Write` that touches the marker file is itself denied.
 - `git push` of task work to the project's `default_branch` — denied unless every path it
   would introduce is board-managed (`BOARD.md`, `EPIC-*.md`, `.tasks/archive/**`, or a task
   file whose only changed frontmatter fields are `status`/`merge_commit`/`pr`).
@@ -37,9 +39,11 @@ directory), to stay dependency-free for any project it's vendored into.
 from __future__ import annotations
 
 import importlib.util
+import json
 import re
 import subprocess
 import sys
+import time
 from dataclasses import dataclass
 from importlib.machinery import SourceFileLoader
 from pathlib import Path
@@ -159,16 +163,104 @@ def _current_branch(cwd: Path) -> str | None:
 # ---------------------------------------------------------------------------
 
 
-def check_gh_pr_merge(command: str, marker_present: bool = False) -> GuardrailResult:
-    """Deny `gh pr merge` unless `marker_present` is `True`.
+AUTO_MERGE_MARKER_RELPATH = ".tmp/auto-merge-marker.json"
+AUTO_MERGE_MARKER_NAME = "auto-merge-marker"
+AUTO_MERGE_MARKER_TTL_SECONDS = 300
 
-    `marker_present` is the hook point for a future opt-in, critic-gated, capped auto-merge
-    path -- once that's built, its own scripted merge step would be the only caller that can
-    ever pass `True` here (a recorded critic approval, under that batch's merge cap). No such
-    marker exists yet, and nothing today constructs one, so this denies every `gh pr merge`
-    unconditionally in practice -- deliberately shaped as "deny unless marker present" rather
-    than a bare unconditional deny, so that future work can wire in the real marker without
-    this check's shape changing.
+
+def auto_merge_marker_path(cwd: Path) -> Path:
+    return cwd / AUTO_MERGE_MARKER_RELPATH
+
+
+def write_auto_merge_marker(
+    cwd: Path, *, pr: int, head_sha: str, ttl_seconds: int = AUTO_MERGE_MARKER_TTL_SECONDS,
+    now: float | None = None,
+) -> Path:
+    """Write the marker that lets exactly one `gh pr merge <pr> ... --match-head-commit
+    <head_sha>` through the hook for `ttl_seconds`. Called only by `implement-task`'s scripted
+    `auto-merge`, after every gate has passed, immediately before the merge -- and removed again
+    right after (`clear_auto_merge_marker`); the short TTL is the backstop if it never gets to.
+    """
+    now = time.time() if now is None else now
+    path = auto_merge_marker_path(cwd)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps({
+        "pr": int(pr), "head_sha": head_sha, "created_at": now, "expires_at": now + ttl_seconds,
+    }))
+    return path
+
+
+def clear_auto_merge_marker(cwd: Path) -> bool:
+    """Delete the marker; returns whether there was one."""
+    try:
+        auto_merge_marker_path(cwd).unlink()
+    except FileNotFoundError:
+        return False
+    return True
+
+
+def _gh_pr_merge_args(command: str) -> list[str] | None:
+    """The tokens after `gh pr merge` in the first such segment of `command`, or `None`."""
+    for segment in _split_command_segments(command):
+        tokens = _safe_split(segment)
+        if tokens[:3] == ["gh", "pr", "merge"]:
+            return tokens[3:]
+    return None
+
+
+def _merge_target_and_head(args: list[str]) -> tuple[str | None, str | None]:
+    """`(<PR number/ref>, <--match-head-commit value>)` from `gh pr merge`'s arguments -- the
+    first non-flag positional (skipping the value of the flags that take one), and the head
+    commit the merge is pinned to; either `None` if absent.
+    """
+    value_flags = {"--match-head-commit", "--body", "-b", "--body-file", "-F", "--subject", "-t", "--author-email", "-A"}
+    target = head = None
+    i = 0
+    while i < len(args):
+        token = args[i]
+        if token == "--match-head-commit" and i + 1 < len(args):
+            head = args[i + 1]
+            i += 2
+            continue
+        if token.startswith("--match-head-commit="):
+            head = token.split("=", 1)[1]
+        elif token in value_flags:
+            i += 2
+            continue
+        elif not token.startswith("-") and target is None:
+            target = token
+        i += 1
+    return target, head
+
+
+def auto_merge_marker_valid(command: str, cwd: Path, config: dict, now: float | None = None) -> bool:
+    """Whether a valid auto-merge marker covers this exact `gh pr merge` command: the project has
+    opted in (`allow_auto_merge: true`), the marker file exists, parses, and hasn't expired, names
+    the same PR the command does, and the command pins the merge to the marker's head commit
+    (`--match-head-commit`) -- so an approval for one reviewed commit of one PR can't be spent
+    on anything else. Any malformed/absent piece means "not valid"; never raises.
+    """
+    if config.get("allow_auto_merge") is not True:
+        return False
+    args = _gh_pr_merge_args(command)
+    if args is None:
+        return False
+    target, head = _merge_target_and_head(args)
+    try:
+        marker = json.loads(auto_merge_marker_path(cwd).read_text())
+        pr, head_sha, expires_at = str(int(marker["pr"])), str(marker["head_sha"]), float(marker["expires_at"])
+    except (OSError, ValueError, KeyError, TypeError):
+        return False
+    if (time.time() if now is None else now) >= expires_at:
+        return False
+    return target == pr and head == head_sha and len(head_sha) >= 7
+
+
+def check_gh_pr_merge(command: str, marker_present: bool = False) -> GuardrailResult:
+    """Deny `gh pr merge` unless `marker_present` is `True` -- the caller
+    (`evaluate_bash_command`) sets it from `auto_merge_marker_valid`, i.e. only for the exact
+    merge `implement-task`'s scripted critic-gated `auto-merge` path just authorised. A bare
+    `gh pr merge` from the model, or any merge without a valid marker, stays denied.
     """
     if not _is_gh_pr_merge(command):
         return GuardrailResult(allow=True)
@@ -178,9 +270,44 @@ def check_gh_pr_merge(command: str, marker_present: bool = False) -> GuardrailRe
         allow=False,
         reason=(
             "`gh pr merge` is denied -- a human reviews and merges on GitHub; "
-            "implement-task's phase 4 only observes and records an already-completed merge."
+            "implement-task's phase 4 only observes and records an already-completed merge "
+            "(unless the project opted into critic-gated auto-merge, which authorises its own "
+            "scripted merge step only)."
         ),
     )
+
+
+def check_auto_merge_marker_bash(command: str) -> GuardrailResult:
+    """Deny any Bash command that names the auto-merge marker file. The scripted `auto-merge`
+    path never puts that name on a command line (it writes the marker itself), so nothing
+    legitimate is affected -- this only stops a model shortcutting the critic gate by forging,
+    reading or deleting the marker through the shell.
+    """
+    if AUTO_MERGE_MARKER_NAME in command:
+        return GuardrailResult(
+            allow=False,
+            reason=(
+                "the auto-merge marker is written and removed only by implement-task's scripted "
+                "`auto-merge` step -- do not create, read, edit or delete it by hand."
+            ),
+        )
+    return GuardrailResult(allow=True)
+
+
+def check_auto_merge_marker_edit(tool_name: str, tool_input: dict, cwd: Path) -> GuardrailResult:
+    """Deny an `Edit`/`Write` whose target is the auto-merge marker file (see
+    `check_auto_merge_marker_bash`).
+    """
+    file_path = str(tool_input.get("file_path") or "")
+    if Path(file_path).name == Path(AUTO_MERGE_MARKER_RELPATH).name:
+        return GuardrailResult(
+            allow=False,
+            reason=(
+                "the auto-merge marker is written only by implement-task's scripted `auto-merge` "
+                "step -- do not create or edit it by hand."
+            ),
+        )
+    return GuardrailResult(allow=True)
 
 
 # ---------------------------------------------------------------------------
@@ -608,7 +735,8 @@ def evaluate_bash_command(command: str, cwd: Path) -> GuardrailResult:
     format_command = config.get("format_command")
 
     for result in (
-        check_gh_pr_merge(command),
+        check_auto_merge_marker_bash(command),
+        check_gh_pr_merge(command, marker_present=auto_merge_marker_valid(command, cwd, config)),
         check_push_to_default_branch(command, cwd, default_branch, remote),
         check_force_push(command, cwd, branch_prefix),
         check_branch_create(command, cwd, branch_prefix, ignored_paths),
@@ -779,7 +907,7 @@ def evaluate_edit_write(tool_name: str, tool_input: dict, cwd: Path) -> Guardrai
     """Run every structural-edit guardrail above against an `Edit`/`Write` tool call, in
     order, returning the first denial (or an allow if none fires).
     """
-    for check in (check_region_edit, check_epic_status_edit):
+    for check in (check_region_edit, check_epic_status_edit, check_auto_merge_marker_edit):
         result = check(tool_name, tool_input, cwd)
         if not result.allow:
             return result
