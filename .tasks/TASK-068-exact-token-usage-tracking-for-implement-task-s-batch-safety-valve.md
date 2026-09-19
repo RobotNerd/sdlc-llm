@@ -2,11 +2,11 @@
 id: TASK-068
 title: Exact token-usage tracking for implement-task's batch safety valve
 type: feature
-status: in-progress
+status: in-review
 epic: EPIC-003
 created: 2026-09-18
 branch: task-068-exact-token-usage-tracking-for-implement-task-s-batch-safety-valve
-pr: null
+pr: "https://github.com/RobotNerd/sdlc-llm/pull/85"
 merge_commit: null
 blocked_by: [TASK-043]
 blocks: []
