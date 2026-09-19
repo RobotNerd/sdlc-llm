@@ -2,12 +2,12 @@
 id: TASK-072
 title: Report malformed task/epic/spec frontmatter as a clear error, not a traceback
 type: bug
-status: in-review
+status: done
 epic: EPIC-003
 created: 2026-09-19
 branch: task-072-report-malformed-task-epic-spec-frontmatter-as-a-clear-error-not-a-traceback
 pr: "https://github.com/RobotNerd/sdlc-llm/pull/88"
-merge_commit: null
+merge_commit: 5a2a8e310832f50ce8b3d07fcc6ee768803cd6d9
 blocked_by: []
 blocks: []
 ---
