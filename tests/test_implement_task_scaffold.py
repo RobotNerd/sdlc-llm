@@ -316,6 +316,33 @@ def test_render_outcome_table_renders_every_row_in_order():
 
 
 # ---------------------------------------------------------------------------
+# interrupt_routing: the five-condition taxonomy -- isolated (skip this task,
+# continue the batch) vs. systemic (halt the batch).
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["needs_clarification", "unexpected_blocker", "quality_gate_failure", "guardrail_denial"],
+)
+def test_interrupt_routing_isolated_kinds_continue_the_batch(kind):
+    assert implement_task_scaffold.interrupt_routing(kind) == {
+        "routing": "isolated", "continue_batch": True,
+    }
+
+
+def test_interrupt_routing_infra_failure_is_systemic_and_halts():
+    assert implement_task_scaffold.interrupt_routing("infra_failure") == {
+        "routing": "systemic", "continue_batch": False,
+    }
+
+
+def test_interrupt_routing_raises_on_unknown_kind():
+    with pytest.raises(ValueError, match="bogus"):
+        implement_task_scaffold.interrupt_routing("bogus")
+
+
+# ---------------------------------------------------------------------------
 # Integration: cmd_start / cmd_bail_out / cmd_resume_state against a real
 # scratch repo with a genuine bare "origin" remote
 # ---------------------------------------------------------------------------
@@ -953,3 +980,24 @@ def test_cmd_render_outcome_table(tmp_path):
     assert result.returncode == 0, result.stderr
     table = json.loads(result.stdout)["table"]
     assert "| TASK-001 | First | done | abc |" in table
+
+
+def test_cmd_classify_interrupt_isolated(tmp_path):
+    result = _run_scaffold(tmp_path, "classify-interrupt", {"kind": "unexpected_blocker"})
+
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout) == {"routing": "isolated", "continue_batch": True}
+
+
+def test_cmd_classify_interrupt_systemic(tmp_path):
+    result = _run_scaffold(tmp_path, "classify-interrupt", {"kind": "infra_failure"})
+
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout) == {"routing": "systemic", "continue_batch": False}
+
+
+def test_cmd_classify_interrupt_refuses_unknown_kind(tmp_path):
+    result = _run_scaffold(tmp_path, "classify-interrupt", {"kind": "bogus"})
+
+    assert result.returncode != 0
+    assert "bogus" in result.stderr
