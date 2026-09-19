@@ -16,6 +16,8 @@ allow_auto_merge: false
 ci_checks: [sync-check, test]
 archive_done: true
 tdd_enforced: true
+context_usage_halt_pct: 85
+token_budget_per_batch: null
 ignored_paths: [.tmp/prompts.md]
 ---
 
@@ -62,3 +64,8 @@ describes: the skills' logic stays identical across projects, only this file cha
   blockers (phase 1's start check, phase 3's pre-rebase stash). `.tmp/prompts.md` is the human's
   own prompt scratchpad, not part of any task's actual work — a fresh project scaffolded by
   `init-project` starts with this empty and adds project-specific paths the same way.
+- **`context_usage_halt_pct: 85`** / **`token_budget_per_batch: null`** — `implement-task` batch
+  mode's usage safety valve (SPEC-003): crossing either halts the batch as a systemic interrupt,
+  checked at each between-task checkpoint. Context usage is the model's own best-effort estimate —
+  this harness exposes no tool that reports exact context/token usage — so this is a deliberately
+  cheap stopgap, not a precise measurement. `null` token budget means no cap.

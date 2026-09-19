@@ -5,7 +5,10 @@
   guardrail — not something init-time should offer to turn on);
   `docs_review_paths`/`docs_ignore_paths`/`ignored_paths` always start at
   the generic defaults below — a human adds project-specific paths later
-  by editing config.md directly.
+  by editing config.md directly. `context_usage_halt_pct`/
+  `token_budget_per_batch` always start at the conservative defaults below
+  too — implement-task batch mode's usage safety valve, not something
+  init-time asks about.
   Placeholders:
     {{test_command}}               e.g. `pytest`, `npm test`, or `null`
     {{lint_command}}                 e.g. `ruff check .`, or `null`
@@ -39,6 +42,8 @@ allow_auto_merge: false
 ci_checks: {{ci_checks}}
 archive_done: {{archive_done}}
 tdd_enforced: {{tdd_enforced}}
+context_usage_halt_pct: 85
+token_budget_per_batch: null
 ignored_paths: []
 ---
 
@@ -76,3 +81,8 @@ skills' logic identical across projects — only this file changes.
   start check, phase 3's pre-rebase stash) — e.g. a personal prompt scratchpad convention that
   isn't part of any task's actual work. Empty by default, same posture as `docs_review_paths`; a
   human adds paths later by editing this file directly, not something init-time asks about.
+- **`context_usage_halt_pct`** / **`token_budget_per_batch`** — `implement-task` batch mode's
+  usage safety valve: crossing either halts the batch as a systemic interrupt. Context is an
+  estimate checked at each between-task checkpoint (this harness exposes no exact-usage tool);
+  `token_budget_per_batch: null` means no cap. Conservative fixed defaults, same posture as
+  `allow_auto_merge` — not something init-time asks about.

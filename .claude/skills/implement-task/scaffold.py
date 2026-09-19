@@ -214,22 +214,60 @@ def render_outcome_table(outcomes: list[dict]) -> str:
 _ISOLATED_INTERRUPT_KINDS = frozenset({
     "needs_clarification", "unexpected_blocker", "quality_gate_failure", "guardrail_denial",
 })
-_SYSTEMIC_INTERRUPT_KINDS = frozenset({"infra_failure"})
+_SYSTEMIC_INTERRUPT_KINDS = frozenset({
+    "infra_failure", "context_usage_exceeded", "token_budget_exceeded",
+})
 
 
 def interrupt_routing(kind: str) -> dict:
-    """Route one of batch mode's five interrupt conditions: `needs_clarification`/
+    """Route one of batch mode's interrupt conditions: `needs_clarification`/
     `unexpected_blocker`/`quality_gate_failure`/`guardrail_denial` are isolated -- bail out this
-    one task and continue the batch at its next task; `infra_failure` is systemic -- halt the
-    whole batch before starting anything else, since the tooling itself (not this task's code) is
-    broken and every remaining task would hit the same wall. Raises `ValueError` on any other
-    `kind`.
+    one task and continue the batch at its next task. `infra_failure`/`context_usage_exceeded`/
+    `token_budget_exceeded` are systemic -- halt the whole batch before starting anything else,
+    since none of them are this task's fault and every remaining task would hit the same wall.
+    Raises `ValueError` on any other `kind`.
     """
     if kind in _ISOLATED_INTERRUPT_KINDS:
         return {"routing": "isolated", "continue_batch": True}
     if kind in _SYSTEMIC_INTERRUPT_KINDS:
         return {"routing": "systemic", "continue_batch": False}
     raise ValueError(f"unknown interrupt kind: {kind!r}")
+
+
+def check_usage_thresholds(
+    *, context_pct: float, halt_pct: float, tokens_used: int, token_budget: int | None
+) -> dict:
+    """Batch mode's usage safety valve: this harness exposes no tool that reports exact context
+    or token usage, so `context_pct`/`tokens_used` are the caller's own best-effort estimate at a
+    checkpoint (between tasks, and where practical after phase 2/before phase 3) -- this stays a
+    cheap, approximate stopgap on purpose, not a real measurement.
+
+    Context is checked first: `context_pct >= halt_pct` reports `context_usage_exceeded`
+    regardless of the token budget. Only when context is fine does a set (non-`None`)
+    `token_budget` get checked against `tokens_used`, reporting `token_budget_exceeded`. Returns
+    `{"halt": bool, "kind": str | None, "message": str | None}` -- `message` names the specific
+    value and threshold crossed, for both `classify-interrupt` and a human reading the halt.
+    """
+    if context_pct >= halt_pct:
+        return {
+            "halt": True, "kind": "context_usage_exceeded",
+            "message": f"context usage {context_pct:g}% >= halt threshold {halt_pct:g}%",
+        }
+    if token_budget is not None and tokens_used >= token_budget:
+        return {
+            "halt": True, "kind": "token_budget_exceeded",
+            "message": f"token usage {tokens_used} >= batch budget {token_budget}",
+        }
+    return {"halt": False, "kind": None, "message": None}
+
+
+def render_usage_summary(*, context_pct: float, tokens_used: int, token_budget: int | None) -> str:
+    """A one-line usage report for the end-of-batch summary -- printed every time, regardless of
+    whether either threshold was ever crossed, so a human can judge whether an opt-in
+    critic/auto-merge path is worth its cost on their plan tier.
+    """
+    budget_text = "no cap" if token_budget is None else str(token_budget)
+    return f"Usage: context {context_pct:g}% · tokens {tokens_used} (budget: {budget_text})"
 
 
 def resume_phase(*, in_flight: dict | None, working_tree_dirty: bool, gh_pr_state: str | None) -> dict:
@@ -811,6 +849,26 @@ def cmd_classify_interrupt(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_check_usage_thresholds(args: argparse.Namespace) -> int:
+    answers = json.loads(Path(args.answers).read_text())
+    result = check_usage_thresholds(
+        context_pct=answers["context_pct"], halt_pct=answers["halt_pct"],
+        tokens_used=answers["tokens_used"], token_budget=answers.get("token_budget"),
+    )
+    print(json.dumps(result))
+    return 0
+
+
+def cmd_render_usage_summary(args: argparse.Namespace) -> int:
+    answers = json.loads(Path(args.answers).read_text())
+    summary = render_usage_summary(
+        context_pct=answers["context_pct"], tokens_used=answers["tokens_used"],
+        token_budget=answers.get("token_budget"),
+    )
+    print(json.dumps({"summary": summary}))
+    return 0
+
+
 def cmd_gh_auth_status(args: argparse.Namespace) -> int:
     result = subprocess.run(["gh", "auth", "status"], capture_output=True, text=True)
     print(result.stdout)
@@ -833,6 +891,8 @@ def main(argv: list[str]) -> int:
         ("record-outcome", "batch mode: append one task's outcome to the accumulator"),
         ("render-outcome-table", "batch mode: render the end-of-batch outcome table"),
         ("classify-interrupt", "batch mode: route an interrupt kind to isolated/systemic"),
+        ("check-usage-thresholds", "batch mode: check context/token usage against config thresholds"),
+        ("render-usage-summary", "batch mode: render the end-of-batch usage report"),
     ):
         sub = subparsers.add_parser(name, help=help_text)
         sub.add_argument("answers", help="path to a JSON file with this subcommand's inputs")
@@ -848,6 +908,8 @@ def main(argv: list[str]) -> int:
         "record-outcome": cmd_record_outcome,
         "render-outcome-table": cmd_render_outcome_table,
         "classify-interrupt": cmd_classify_interrupt,
+        "check-usage-thresholds": cmd_check_usage_thresholds,
+        "render-usage-summary": cmd_render_usage_summary,
     }
     return dispatch[args.command](args)
 
