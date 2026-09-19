@@ -2,11 +2,11 @@
 id: TASK-044
 title: Follow-up task creation policy with a configurable per-batch limit
 type: feature
-status: in-progress
+status: in-review
 epic: EPIC-003
 created: 2026-09-14
 branch: task-044-follow-up-task-creation-policy
-pr: null
+pr: "https://github.com/RobotNerd/sdlc-llm/pull/89"
 merge_commit: null
 blocked_by: [TASK-041]
 blocks: [TASK-054, TASK-055]

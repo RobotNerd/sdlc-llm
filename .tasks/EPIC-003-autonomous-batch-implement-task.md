@@ -62,7 +62,7 @@ interrupting appropriately, while human review of merges stays the default.
 | TASK-041 | done | Core autonomous loop: iterate a validated batch without manual re-invocation |
 | TASK-042 | done | Interrupt taxonomy: isolated skip-task vs. systemic halt-batch routing |
 | TASK-043 | done | Context/token usage safety-valve interrupt + usage reporting |
-| TASK-044 | in-progress | Follow-up task creation policy with a configurable per-batch limit |
+| TASK-044 | in-review | Follow-up task creation policy with a configurable per-batch limit |
 | TASK-045 | todo | Opt-in, critic-gated, per-batch-capped auto-merge |
 | TASK-067 | done | batch_select range mode: use BOARD.md's hand-ordered TODO slice, not numeric task-id order |
 | TASK-068 | done | Exact token-usage tracking for implement-task's batch safety valve |
