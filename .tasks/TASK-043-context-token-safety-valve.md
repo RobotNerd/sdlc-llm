@@ -2,11 +2,11 @@
 id: TASK-043
 title: Context/token usage safety-valve interrupt + usage reporting
 type: feature
-status: in-progress
+status: in-review
 epic: EPIC-003
 created: 2026-09-14
 branch: task-043-context-token-safety-valve
-pr: null
+pr: "https://github.com/RobotNerd/sdlc-llm/pull/81"
 merge_commit: null
 blocked_by: [TASK-041]
 blocks: [TASK-054, TASK-055, TASK-064]
