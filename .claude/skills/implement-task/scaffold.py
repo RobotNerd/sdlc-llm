@@ -122,6 +122,22 @@ def remote_branch_exists(cwd: Path, remote: str, branch: str) -> bool:
     return result.returncode == 0
 
 
+def stage_bookkeeping(cwd: Path) -> subprocess.CompletedProcess:
+    """Stage exactly what a bookkeeping commit (`wrap-up`'s `pr:`/`status:` update,
+    `finish-merge`'s merge record) owns, and nothing else under `.tasks/`. `git add -u -- .tasks`
+    stages modifications and deletions of already-tracked files only -- `BOARD.md`, `EPIC-*.md`,
+    the task's own frontmatter, and the deletion side of an archive move -- never a new untracked
+    file, so unrelated leftovers in `.tasks/` (say, an in-flight `add-task` run's output) can't
+    ride along into a commit that `finish-merge` pushes straight to the default branch.
+    `.tasks/archive/` is then added whole: `sync` moves *every* `done` task there, and staging
+    only one of them would commit a deletion without its archived copy.
+    """
+    result = subprocess.run(["git", "add", "-u", "--", ".tasks"], cwd=cwd, capture_output=True, text=True)
+    if result.returncode != 0 or not (cwd / ".tasks" / "archive").is_dir():
+        return result
+    return subprocess.run(["git", "add", "--", ".tasks/archive"], cwd=cwd, capture_output=True, text=True)
+
+
 # ---------------------------------------------------------------------------
 # Pure functions -- the four AC7 asks unit tests for, plus their small
 # supporting helpers. No git/gh/filesystem I/O in here.
@@ -792,7 +808,7 @@ def cmd_wrap_up(args: argparse.Namespace) -> int:
     # otherwise this sits as uncommitted local drift and the PR's own diff never reflects
     # it (found for real: `wrap-up` reported success, but `git status` immediately
     # after showed this exact change uncommitted).
-    bookkeeping_add = subprocess.run(["git", "add", "--", ".tasks"], cwd=root, capture_output=True, text=True)
+    bookkeeping_add = stage_bookkeeping(root)
     if bookkeeping_add.returncode != 0:
         print(bookkeeping_add.stderr, file=sys.stderr)
         return bookkeeping_add.returncode
@@ -913,7 +929,7 @@ def cmd_finish_merge(args: argparse.Namespace) -> int:
             file=sys.stderr,
         )
         return 2
-    add_result = subprocess.run(["git", "add", "--", ".tasks"], cwd=root, capture_output=True, text=True)
+    add_result = stage_bookkeeping(root)
     if add_result.returncode != 0:
         print(add_result.stderr, file=sys.stderr)
         return add_result.returncode
