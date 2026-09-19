@@ -1,12 +1,12 @@
 ---
 id: TASK-068
-title: "Exact token-usage tracking for implement-task's batch safety valve"
+title: Exact token-usage tracking for implement-task's batch safety valve
 type: feature
-status: todo
+status: in-review
 epic: EPIC-003
 created: 2026-09-18
 branch: task-068-exact-token-usage-tracking-for-implement-task-s-batch-safety-valve
-pr: null
+pr: "https://github.com/RobotNerd/sdlc-llm/pull/85"
 merge_commit: null
 blocked_by: [TASK-043]
 blocks: []
@@ -50,16 +50,16 @@ from the session's own transcript, not an estimate.
 
 ## Acceptance criteria
 
-- [ ] `compute_session_token_usage` correctly sums a synthetic transcript fixture's token usage,
+- [x] `compute_session_token_usage` correctly sums a synthetic transcript fixture's token usage,
       matching ccstatusline's own dedup-then-sum algorithm (streaming partials excluded).
-- [ ] `session-token-usage` (CLI) returns `{"tokens_used", ...}` for a real transcript file and
+- [x] `session-token-usage` (CLI) returns `{"tokens_used", ...}` for a real transcript file and
       exits non-zero with a clear message (not a traceback) on a missing/malformed one.
-- [ ] `SKILL.md`'s batch-mode usage checkpoints use `session-token-usage`'s real total instead of a
+- [x] `SKILL.md`'s batch-mode usage checkpoints use `session-token-usage`'s real total instead of a
       self-estimated running tally, with a documented fallback (skip the token-budget check, don't
       halt) when that call fails.
-- [ ] `context_pct` is untouched — still documented as a self-estimate; this task doesn't attempt
+- [x] `context_pct` is untouched — still documented as a self-estimate; this task doesn't attempt
       to make it exact.
-- [ ] `pytest` and `python3 .tasks/bin/sync check` both pass.
+- [x] `pytest` and `python3 .tasks/bin/sync check` both pass.
 
 ## Testing strategy
 
@@ -78,7 +78,13 @@ from the session's own transcript, not an estimate.
 
 ## Worklog
 
-_(empty — appended during implementation)_
+- Tests first (10 failing: function/subcommand absent), then implemented; all pass.
+- `compute_session_token_usage` raises `TranscriptError` (CLI: message to stderr, exit 2, no traceback) on a missing/unreadable file, a non-JSON line (names the line number), or a transcript with **no** `message.usage` entries at all. Interpretation note: the task text says "a line with no `message.usage`" should raise, but such lines (user turns, summaries) are routine in real transcripts, so they're skipped; only "nothing recognisable anywhere" is treated as a format change.
+- Dedup: entries with a truthy `stop_reason` kept, plus the last usage entry regardless (the in-progress turn); earlier `stop_reason: null` partials dropped.
+- Manual sanity check (Testing strategy step 4), run against this session's own transcript: `{"tokens_used": 4581452, "input_tokens": 100, "output_tokens": 49950, "cache_read_input_tokens": 4251939, "cache_creation_input_tokens": 279463}` -- plausible cumulative figure for ~a dozen implement-task phases; dominated by cache reads, as the specified algorithm sums them.
+- SKILL.md: step 3.1 now derives the transcript path from the scratchpad path and calls `session-token-usage`; fallback on failure = Worklog note + `token_budget: null` + continue (never an interrupt). Removed the running self-estimated tally (step 2). `context_pct` untouched, still documented as an estimate.
+- `.tasks/config.md` and `templates/config.md` Key notes updated.
+- Full suite + `sync check` results recorded in the PR.
 
 ## Notes
 

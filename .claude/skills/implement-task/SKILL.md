@@ -180,17 +180,25 @@ always halting the batch, as is crossing either usage threshold (steps 3.1/3.4).
    `{"order": [task-ids...]}`: the tasks to work, in the order to work them.
 2. Run `scaffold.py batch-init` with `{"selection": <the batch parameter>, "order": [...]}` to
    write the local, git-ignored `.tmp/batch-state.json` — the record a fresh session recovers the
-   batch from if this one is lost (see §0). Start an empty outcomes accumulator (`[]`) and a
-   running best-effort tally of tokens spent so far in this batch (`0` at the start) for the whole
-   run; the state file carries the accumulator from here on.
+   batch from if this one is lost (see §0). Start an empty outcomes accumulator (`[]`); the state
+   file carries it from here on. Token usage needs no running tally — each usage checkpoint reads
+   the exact figure (step 3.1).
 3. For each `task_id` in `order`, in turn:
    1. **Usage checkpoint, before this task starts:** read `context_usage_halt_pct`/
-      `token_budget_per_batch` from `.tasks/config.md`, estimate your own current context-window
-      usage as a percentage as best you can (this harness exposes no tool that reports it
-      exactly — an honest estimate, not a real measurement), and run
-      `check-usage-thresholds` (`{"context_pct", "halt_pct", "tokens_used", "token_budget"}`). A
-      `halt: true` result is a systemic interrupt (see "Interrupts") — route it before starting
-      this task's phase 1, not after.
+      `token_budget_per_batch` from `.tasks/config.md`. Get `tokens_used` exactly: run
+      `session-token-usage` with `{"transcript_path"}` — this session's own transcript,
+      `~/.claude/projects/<escaped-cwd>/<session-id>.jsonl`, where `<escaped-cwd>` and
+      `<session-id>` are the two path components just above `scratchpad` in this session's
+      scratchpad directory. Its `tokens_used` is a real sum of the transcript's per-turn usage, not
+      an estimate. `context_pct` stays your own best-effort estimate of current context-window
+      usage as a percentage (no file records the context-window size, so it can't be made exact —
+      an honest estimate, not a real measurement). Then run `check-usage-thresholds`
+      (`{"context_pct", "halt_pct", "tokens_used", "token_budget"}`). A `halt: true` result is a
+      systemic interrupt (see "Interrupts") — route it before starting this task's phase 1, not
+      after. **If `session-token-usage` fails** (non-zero exit — it reads an internal Claude Code
+      file format that can change): note that in the current task's Worklog, pass `"token_budget":
+      null` so only the context half of this checkpoint is checked, and continue. A transcript
+      parsing failure is never itself an interrupt.
    2. **Phase 1:** run `start` with `{"task_id": task_id, "batch_mode": true}`. Restate the plan
       (Description, Acceptance criteria, Testing strategy, implementation approach) exactly as
       single-task mode does — but its result carries `"stop_required": false`, so print the plan
@@ -201,7 +209,8 @@ always halting the batch, as is crossing either usage threshold (steps 3.1/3.4).
    3. **Phase 2:** unchanged, except a decision that would stop single-task mode is routed through
       "Interrupts" below instead of always stopping the batch outright.
    4. **Usage checkpoint again**, same call as step 3.1 — after phase 2, before phase 3, per
-      `.tasks/config.md`'s own description of when these checks happen.
+      `.tasks/config.md`'s own description of when these checks happen (including the
+      `session-token-usage` call and its fallback).
    5. **Phase 3:** unchanged through `wrap-up` opening the PR (a rebase/format-command failure here
       is also routed through "Interrupts"). Once it succeeds, append this task's provisional
       outcome — `{"task_id", "title", "status": "in-review", "link": pr_url}` — to the accumulator
@@ -228,9 +237,10 @@ always halting the batch, as is crossing either usage threshold (steps 3.1/3.4).
       - `phase4_closed_not_merged` or `ambiguous` (single-task mode's own STOP conditions here):
         routed through "Interrupts" below, same as any other decision point in this loop.
 4. Once every task in `order` is accounted for (merged or the batch halted early), run
-   `render-outcome-table` with the accumulated outcomes and `render-usage-summary` with your final
-   usage estimate — regardless of whether either threshold was ever crossed — and print both as the
-   batch's summary. The state file is already gone by now (`batch-update` removed it on the last
+   `render-outcome-table` with the accumulated outcomes and `render-usage-summary` with final
+   usage (a fresh `session-token-usage` total, if it works, and your context estimate) —
+   regardless of whether either threshold was ever crossed — and print both as the batch's
+   summary. The state file is already gone by now (`batch-update` removed it on the last
    task); if the batch ended any other way, run `batch-clear` — a finished run must never leave
    batch state behind for a later plain invocation to find. **STOP.**
 

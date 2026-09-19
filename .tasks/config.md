@@ -66,6 +66,7 @@ describes: the skills' logic stays identical across projects, only this file cha
   `init-project` starts with this empty and adds project-specific paths the same way.
 - **`context_usage_halt_pct: 85`** / **`token_budget_per_batch: null`** — `implement-task` batch
   mode's usage safety valve (SPEC-003): crossing either halts the batch as a systemic interrupt,
-  checked at each between-task checkpoint. Context usage is the model's own best-effort estimate —
-  this harness exposes no tool that reports exact context/token usage — so this is a deliberately
-  cheap stopgap, not a precise measurement. `null` token budget means no cap.
+  checked at each between-task checkpoint. Token usage is an exact sum read from the session's own
+  transcript file (`session-token-usage`), not an estimate. Context usage is still the model's own
+  best-effort estimate — no file records the context-window size, so it can't be made exact — a
+  deliberately cheap stopgap, not a precise measurement. `null` token budget means no cap.
