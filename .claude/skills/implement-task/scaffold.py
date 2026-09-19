@@ -174,6 +174,102 @@ def pick_top_unblocked(board_text: str, sync_mod: ModuleType) -> dict:
     return {"task_id": None, "skipped": skipped}
 
 
+def stop_required_for_phase1(*, batch_mode: bool) -> bool:
+    """Phase 1's announce-vs-block decision, for the autonomous batch mode: outside a batch, the
+    plan restatement always ends in a hard STOP (unchanged). Inside an approved batch, the batch
+    selection itself was the approval, so the plan is printed for the record but nothing blocks on
+    it -- the caller proceeds straight into phase 2.
+    """
+    return not batch_mode
+
+
+def record_outcome(outcomes: list[dict], entry: dict) -> list[dict]:
+    """Append one task's outcome record to a batch run's accumulator, in encounter order. Returns
+    a new list -- `outcomes` itself is never mutated, so a caller can keep holding the prior list.
+
+    `entry` must carry `task_id`/`title`/`status` (a `link` of `None` is fine -- not every status,
+    e.g. a task still `in-progress`, has a PR/merge-commit link yet); missing any of the first
+    three raises `ValueError` naming it, since a silently incomplete row would make the
+    end-of-batch summary misleading.
+    """
+    for key in ("task_id", "title", "status"):
+        if key not in entry:
+            raise ValueError(f"outcome entry missing required key: {key!r}")
+    return [*outcomes, dict(entry)]
+
+
+def render_outcome_table(outcomes: list[dict]) -> str:
+    """The end-of-batch summary table: `Task | Title | Status | PR/Merge`, one row per outcome in
+    accumulation order. An empty batch still renders a header-only table rather than raising --
+    the caller always has something to print. A missing/`None` `link` renders as `—` (halted
+    before a PR ever opened, or a task the batch skipped).
+    """
+    lines = ["| Task | Title | Status | PR/Merge |", "|---|---|---|---|"]
+    for entry in outcomes:
+        link = entry.get("link") or "—"
+        lines.append(f"| {entry['task_id']} | {entry['title']} | {entry['status']} | {link} |")
+    return "\n".join(lines)
+
+
+_ISOLATED_INTERRUPT_KINDS = frozenset({
+    "needs_clarification", "unexpected_blocker", "quality_gate_failure", "guardrail_denial",
+})
+_SYSTEMIC_INTERRUPT_KINDS = frozenset({
+    "infra_failure", "context_usage_exceeded", "token_budget_exceeded",
+})
+
+
+def interrupt_routing(kind: str) -> dict:
+    """Route one of batch mode's interrupt conditions: `needs_clarification`/
+    `unexpected_blocker`/`quality_gate_failure`/`guardrail_denial` are isolated -- bail out this
+    one task and continue the batch at its next task. `infra_failure`/`context_usage_exceeded`/
+    `token_budget_exceeded` are systemic -- halt the whole batch before starting anything else,
+    since none of them are this task's fault and every remaining task would hit the same wall.
+    Raises `ValueError` on any other `kind`.
+    """
+    if kind in _ISOLATED_INTERRUPT_KINDS:
+        return {"routing": "isolated", "continue_batch": True}
+    if kind in _SYSTEMIC_INTERRUPT_KINDS:
+        return {"routing": "systemic", "continue_batch": False}
+    raise ValueError(f"unknown interrupt kind: {kind!r}")
+
+
+def check_usage_thresholds(
+    *, context_pct: float, halt_pct: float, tokens_used: int, token_budget: int | None
+) -> dict:
+    """Batch mode's usage safety valve: this harness exposes no tool that reports exact context
+    or token usage, so `context_pct`/`tokens_used` are the caller's own best-effort estimate at a
+    checkpoint (between tasks, and where practical after phase 2/before phase 3) -- this stays a
+    cheap, approximate stopgap on purpose, not a real measurement.
+
+    Context is checked first: `context_pct >= halt_pct` reports `context_usage_exceeded`
+    regardless of the token budget. Only when context is fine does a set (non-`None`)
+    `token_budget` get checked against `tokens_used`, reporting `token_budget_exceeded`. Returns
+    `{"halt": bool, "kind": str | None, "message": str | None}` -- `message` names the specific
+    value and threshold crossed, for both `classify-interrupt` and a human reading the halt.
+    """
+    if context_pct >= halt_pct:
+        return {
+            "halt": True, "kind": "context_usage_exceeded",
+            "message": f"context usage {context_pct:g}% >= halt threshold {halt_pct:g}%",
+        }
+    if token_budget is not None and tokens_used >= token_budget:
+        return {
+            "halt": True, "kind": "token_budget_exceeded",
+            "message": f"token usage {tokens_used} >= batch budget {token_budget}",
+        }
+    return {"halt": False, "kind": None, "message": None}
+
+
+def render_usage_summary(*, context_pct: float, tokens_used: int, token_budget: int | None) -> str:
+    """A one-line usage report for the end-of-batch summary -- printed every time, regardless of
+    whether either threshold was ever crossed, so a human can judge whether an opt-in
+    critic/auto-merge path is worth its cost on their plan tier.
+    """
+    budget_text = "no cap" if token_budget is None else str(token_budget)
+    return f"Usage: context {context_pct:g}% · tokens {tokens_used} (budget: {budget_text})"
+
+
 def resume_phase(*, in_flight: dict | None, working_tree_dirty: bool, gh_pr_state: str | None) -> dict:
     """The resume-detection table, as a pure function of already-gathered
     state (no git/gh calls in here -- see `cmd_resume_state` for the real gathering).
@@ -313,6 +409,7 @@ def cmd_start(args: argparse.Namespace) -> int:
     sync_mod = load_sync_module(tasks_root)
     answers = json.loads(Path(args.answers).read_text())
     task_id = answers.get("task_id")
+    batch_mode = bool(answers.get("batch_mode", False))
 
     config = sync_mod.load_config(tasks_root)
     remote = config.get("remote", "origin")
@@ -381,7 +478,10 @@ def cmd_start(args: argparse.Namespace) -> int:
         print(sync_result.stderr, file=sys.stderr)
         return sync_result.returncode
 
-    print(json.dumps({"task_id": task_id, "branch": branch, "skipped": skipped}))
+    print(json.dumps({
+        "task_id": task_id, "branch": branch, "skipped": skipped,
+        "stop_required": stop_required_for_phase1(batch_mode=batch_mode),
+    }))
     return 0
 
 
@@ -720,6 +820,55 @@ def cmd_bail_out(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_record_outcome(args: argparse.Namespace) -> int:
+    answers = json.loads(Path(args.answers).read_text())
+    try:
+        outcomes = record_outcome(answers.get("outcomes") or [], answers["entry"])
+    except ValueError as exc:
+        print(f"implement-task: {exc}", file=sys.stderr)
+        return 2
+    print(json.dumps({"outcomes": outcomes}))
+    return 0
+
+
+def cmd_render_outcome_table(args: argparse.Namespace) -> int:
+    answers = json.loads(Path(args.answers).read_text())
+    table = render_outcome_table(answers.get("outcomes") or [])
+    print(json.dumps({"table": table}))
+    return 0
+
+
+def cmd_classify_interrupt(args: argparse.Namespace) -> int:
+    answers = json.loads(Path(args.answers).read_text())
+    try:
+        result = interrupt_routing(answers["kind"])
+    except ValueError as exc:
+        print(f"implement-task: {exc}", file=sys.stderr)
+        return 2
+    print(json.dumps(result))
+    return 0
+
+
+def cmd_check_usage_thresholds(args: argparse.Namespace) -> int:
+    answers = json.loads(Path(args.answers).read_text())
+    result = check_usage_thresholds(
+        context_pct=answers["context_pct"], halt_pct=answers["halt_pct"],
+        tokens_used=answers["tokens_used"], token_budget=answers.get("token_budget"),
+    )
+    print(json.dumps(result))
+    return 0
+
+
+def cmd_render_usage_summary(args: argparse.Namespace) -> int:
+    answers = json.loads(Path(args.answers).read_text())
+    summary = render_usage_summary(
+        context_pct=answers["context_pct"], tokens_used=answers["tokens_used"],
+        token_budget=answers.get("token_budget"),
+    )
+    print(json.dumps({"summary": summary}))
+    return 0
+
+
 def cmd_gh_auth_status(args: argparse.Namespace) -> int:
     result = subprocess.run(["gh", "auth", "status"], capture_output=True, text=True)
     print(result.stdout)
@@ -739,6 +888,11 @@ def main(argv: list[str]) -> int:
         ("wrap-up", "phase 3: commit, rebase, push, gh pr create, record pr, run sync"),
         ("finish-merge", "phase 4: observe the merge, record it, archive, clean up branches"),
         ("bail-out", "set status back to todo/blocked and run sync"),
+        ("record-outcome", "batch mode: append one task's outcome to the accumulator"),
+        ("render-outcome-table", "batch mode: render the end-of-batch outcome table"),
+        ("classify-interrupt", "batch mode: route an interrupt kind to isolated/systemic"),
+        ("check-usage-thresholds", "batch mode: check context/token usage against config thresholds"),
+        ("render-usage-summary", "batch mode: render the end-of-batch usage report"),
     ):
         sub = subparsers.add_parser(name, help=help_text)
         sub.add_argument("answers", help="path to a JSON file with this subcommand's inputs")
@@ -751,6 +905,11 @@ def main(argv: list[str]) -> int:
         "wrap-up": cmd_wrap_up,
         "finish-merge": cmd_finish_merge,
         "bail-out": cmd_bail_out,
+        "record-outcome": cmd_record_outcome,
+        "render-outcome-table": cmd_render_outcome_table,
+        "classify-interrupt": cmd_classify_interrupt,
+        "check-usage-thresholds": cmd_check_usage_thresholds,
+        "render-usage-summary": cmd_render_usage_summary,
     }
     return dispatch[args.command](args)
 

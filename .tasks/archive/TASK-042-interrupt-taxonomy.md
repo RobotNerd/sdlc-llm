@@ -2,12 +2,12 @@
 id: TASK-042
 title: "Interrupt taxonomy: isolated skip-task vs. systemic halt-batch routing"
 type: feature
-status: todo
+status: done
 epic: EPIC-003
 created: 2026-09-14
 branch: task-042-interrupt-taxonomy
-pr: null
-merge_commit: null
+pr: "https://github.com/RobotNerd/sdlc-llm/pull/80"
+merge_commit: 2485601889cf3beaafbebbb1da9dda203207c7ee
 blocked_by: [TASK-041]
 blocks: [TASK-054, TASK-055]
 ---
@@ -43,13 +43,13 @@ was) into that task's Worklog and the batch's running outcome table.
 
 ## Acceptance criteria
 
-- [ ] Each of the five conditions above is detected and routed as specified (four isolated, one
+- [x] Each of the five conditions above is detected and routed as specified (four isolated, one
       systemic).
-- [ ] An isolated interrupt on task N leaves tasks N+1 onward in the batch to run normally.
-- [ ] A systemic interrupt halts before starting the next task, with a clear summary of why.
-- [ ] The interrupted task's Worklog records what happened, matching today's existing bail-out
+- [x] An isolated interrupt on task N leaves tasks N+1 onward in the batch to run normally.
+- [x] A systemic interrupt halts before starting the next task, with a clear summary of why.
+- [x] The interrupted task's Worklog records what happened, matching today's existing bail-out
       convention (set `status` back to `todo`/`blocked`, note findings) for isolated interrupts.
-- [ ] `pytest` and `python3 .tasks/bin/sync check` both pass.
+- [x] `pytest` and `python3 .tasks/bin/sync check` both pass.
 
 ## Testing strategy
 
@@ -63,7 +63,30 @@ was) into that task's Worklog and the batch's running outcome table.
 
 ## Worklog
 
-_(empty — appended during implementation)_
+- 2026-09-18: Added `interrupt_routing(kind)` to `.claude/skills/implement-task/scaffold.py` -- a
+  pure lookup over the five defined kinds (`needs_clarification`/`unexpected_blocker`/
+  `quality_gate_failure`/`guardrail_denial` isolated, `infra_failure` systemic), returning
+  `{"routing", "continue_batch"}` and raising on anything else, wired to a new `classify-interrupt`
+  CLI subcommand. Deliberately didn't build a separate "batch position" state machine: isolated's
+  `continue_batch: true` and systemic's `false` are exactly what the two behavioral tests below
+  ask for, and the loop's own position in `order` is already tracked in-context per TASK-041 --
+  no new state needed to prove "N+1 onward still runs" vs. "halts before starting anything else."
+- 2026-09-18: Rewrote `SKILL.md`'s "Batch mode" section: replaced the blanket "anything else halts
+  the batch" line from TASK-041 with a new "Interrupts" subsection giving concrete detection
+  guidance per condition (a `start` refusal routes as `unexpected_blocker`; 3 consecutive
+  same-reason quality-gate failures or 3 consecutive denials of the same guardrail hook on one
+  task route as `quality_gate_failure`/`guardrail_denial`) and the actual routing procedure --
+  isolated bails out the task (existing `bail-out`) and records its outcome before continuing;
+  systemic leaves the task's status untouched (the tooling failed, not the task -- a normal
+  single-task `resume-state` picks it back up once `git`/`gh` works again) and halts after
+  printing what's accumulated so far.
+- 2026-09-18: TDD per `tdd_enforced: true`: added failing tests for `interrupt_routing` (all four
+  isolated kinds, the one systemic kind, and an unknown-kind `ValueError`) and the
+  `classify-interrupt` CLI subcommand to `tests/test_implement_task_scaffold.py`; confirmed each
+  failed for the expected reason (`AttributeError` for the undefined function, argparse's "invalid
+  choice" for the unregistered subcommand) before implementing until green.
+- 2026-09-18: `.venv/bin/pytest`: 643 passed, 0 failed.
+- 2026-09-18: `python3 .tasks/bin/sync check` exits 0.
 
 ## Notes
 

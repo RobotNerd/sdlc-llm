@@ -247,6 +247,170 @@ def test_pick_top_unblocked_empty_todo_returns_none():
 
 
 # ---------------------------------------------------------------------------
+# stop_required_for_phase1 (TASK-041): the announce-not-block decision for a
+# batch task's phase 1 -- pure function of the one flag that decides it.
+# ---------------------------------------------------------------------------
+
+
+def test_stop_required_for_phase1_true_outside_batch_mode():
+    assert implement_task_scaffold.stop_required_for_phase1(batch_mode=False) is True
+
+
+def test_stop_required_for_phase1_false_in_batch_mode():
+    assert implement_task_scaffold.stop_required_for_phase1(batch_mode=True) is False
+
+
+# ---------------------------------------------------------------------------
+# record_outcome / render_outcome_table (TASK-041): the batch loop's
+# end-of-run outcome accumulation -- pure functions, no I/O.
+# ---------------------------------------------------------------------------
+
+
+def test_record_outcome_appends_without_mutating_input():
+    outcomes = [{"task_id": "TASK-001", "title": "First", "status": "done", "link": "abc123"}]
+    entry = {"task_id": "TASK-002", "title": "Second", "status": "done", "link": "def456"}
+
+    result = implement_task_scaffold.record_outcome(outcomes, entry)
+
+    assert result == [
+        {"task_id": "TASK-001", "title": "First", "status": "done", "link": "abc123"},
+        {"task_id": "TASK-002", "title": "Second", "status": "done", "link": "def456"},
+    ]
+    assert outcomes == [{"task_id": "TASK-001", "title": "First", "status": "done", "link": "abc123"}]
+
+
+def test_record_outcome_onto_empty_list():
+    entry = {"task_id": "TASK-001", "title": "First", "status": "done", "link": "abc123"}
+    assert implement_task_scaffold.record_outcome([], entry) == [entry]
+
+
+@pytest.mark.parametrize("missing_key", ["task_id", "title", "status"])
+def test_record_outcome_raises_on_missing_required_key(missing_key):
+    entry = {"task_id": "TASK-001", "title": "First", "status": "done", "link": None}
+    del entry[missing_key]
+    with pytest.raises(ValueError, match=missing_key):
+        implement_task_scaffold.record_outcome([], entry)
+
+
+def test_record_outcome_allows_link_to_be_none():
+    entry = {"task_id": "TASK-001", "title": "First", "status": "todo", "link": None}
+    assert implement_task_scaffold.record_outcome([], entry) == [entry]
+
+
+def test_render_outcome_table_empty_is_header_only():
+    table = implement_task_scaffold.render_outcome_table([])
+    lines = table.splitlines()
+    assert lines == ["| Task | Title | Status | PR/Merge |", "|---|---|---|---|"]
+
+
+def test_render_outcome_table_renders_every_row_in_order():
+    outcomes = [
+        {"task_id": "TASK-001", "title": "First", "status": "done", "link": "https://x/pr/1"},
+        {"task_id": "TASK-002", "title": "Second", "status": "in-review", "link": None},
+    ]
+    table = implement_task_scaffold.render_outcome_table(outcomes)
+    lines = table.splitlines()
+    assert lines[0] == "| Task | Title | Status | PR/Merge |"
+    assert lines[2] == "| TASK-001 | First | done | https://x/pr/1 |"
+    assert lines[3] == "| TASK-002 | Second | in-review | — |"
+
+
+# ---------------------------------------------------------------------------
+# interrupt_routing: the five-condition taxonomy -- isolated (skip this task,
+# continue the batch) vs. systemic (halt the batch).
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["needs_clarification", "unexpected_blocker", "quality_gate_failure", "guardrail_denial"],
+)
+def test_interrupt_routing_isolated_kinds_continue_the_batch(kind):
+    assert implement_task_scaffold.interrupt_routing(kind) == {
+        "routing": "isolated", "continue_batch": True,
+    }
+
+
+@pytest.mark.parametrize(
+    "kind", ["infra_failure", "context_usage_exceeded", "token_budget_exceeded"],
+)
+def test_interrupt_routing_systemic_kinds_halt_the_batch(kind):
+    assert implement_task_scaffold.interrupt_routing(kind) == {
+        "routing": "systemic", "continue_batch": False,
+    }
+
+
+def test_interrupt_routing_raises_on_unknown_kind():
+    with pytest.raises(ValueError, match="bogus"):
+        implement_task_scaffold.interrupt_routing("bogus")
+
+
+# ---------------------------------------------------------------------------
+# check_usage_thresholds / render_usage_summary (TASK-043): the context/token
+# safety-valve -- pure functions over caller-supplied usage figures (this
+# harness exposes no tool that reports exact usage, so these are estimates).
+# ---------------------------------------------------------------------------
+
+
+def test_check_usage_thresholds_under_both_is_no_halt():
+    result = implement_task_scaffold.check_usage_thresholds(
+        context_pct=40, halt_pct=85, tokens_used=1000, token_budget=100000,
+    )
+    assert result == {"halt": False, "kind": None, "message": None}
+
+
+def test_check_usage_thresholds_context_over_halts_and_names_it():
+    result = implement_task_scaffold.check_usage_thresholds(
+        context_pct=90, halt_pct=85, tokens_used=1000, token_budget=None,
+    )
+    assert result["halt"] is True
+    assert result["kind"] == "context_usage_exceeded"
+    assert "90" in result["message"]
+    assert "85" in result["message"]
+
+
+def test_check_usage_thresholds_token_budget_over_halts_and_names_it():
+    result = implement_task_scaffold.check_usage_thresholds(
+        context_pct=10, halt_pct=85, tokens_used=50000, token_budget=40000,
+    )
+    assert result["halt"] is True
+    assert result["kind"] == "token_budget_exceeded"
+    assert "50000" in result["message"]
+    assert "40000" in result["message"]
+
+
+def test_check_usage_thresholds_no_token_budget_never_triggers_it():
+    result = implement_task_scaffold.check_usage_thresholds(
+        context_pct=10, halt_pct=85, tokens_used=10_000_000, token_budget=None,
+    )
+    assert result == {"halt": False, "kind": None, "message": None}
+
+
+def test_check_usage_thresholds_context_checked_before_token_budget():
+    # both crossed at once -- context is reported, matching the checkpoint order in SKILL.md
+    result = implement_task_scaffold.check_usage_thresholds(
+        context_pct=95, halt_pct=85, tokens_used=50000, token_budget=40000,
+    )
+    assert result["kind"] == "context_usage_exceeded"
+
+
+def test_render_usage_summary_includes_context_and_tokens_with_no_cap():
+    summary = implement_task_scaffold.render_usage_summary(
+        context_pct=42, tokens_used=12345, token_budget=None,
+    )
+    assert "42" in summary
+    assert "12345" in summary
+    assert "no cap" in summary
+
+
+def test_render_usage_summary_includes_the_budget_when_set():
+    summary = implement_task_scaffold.render_usage_summary(
+        context_pct=42, tokens_used=12345, token_budget=100000,
+    )
+    assert "100000" in summary
+
+
+# ---------------------------------------------------------------------------
 # Integration: cmd_start / cmd_bail_out / cmd_resume_state against a real
 # scratch repo with a genuine bare "origin" remote
 # ---------------------------------------------------------------------------
@@ -337,9 +501,12 @@ def _push_tasks(cwd):
     _git(["push"], cwd=cwd)
 
 
-def _run_start(cwd, task_id=None):
+def _run_start(cwd, task_id=None, batch_mode=None):
+    answers = {"task_id": task_id}
+    if batch_mode is not None:
+        answers["batch_mode"] = batch_mode
     answers_path = cwd.parent / "start-answers.json"
-    answers_path.write_text(json.dumps({"task_id": task_id}))
+    answers_path.write_text(json.dumps(answers))
     return subprocess.run(
         [sys.executable, str(SCRIPT_PATH), "start", str(answers_path)], cwd=cwd, capture_output=True, text=True
     )
@@ -665,6 +832,17 @@ def test_start_creates_branch_and_sets_frontmatter(repo):
     assert "status: in-progress" in task_text
     assert f"branch: {output['branch']}" in task_text
     assert _sync_check(repo).returncode == 0
+    assert output["stop_required"] is True
+
+
+def test_start_batch_mode_sets_stop_required_false(repo):
+    _add_task(repo, "First task")
+    _push_tasks(repo)
+
+    result = _run_start(repo, task_id="TASK-001", batch_mode=True)
+
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout)["stop_required"] is False
 
 
 def test_bail_out_reverts_status_to_todo(repo):
@@ -827,3 +1005,98 @@ def test_wrap_up_stashes_and_restores_dirty_ignored_paths_around_rebase(repo, fa
     # and it's genuinely not part of the pushed commit
     show = _git(["show", "--stat", "HEAD"], cwd=repo).stdout
     assert "prompts.md" not in show
+
+
+# ---------------------------------------------------------------------------
+# record-outcome / render-outcome-table CLI subcommands (TASK-041): thin,
+# side-effect-free wrappers -- no scratch repo needed, just a tmp_path cwd.
+# ---------------------------------------------------------------------------
+
+
+def _run_scaffold(cwd, command, answers):
+    answers_path = cwd / f"{command}-answers.json"
+    answers_path.write_text(json.dumps(answers))
+    return subprocess.run(
+        [sys.executable, str(SCRIPT_PATH), command, str(answers_path)], cwd=cwd, capture_output=True, text=True
+    )
+
+
+def test_cmd_record_outcome_appends_entry(tmp_path):
+    existing = [{"task_id": "TASK-001", "title": "First", "status": "done", "link": "abc"}]
+    entry = {"task_id": "TASK-002", "title": "Second", "status": "done", "link": "def"}
+
+    result = _run_scaffold(tmp_path, "record-outcome", {"outcomes": existing, "entry": entry})
+
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout) == {"outcomes": existing + [entry]}
+
+
+def test_cmd_record_outcome_refuses_incomplete_entry(tmp_path):
+    entry = {"task_id": "TASK-001", "title": "First", "link": "abc"}  # no "status"
+
+    result = _run_scaffold(tmp_path, "record-outcome", {"outcomes": [], "entry": entry})
+
+    assert result.returncode != 0
+    assert "status" in result.stderr
+
+
+def test_cmd_render_outcome_table(tmp_path):
+    outcomes = [{"task_id": "TASK-001", "title": "First", "status": "done", "link": "abc"}]
+
+    result = _run_scaffold(tmp_path, "render-outcome-table", {"outcomes": outcomes})
+
+    assert result.returncode == 0, result.stderr
+    table = json.loads(result.stdout)["table"]
+    assert "| TASK-001 | First | done | abc |" in table
+
+
+def test_cmd_classify_interrupt_isolated(tmp_path):
+    result = _run_scaffold(tmp_path, "classify-interrupt", {"kind": "unexpected_blocker"})
+
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout) == {"routing": "isolated", "continue_batch": True}
+
+
+def test_cmd_classify_interrupt_systemic(tmp_path):
+    result = _run_scaffold(tmp_path, "classify-interrupt", {"kind": "infra_failure"})
+
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout) == {"routing": "systemic", "continue_batch": False}
+
+
+def test_cmd_classify_interrupt_refuses_unknown_kind(tmp_path):
+    result = _run_scaffold(tmp_path, "classify-interrupt", {"kind": "bogus"})
+
+    assert result.returncode != 0
+    assert "bogus" in result.stderr
+
+
+def test_cmd_check_usage_thresholds_halts_on_context(tmp_path):
+    result = _run_scaffold(tmp_path, "check-usage-thresholds", {
+        "context_pct": 90, "halt_pct": 85, "tokens_used": 100, "token_budget": None,
+    })
+
+    assert result.returncode == 0, result.stderr
+    output = json.loads(result.stdout)
+    assert output["halt"] is True
+    assert output["kind"] == "context_usage_exceeded"
+
+
+def test_cmd_check_usage_thresholds_no_halt(tmp_path):
+    result = _run_scaffold(tmp_path, "check-usage-thresholds", {
+        "context_pct": 10, "halt_pct": 85, "tokens_used": 100, "token_budget": None,
+    })
+
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout) == {"halt": False, "kind": None, "message": None}
+
+
+def test_cmd_render_usage_summary(tmp_path):
+    result = _run_scaffold(tmp_path, "render-usage-summary", {
+        "context_pct": 42, "tokens_used": 12345, "token_budget": None,
+    })
+
+    assert result.returncode == 0, result.stderr
+    summary = json.loads(result.stdout)["summary"]
+    assert "42" in summary
+    assert "12345" in summary
