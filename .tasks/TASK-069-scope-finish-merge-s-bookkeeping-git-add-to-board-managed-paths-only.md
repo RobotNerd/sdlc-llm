@@ -2,11 +2,11 @@
 id: TASK-069
 title: Scope finish-merge's bookkeeping git add to board-managed paths only
 type: bug
-status: in-progress
+status: in-review
 epic: null
 created: 2026-09-18
 branch: task-069-scope-finish-merge-s-bookkeeping-git-add-to-board-managed-paths-only
-pr: null
+pr: "https://github.com/RobotNerd/sdlc-llm/pull/86"
 merge_commit: null
 blocked_by: []
 blocks: []
