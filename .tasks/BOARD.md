@@ -15,6 +15,8 @@ between `<!-- BEGIN -->` / `<!-- END -->` markers — change the task/epic file 
 
 ## TODO
 
+- TASK-068 — Exact token-usage tracking for implement-task's batch safety valve  `EPIC-003`
+- TASK-069 — Scope finish-merge's bookkeeping git add to board-managed paths only
 - TASK-044 — Follow-up task creation policy with a configurable per-batch limit  `EPIC-003`
 - TASK-045 — Opt-in, critic-gated, per-batch-capped auto-merge  `EPIC-003`
 - TASK-054 — Agent roster: per-role config keys and generated .claude/agents/*.md  `EPIC-004` ⛔ blocked_by TASK-044, TASK-045
@@ -28,7 +30,6 @@ between `<!-- BEGIN -->` / `<!-- END -->` markers — change the task/epic file 
 - TASK-062 — Worker scope fence: SubagentStop hook denying out-of-scope diffs  `EPIC-004` ⛔ blocked_by TASK-054
 - TASK-063 — orchestrate-batch skill: wire orchestrator/worker/critic into implement-task's loop  `EPIC-004` ⛔ blocked_by TASK-056, TASK-057, TASK-058, TASK-059, TASK-060, TASK-061, TASK-062, TASK-064
 - TASK-064 — Context compaction/reset: proactive orchestrator checkpoint-clear + worker mid-task guard  `EPIC-004` ⛔ blocked_by TASK-054, TASK-060
-- TASK-068 — Exact token-usage tracking for implement-task's batch safety valve  `EPIC-003`
 
 ## In Progress
 
