@@ -280,6 +280,10 @@ The new task ensures that batch progress can be recovered from the repo state al
 - Determine if and steps can be merged.
 - Determine if the wording of any steps can be simplified to improve clarity and reduce context without losing the meaning. -->
 
+<!-- /add-task EPIC-003. Top of TODO list. Create a bug ticket for the problem you mentioned in the previous task:
+
+Separate bug, not fixed: a stray .tasks/TASK-*.md without valid frontmatter makes sync crash with a traceback instead of a clear error. That could be its own task. -->
+
 ---
 
 Rewrite README to be more human-readable; right now it seems geared more towards AI, with some sections being too dense; focus on simplifying by removing technical details and focus on usage from a human user perspective; [TODO] provide examples to the LLM of good READMEs from other projects to use as a guide
