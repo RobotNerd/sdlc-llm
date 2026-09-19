@@ -2,12 +2,12 @@
 id: TASK-042
 title: "Interrupt taxonomy: isolated skip-task vs. systemic halt-batch routing"
 type: feature
-status: in-review
+status: done
 epic: EPIC-003
 created: 2026-09-14
 branch: task-042-interrupt-taxonomy
 pr: "https://github.com/RobotNerd/sdlc-llm/pull/80"
-merge_commit: null
+merge_commit: 2485601889cf3beaafbebbb1da9dda203207c7ee
 blocked_by: [TASK-041]
 blocks: [TASK-054, TASK-055]
 ---
