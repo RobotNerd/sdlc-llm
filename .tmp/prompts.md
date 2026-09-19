@@ -263,7 +263,7 @@ Once you've finished the post-merge clean up, add a new task at the top of the b
 - run /review-docs next
 - Is there any way to programmatically enforce TDD with hooks? Right now it's prose-only and relies on the LLM model's decision. See recent implementation details in @.tasks/archive/TASK-040-tdd-mode.md -->
 
-/add-task Add to EPIC-003 and place at the top of the TODO list. Address this note on @.tasks/archive/TASK-041-core-autonomous-loop.md:
+<!-- /add-task Add to EPIC-003 and place at the top of the TODO list. Address this note on @.tasks/archive/TASK-041-core-autonomous-loop.md:
 
 ```
 No persistent batch-state file: ScheduleWakeup resumes the same session/conversation rather
@@ -272,9 +272,7 @@ in context across a wait. Recovering batch progress from repo state alone after 
 is an open gap, not required by this task and not claimed by any of TASK-042/043/044/045 either.
 ```
 
-The new task ensures that batch progress can be recovered from the repo state alone when starting a fresh session.
-
----
+The new task ensures that batch progress can be recovered from the repo state alone when starting a fresh session. -->
 
 /add-task Analyze the content of @.claude/skills/implement-task/SKILL.md to determine if it can be simplified.
 - Remove historical decisions that are unnecessary for the skill behavior, e.g. using phrasing like "unchanged".
