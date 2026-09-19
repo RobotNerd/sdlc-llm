@@ -2,11 +2,11 @@
 id: TASK-041
 title: "Core autonomous loop: iterate a validated batch without manual re-invocation"
 type: feature
-status: todo
+status: in-review
 epic: EPIC-003
 created: 2026-09-14
 branch: task-041-core-autonomous-loop
-pr: null
+pr: "https://github.com/RobotNerd/sdlc-llm/pull/79"
 merge_commit: null
 blocked_by: [TASK-039]
 blocks: [TASK-042, TASK-043, TASK-044, TASK-045]
@@ -42,12 +42,13 @@ extend it with more sections.
 
 - [ ] The batch loop runs phases 1-4 for each task in the validated order with no required human
       input between a PR opening and the next task starting (verified by the merge still being a
-      real human action — polling detects it, nothing bypasses it).
-- [ ] Phase 1's plan is printed for every task in the batch without a blocking STOP.
-- [ ] The loop uses `ScheduleWakeup` (not a tight polling loop) to wait for each merge.
-- [ ] A basic per-task outcome table (id, title, status, PR/merge-commit link) is produced once the
+      real human action — polling detects it, nothing bypasses it). *(implemented; live
+      verification is the deferred scratch-branch dry run below)*
+- [x] Phase 1's plan is printed for every task in the batch without a blocking STOP.
+- [x] The loop uses `ScheduleWakeup` (not a tight polling loop) to wait for each merge.
+- [x] A basic per-task outcome table (id, title, status, PR/merge-commit link) is produced once the
       batch ends.
-- [ ] `pytest` and `python3 .tasks/bin/sync check` both pass.
+- [x] `pytest` and `python3 .tasks/bin/sync check` both pass.
 
 ## Testing strategy
 
@@ -61,7 +62,36 @@ extend it with more sections.
 
 ## Worklog
 
-_(empty — appended during implementation)_
+- 2026-09-18: Added `stop_required_for_phase1`/`record_outcome`/`render_outcome_table` to
+  `.claude/skills/implement-task/scaffold.py` -- pure functions, wired into `cmd_start` (a new
+  optional `batch_mode` answer, surfaced as `stop_required` in `start`'s output) and two new thin
+  CLI subcommands, `record-outcome`/`render-outcome-table`. Rewrote `SKILL.md`: a batch-parameter
+  alternative to the single-task-id parameter, a batch-mode carve-out on the STOP-semantics list,
+  and a new "Batch mode" section describing the per-task loop -- `batch_select.py select` up
+  front (refuse-and-STOP on an invalid selection), phase 1 announced instead of blocked, phase 3
+  unchanged through PR-open, then `ScheduleWakeup` in place of phase 3's hard STOP (re-running
+  `finish-merge` on each wake, rescheduling on `merged: false`, advancing to the next task on
+  `merged: true`), and every other single-task STOP (phase 2 decision, rebase conflict,
+  `phase4_closed_not_merged`, `ambiguous`) still halting the whole batch. Deliberately did not add
+  a persistent batch-state file: `ScheduleWakeup` resumes the same session/conversation rather
+  than starting a fresh process, so the remaining `order` and the outcomes accumulator survive in
+  context across a wait; recovering batch progress from repo state alone after a lost session is
+  an open gap, not required by this task's acceptance criteria, and not claimed by any of
+  TASK-042/043/044/045 either.
+- 2026-09-18: Step 1 -- TDD per `tdd_enforced: true`: added failing tests for the three new pure
+  functions plus `cmd_start`'s new `stop_required` output and the two new CLI subcommands to
+  `tests/test_implement_task_scaffold.py`, confirmed each failed for the expected reason
+  (`AttributeError` for the not-yet-defined functions, `KeyError` for the missing `stop_required`
+  key, argparse's "invalid choice" for the two unregistered subcommands), then implemented until
+  green.
+- 2026-09-18: A first pass leaked this task's own id into two new docstrings in `scaffold.py`,
+  caught by the same portable-surface test suite TASK-039's Worklog flagged -- reworded both
+  before re-running the suite (same class of mistake, same fix).
+- 2026-09-18: Step 2 (scratch-branch dry run) is genuinely human-run and real (live PRs/merges
+  against `origin`) -- deferred to the human to run separately rather than in this session; not
+  checked off below pending that run.
+- 2026-09-18: Step 3 -- `.venv/bin/pytest`: 634 passed, 0 failed.
+- 2026-09-18: Step 4 -- `python3 .tasks/bin/sync check` exits 0.
 
 ## Notes
 

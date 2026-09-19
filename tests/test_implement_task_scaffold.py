@@ -247,6 +247,75 @@ def test_pick_top_unblocked_empty_todo_returns_none():
 
 
 # ---------------------------------------------------------------------------
+# stop_required_for_phase1 (TASK-041): the announce-not-block decision for a
+# batch task's phase 1 -- pure function of the one flag that decides it.
+# ---------------------------------------------------------------------------
+
+
+def test_stop_required_for_phase1_true_outside_batch_mode():
+    assert implement_task_scaffold.stop_required_for_phase1(batch_mode=False) is True
+
+
+def test_stop_required_for_phase1_false_in_batch_mode():
+    assert implement_task_scaffold.stop_required_for_phase1(batch_mode=True) is False
+
+
+# ---------------------------------------------------------------------------
+# record_outcome / render_outcome_table (TASK-041): the batch loop's
+# end-of-run outcome accumulation -- pure functions, no I/O.
+# ---------------------------------------------------------------------------
+
+
+def test_record_outcome_appends_without_mutating_input():
+    outcomes = [{"task_id": "TASK-001", "title": "First", "status": "done", "link": "abc123"}]
+    entry = {"task_id": "TASK-002", "title": "Second", "status": "done", "link": "def456"}
+
+    result = implement_task_scaffold.record_outcome(outcomes, entry)
+
+    assert result == [
+        {"task_id": "TASK-001", "title": "First", "status": "done", "link": "abc123"},
+        {"task_id": "TASK-002", "title": "Second", "status": "done", "link": "def456"},
+    ]
+    assert outcomes == [{"task_id": "TASK-001", "title": "First", "status": "done", "link": "abc123"}]
+
+
+def test_record_outcome_onto_empty_list():
+    entry = {"task_id": "TASK-001", "title": "First", "status": "done", "link": "abc123"}
+    assert implement_task_scaffold.record_outcome([], entry) == [entry]
+
+
+@pytest.mark.parametrize("missing_key", ["task_id", "title", "status"])
+def test_record_outcome_raises_on_missing_required_key(missing_key):
+    entry = {"task_id": "TASK-001", "title": "First", "status": "done", "link": None}
+    del entry[missing_key]
+    with pytest.raises(ValueError, match=missing_key):
+        implement_task_scaffold.record_outcome([], entry)
+
+
+def test_record_outcome_allows_link_to_be_none():
+    entry = {"task_id": "TASK-001", "title": "First", "status": "todo", "link": None}
+    assert implement_task_scaffold.record_outcome([], entry) == [entry]
+
+
+def test_render_outcome_table_empty_is_header_only():
+    table = implement_task_scaffold.render_outcome_table([])
+    lines = table.splitlines()
+    assert lines == ["| Task | Title | Status | PR/Merge |", "|---|---|---|---|"]
+
+
+def test_render_outcome_table_renders_every_row_in_order():
+    outcomes = [
+        {"task_id": "TASK-001", "title": "First", "status": "done", "link": "https://x/pr/1"},
+        {"task_id": "TASK-002", "title": "Second", "status": "in-review", "link": None},
+    ]
+    table = implement_task_scaffold.render_outcome_table(outcomes)
+    lines = table.splitlines()
+    assert lines[0] == "| Task | Title | Status | PR/Merge |"
+    assert lines[2] == "| TASK-001 | First | done | https://x/pr/1 |"
+    assert lines[3] == "| TASK-002 | Second | in-review | — |"
+
+
+# ---------------------------------------------------------------------------
 # Integration: cmd_start / cmd_bail_out / cmd_resume_state against a real
 # scratch repo with a genuine bare "origin" remote
 # ---------------------------------------------------------------------------
@@ -337,9 +406,12 @@ def _push_tasks(cwd):
     _git(["push"], cwd=cwd)
 
 
-def _run_start(cwd, task_id=None):
+def _run_start(cwd, task_id=None, batch_mode=None):
+    answers = {"task_id": task_id}
+    if batch_mode is not None:
+        answers["batch_mode"] = batch_mode
     answers_path = cwd.parent / "start-answers.json"
-    answers_path.write_text(json.dumps({"task_id": task_id}))
+    answers_path.write_text(json.dumps(answers))
     return subprocess.run(
         [sys.executable, str(SCRIPT_PATH), "start", str(answers_path)], cwd=cwd, capture_output=True, text=True
     )
@@ -665,6 +737,17 @@ def test_start_creates_branch_and_sets_frontmatter(repo):
     assert "status: in-progress" in task_text
     assert f"branch: {output['branch']}" in task_text
     assert _sync_check(repo).returncode == 0
+    assert output["stop_required"] is True
+
+
+def test_start_batch_mode_sets_stop_required_false(repo):
+    _add_task(repo, "First task")
+    _push_tasks(repo)
+
+    result = _run_start(repo, task_id="TASK-001", batch_mode=True)
+
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout)["stop_required"] is False
 
 
 def test_bail_out_reverts_status_to_todo(repo):
@@ -827,3 +910,46 @@ def test_wrap_up_stashes_and_restores_dirty_ignored_paths_around_rebase(repo, fa
     # and it's genuinely not part of the pushed commit
     show = _git(["show", "--stat", "HEAD"], cwd=repo).stdout
     assert "prompts.md" not in show
+
+
+# ---------------------------------------------------------------------------
+# record-outcome / render-outcome-table CLI subcommands (TASK-041): thin,
+# side-effect-free wrappers -- no scratch repo needed, just a tmp_path cwd.
+# ---------------------------------------------------------------------------
+
+
+def _run_scaffold(cwd, command, answers):
+    answers_path = cwd / f"{command}-answers.json"
+    answers_path.write_text(json.dumps(answers))
+    return subprocess.run(
+        [sys.executable, str(SCRIPT_PATH), command, str(answers_path)], cwd=cwd, capture_output=True, text=True
+    )
+
+
+def test_cmd_record_outcome_appends_entry(tmp_path):
+    existing = [{"task_id": "TASK-001", "title": "First", "status": "done", "link": "abc"}]
+    entry = {"task_id": "TASK-002", "title": "Second", "status": "done", "link": "def"}
+
+    result = _run_scaffold(tmp_path, "record-outcome", {"outcomes": existing, "entry": entry})
+
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout) == {"outcomes": existing + [entry]}
+
+
+def test_cmd_record_outcome_refuses_incomplete_entry(tmp_path):
+    entry = {"task_id": "TASK-001", "title": "First", "link": "abc"}  # no "status"
+
+    result = _run_scaffold(tmp_path, "record-outcome", {"outcomes": [], "entry": entry})
+
+    assert result.returncode != 0
+    assert "status" in result.stderr
+
+
+def test_cmd_render_outcome_table(tmp_path):
+    outcomes = [{"task_id": "TASK-001", "title": "First", "status": "done", "link": "abc"}]
+
+    result = _run_scaffold(tmp_path, "render-outcome-table", {"outcomes": outcomes})
+
+    assert result.returncode == 0, result.stderr
+    table = json.loads(result.stdout)["table"]
+    assert "| TASK-001 | First | done | abc |" in table
