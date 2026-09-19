@@ -1,12 +1,12 @@
 ---
 id: TASK-069
-title: "Scope finish-merge's bookkeeping git add to board-managed paths only"
+title: Scope finish-merge's bookkeeping git add to board-managed paths only
 type: bug
-status: todo
+status: in-review
 epic: null
 created: 2026-09-18
 branch: task-069-scope-finish-merge-s-bookkeeping-git-add-to-board-managed-paths-only
-pr: null
+pr: "https://github.com/RobotNerd/sdlc-llm/pull/86"
 merge_commit: null
 blocked_by: []
 blocks: []
@@ -41,13 +41,13 @@ existing "commit the sync-regenerated board/epic/task changes" behavior every cu
 
 ## Acceptance criteria
 
-- [ ] `cmd_finish_merge`'s bookkeeping commit never stages a file outside `BOARD.md`/`EPIC-*.md`/
+- [x] `cmd_finish_merge`'s bookkeeping commit never stages a file outside `BOARD.md`/`EPIC-*.md`/
       `.tasks/archive/**`/the merged task's own frontmatter fields, even when an unrelated
       untracked file is sitting in `.tasks/` at the time it runs.
-- [ ] `cmd_wrap_up`'s bookkeeping commit has the same guarantee.
-- [ ] Every existing `wrap-up`/`finish-merge` test in `tests/test_implement_task_scaffold.py` still
+- [x] `cmd_wrap_up`'s bookkeeping commit has the same guarantee.
+- [x] Every existing `wrap-up`/`finish-merge` test in `tests/test_implement_task_scaffold.py` still
       passes — the fix must not stop staging what these commits are actually supposed to.
-- [ ] `pytest` and `python3 .tasks/bin/sync check` both pass.
+- [x] `pytest` and `python3 .tasks/bin/sync check` both pass.
 
 ## Testing strategy
 
@@ -62,7 +62,11 @@ existing "commit the sync-regenerated board/epic/task changes" behavior every cu
 
 ## Worklog
 
-_(empty — appended during implementation)_
+- Tests first: added a `pr view` (MERGED) branch to the `fake_gh` stub (`finish-merge` had no test coverage before), a `finish-merge` happy-path test (archived task file + its removal, `BOARD.md`, pushed to `origin/main`), and stray-untracked-file regression tests for both `wrap-up` and `finish-merge`. The two regression tests failed for the expected reason (stray file committed); happy path passed against the old code, then everything passed after the fix.
+- Fix: one shared `stage_bookkeeping(cwd)` replaces both `git add -- .tasks` calls: `git add -u -- .tasks` (tracked modifications/deletions only), then `git add -- .tasks/archive` when it exists.
+- Deviation from the task's suggested approach: stage the whole `.tasks/archive/` directory rather than only the merged task's archived path. `sync` archives *every* `done` task, so staging just one could commit another task's deletion without its archived copy (data loss on the remote). Only `sync`'s own moves land in `archive/`, so it's safe to stage as a unit.
+- The stray file in the tests is a non-task file (`.tasks/scratch-notes.txt`): a stray `TASK-*.md` without valid frontmatter makes `sync` itself crash on discovery (a separate, pre-existing behavior, not touched here).
+- `SKILL.md` guardrails section notes the bookkeeping commits are scoped. Full suite + `sync check` results recorded in the PR.
 
 ## Notes
 

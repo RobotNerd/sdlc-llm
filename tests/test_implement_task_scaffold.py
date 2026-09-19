@@ -525,7 +525,8 @@ FAKE_PR_URL = "https://example.invalid/pr/1"
 def fake_gh(tmp_path_factory):
     """A `gh` stub on its own directory: `pr create` prints a fixed fake PR URL (deterministic,
     no network); `pr checks` reports nothing configured (a plausible real response, and `wrap-up`
-    must not fail on it regardless). Prepend this directory to `PATH` to use it in a subprocess.
+    must not fail on it regardless); `pr view` reports the PR already MERGED (TASK-069's
+    `finish-merge` tests). Prepend this directory to `PATH` to use it in a subprocess.
     """
     bin_dir = tmp_path_factory.mktemp("fake-gh-bin")
     gh_path = bin_dir / "gh"
@@ -535,6 +536,9 @@ def fake_gh(tmp_path_factory):
         "args = sys.argv[1:]\n"
         "if args[:2] == ['pr', 'create']:\n"
         f"    print({FAKE_PR_URL!r})\n"
+        "    sys.exit(0)\n"
+        "if args[:2] == ['pr', 'view']:\n"
+        "    print('{\"state\": \"MERGED\", \"mergeCommit\": {\"oid\": \"abc1234\"}}')\n"
         "    sys.exit(0)\n"
         "if args[:2] == ['pr', 'checks']:\n"
         "    print('no checks configured')\n"
@@ -1454,3 +1458,108 @@ def test_cmd_session_token_usage_fails_cleanly_on_a_malformed_file(tmp_path):
     assert result.returncode != 0
     assert "line 1" in result.stderr
     assert "Traceback" not in result.stderr
+
+
+# ---------------------------------------------------------------------------
+# Bookkeeping commits stage only what they own (TASK-069): a stray untracked file in `.tasks/`
+# (e.g. leftovers from an in-flight `add-task` run) must never be swept into `wrap-up`'s or `finish-merge`'s
+# bookkeeping commit -- `finish-merge`'s is pushed straight to the default branch.
+# ---------------------------------------------------------------------------
+
+_STRAY = Path(".tasks") / "scratch-notes.txt"
+
+
+def _committed_files(cwd, rev="HEAD"):
+    return set(_git(["show", "--name-only", "--no-renames", "--format=", rev], cwd=cwd).stdout.split())
+
+
+def _run_finish_merge(cwd, fake_gh, task_id="TASK-001"):
+    answers_path = cwd.parent / "finish-merge-answers.json"
+    answers_path.write_text(json.dumps({
+        "task_id": task_id, "bookkeeping_commit_message": f"chore({task_id}): phase 4",
+    }))
+    env = os.environ.copy()
+    env["PATH"] = f"{fake_gh}{os.pathsep}{env['PATH']}"
+    return subprocess.run(
+        [sys.executable, str(SCRIPT_PATH), "finish-merge", str(answers_path)],
+        cwd=cwd, capture_output=True, text=True, env=env,
+    )
+
+
+def _wrapped_up_task(repo, fake_gh, stray=False):
+    """A scratch repo with TASK-001 started, committed and wrapped up (PR "opened")."""
+    _add_task(repo, "First task")
+    _push_tasks(repo)
+    started = _run_start(repo, task_id="TASK-001")
+    assert started.returncode == 0, started.stderr
+    _git(["add", "-A"], cwd=repo)
+    _git(["commit", "-q", "-m", "wip"], cwd=repo)
+    (repo / "feature.txt").write_text("the change\n")
+    if stray:
+        (repo / _STRAY).write_text("stray file from unrelated in-flight work\n")
+    return _run_wrap_up(repo, {
+        "task_id": "TASK-001", "paths": ["feature.txt"],
+        "commit_message": "feat(TASK-001): add the feature", "pr_title": "feat(TASK-001): add the feature",
+        "pr_body": "body", "bookkeeping_commit_message": "chore(TASK-001): record PR, set status in-review",
+    }, fake_gh)
+
+
+def test_wrap_up_bookkeeping_commit_leaves_a_stray_untracked_tasks_file_alone(repo, fake_gh):
+    result = _wrapped_up_task(repo, fake_gh, stray=True)
+
+    assert result.returncode == 0, result.stderr
+    bookkeeping = _committed_files(repo)  # HEAD is the bookkeeping commit
+    assert ".tasks/TASK-001-first-task.md" in bookkeeping  # still stages what it owns
+    assert str(_STRAY) not in bookkeeping
+    assert str(_STRAY) not in _committed_files(repo, "HEAD~1")
+    assert (repo / _STRAY).exists()
+    assert str(_STRAY) in implement_task_scaffold.dirty_files(repo)  # still untracked
+
+
+def _squash_merge_and_return(repo, branch):
+    """Stand in for the human's squash-merge on GitHub: land `branch` on main, push, come back."""
+    _git(["checkout", "-q", "main"], cwd=repo)
+    _git(["merge", "--squash", branch], cwd=repo)
+    _git(["commit", "-q", "-m", "squash-merge TASK-001"], cwd=repo)
+    _git(["push", "-q", "origin", "main"], cwd=repo)
+    _git(["checkout", "-q", branch], cwd=repo)
+
+
+def test_finish_merge_commits_and_pushes_archive_board_and_epic_bookkeeping(repo, fake_gh):
+    result = _wrapped_up_task(repo, fake_gh)
+    assert result.returncode == 0, result.stderr
+    _squash_merge_and_return(repo, "task-001-first-task")
+
+    result = _run_finish_merge(repo, fake_gh)
+
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout) == {"merged": True, "merge_commit": "abc1234"}
+    bookkeeping = _committed_files(repo)
+    assert ".tasks/archive/TASK-001-first-task.md" in bookkeeping  # the archived task file
+    assert ".tasks/TASK-001-first-task.md" in bookkeeping  # ...and its removal from `.tasks/`
+    assert ".tasks/BOARD.md" in bookkeeping
+    assert not (repo / ".tasks" / "TASK-001-first-task.md").exists()
+    assert implement_task_scaffold.dirty_files(repo) == []
+    assert _sync_check(repo).returncode == 0
+    # pushed to the default branch, not just committed locally
+    _git(["fetch", "origin"], cwd=repo)
+    assert _git(["rev-parse", "HEAD"], cwd=repo).stdout == _git(["rev-parse", "origin/main"], cwd=repo).stdout
+
+
+def test_finish_merge_bookkeeping_commit_leaves_a_stray_untracked_tasks_file_alone(repo, fake_gh):
+    result = _wrapped_up_task(repo, fake_gh)
+    assert result.returncode == 0, result.stderr
+    _squash_merge_and_return(repo, "task-001-first-task")
+    (repo / _STRAY).write_text("stray file from unrelated in-flight work\n")
+
+    result = _run_finish_merge(repo, fake_gh)
+
+    assert result.returncode == 0, result.stderr
+    bookkeeping = _committed_files(repo)
+    assert ".tasks/archive/TASK-001-first-task.md" in bookkeeping  # still stages what it owns
+    assert str(_STRAY) not in bookkeeping
+    assert (repo / _STRAY).exists()
+    assert implement_task_scaffold.dirty_files(repo) == [str(_STRAY)]  # still untracked
+    _git(["fetch", "origin"], cwd=repo)
+    remote_files = _git(["ls-tree", "-r", "--name-only", "origin/main"], cwd=repo).stdout.split()
+    assert str(_STRAY) not in remote_files

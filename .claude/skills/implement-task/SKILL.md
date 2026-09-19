@@ -305,6 +305,9 @@ Enforced *in the script*, not only documented here:
   branch isn't the task's own branch, or if that branch is `default_branch`; `--force-with-lease`
   only fires when a rebase actually rewrote already-pushed history.
 - Never touch files outside the task's own scope — `wrap-up` only ever adds the `paths` it's given.
+  The bookkeeping commits are scoped the same way: `wrap-up`'s and `finish-merge`'s stage only
+  tracked-file changes under `.tasks/` plus `.tasks/archive/` — never an unrelated untracked file
+  sitting in `.tasks/`, which `finish-merge` would otherwise push straight to `default_branch`.
 - Never hand-edit a `BEGIN:`/`END:` region or an epic's `status` — that's `sync`'s job, always
   invoked through the script, never by hand.
 
