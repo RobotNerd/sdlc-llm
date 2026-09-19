@@ -49,6 +49,17 @@ def repo_root() -> Path:
     return Path(result.stdout.strip())
 
 
+def discover_or_exit(sync_mod: ModuleType, tasks_root: Path) -> dict:
+    """`sync_mod.discover(tasks_root)`, but a malformed task/epic/spec file (`FrontmatterError`,
+    whose message already names the file and the problem) becomes a one-line error and a non-zero
+    exit instead of a traceback. Never skips the bad file -- it still fails the command.
+    """
+    try:
+        return sync_mod.discover(tasks_root)
+    except sync_mod.FrontmatterError as exc:
+        raise SystemExit(f"add-task: {exc}") from None
+
+
 def load_sync_module(tasks_root: Path) -> ModuleType:
     """Import `<tasks_root>/bin/sync` by file path -- it has no `.py` suffix so a normal
     `import` can't find it. Raises `SystemExit` if `.tasks/bin/sync` doesn't exist yet
@@ -90,7 +101,7 @@ def list_open_epics(tasks_root: Path, sync_mod: ModuleType) -> list[dict]:
     """Every epic whose `status` is not `done`/`wont-do` -- the same "open" definition
     `sync`'s board panel uses -- scanning `.tasks/` and `.tasks/archive/`. Sorted by id.
     """
-    artifacts = sync_mod.discover(tasks_root)
+    artifacts = discover_or_exit(sync_mod, tasks_root)
     open_epics = [
         {"id": art.id, "title": art.fields.get("title")}
         for art in artifacts.values()
@@ -231,7 +242,7 @@ def cmd_run(args: argparse.Namespace) -> int:
         )
         return 2
 
-    artifacts = sync_mod.discover(tasks_root)
+    artifacts = discover_or_exit(sync_mod, tasks_root)
 
     epic = answers["epic"]
     if epic is not None and (epic not in artifacts or artifacts[epic].kind != "epic"):

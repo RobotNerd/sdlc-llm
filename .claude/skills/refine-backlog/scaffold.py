@@ -37,6 +37,17 @@ def repo_root() -> Path:
     return Path(result.stdout.strip())
 
 
+def discover_or_exit(sync_mod: ModuleType, tasks_root: Path) -> dict:
+    """`sync_mod.discover(tasks_root)`, but a malformed task/epic/spec file (`FrontmatterError`,
+    whose message already names the file and the problem) becomes a one-line error and a non-zero
+    exit instead of a traceback. Never skips the bad file -- it still fails the command.
+    """
+    try:
+        return sync_mod.discover(tasks_root)
+    except sync_mod.FrontmatterError as exc:
+        raise SystemExit(f"refine-backlog: {exc}") from None
+
+
 def load_sync_module(tasks_root: Path) -> ModuleType:
     sync_path = tasks_root / "bin" / "sync"
     if not sync_path.is_file():
@@ -231,7 +242,7 @@ def cmd_report(args: argparse.Namespace) -> int:
     config = sync_mod.load_config(tasks_root)
     default_branch = config.get("default_branch", "main")
 
-    artifacts = sync_mod.discover(tasks_root)
+    artifacts = discover_or_exit(sync_mod, tasks_root)
     tasks = {a.id: a for a in artifacts.values() if a.kind == "task"}
     board_text = (tasks_root / "BOARD.md").read_text()
 
@@ -251,7 +262,7 @@ def cmd_mark_wont_do(args: argparse.Namespace) -> int:
     answers = json.loads(Path(args.answers).read_text())
     task_id = answers["task_id"]
 
-    artifacts = sync_mod.discover(tasks_root)
+    artifacts = discover_or_exit(sync_mod, tasks_root)
     if task_id not in artifacts:
         print(f"refine-backlog: {task_id} not found", file=sys.stderr)
         return 2
@@ -276,7 +287,7 @@ def cmd_reorder(args: argparse.Namespace) -> int:
     answers = json.loads(Path(args.answers).read_text())
     new_order = answers["new_order"]
 
-    artifacts = sync_mod.discover(tasks_root)
+    artifacts = discover_or_exit(sync_mod, tasks_root)
     tasks = {a.id: a for a in artifacts.values() if a.kind == "task"}
     board_path = tasks_root / "BOARD.md"
     board_text = board_path.read_text()

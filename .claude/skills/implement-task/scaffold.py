@@ -44,6 +44,17 @@ def repo_root() -> Path:
     return Path(result.stdout.strip())
 
 
+def discover_or_exit(sync_mod: ModuleType, tasks_root: Path) -> dict:
+    """`sync_mod.discover(tasks_root)`, but a malformed task/epic/spec file (`FrontmatterError`,
+    whose message already names the file and the problem) becomes a one-line error and a non-zero
+    exit instead of a traceback. Never skips the bad file -- it still fails the command.
+    """
+    try:
+        return sync_mod.discover(tasks_root)
+    except sync_mod.FrontmatterError as exc:
+        raise SystemExit(f"implement-task: {exc}") from None
+
+
 def load_sync_module(tasks_root: Path) -> ModuleType:
     sync_path = tasks_root / "bin" / "sync"
     if not sync_path.is_file():
@@ -513,7 +524,7 @@ def cmd_resume_state(args: argparse.Namespace) -> int:
     remote = config.get("remote", "origin")
     ignored_paths = effective_ignored_paths(config)
 
-    artifacts = sync_mod.discover(tasks_root)
+    artifacts = discover_or_exit(sync_mod, tasks_root)
     in_flight_tasks = [
         a for a in artifacts.values() if a.kind == "task" and a.fields.get("status") in _IN_FLIGHT_STATUSES
     ]
@@ -593,7 +604,7 @@ def cmd_start(args: argparse.Namespace) -> int:
             print("implement-task: no unblocked TODO task found", file=sys.stderr)
             return 2
 
-    artifacts = sync_mod.discover(tasks_root)
+    artifacts = discover_or_exit(sync_mod, tasks_root)
     if task_id not in artifacts or artifacts[task_id].kind != "task":
         print(f"implement-task: {task_id} not found", file=sys.stderr)
         return 2
@@ -654,7 +665,7 @@ def cmd_wrap_up(args: argparse.Namespace) -> int:
     task_id = answers["task_id"]
     paths = answers["paths"]
 
-    artifacts = sync_mod.discover(tasks_root)
+    artifacts = discover_or_exit(sync_mod, tasks_root)
     if task_id not in artifacts:
         print(f"implement-task: {task_id} not found", file=sys.stderr)
         return 2
@@ -847,7 +858,7 @@ def cmd_finish_merge(args: argparse.Namespace) -> int:
     answers = json.loads(Path(args.answers).read_text())
     task_id = answers["task_id"]
 
-    artifacts = sync_mod.discover(tasks_root)
+    artifacts = discover_or_exit(sync_mod, tasks_root)
     if task_id not in artifacts:
         print(f"implement-task: {task_id} not found", file=sys.stderr)
         return 2
@@ -963,7 +974,7 @@ def cmd_bail_out(args: argparse.Namespace) -> int:
         print(f"implement-task: bail-out status must be 'todo' or 'blocked', got {status!r}", file=sys.stderr)
         return 2
 
-    artifacts = sync_mod.discover(tasks_root)
+    artifacts = discover_or_exit(sync_mod, tasks_root)
     if task_id not in artifacts:
         print(f"implement-task: {task_id} not found", file=sys.stderr)
         return 2
