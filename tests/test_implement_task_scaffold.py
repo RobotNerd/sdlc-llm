@@ -331,8 +331,11 @@ def test_interrupt_routing_isolated_kinds_continue_the_batch(kind):
     }
 
 
-def test_interrupt_routing_infra_failure_is_systemic_and_halts():
-    assert implement_task_scaffold.interrupt_routing("infra_failure") == {
+@pytest.mark.parametrize(
+    "kind", ["infra_failure", "context_usage_exceeded", "token_budget_exceeded"],
+)
+def test_interrupt_routing_systemic_kinds_halt_the_batch(kind):
+    assert implement_task_scaffold.interrupt_routing(kind) == {
         "routing": "systemic", "continue_batch": False,
     }
 
@@ -340,6 +343,71 @@ def test_interrupt_routing_infra_failure_is_systemic_and_halts():
 def test_interrupt_routing_raises_on_unknown_kind():
     with pytest.raises(ValueError, match="bogus"):
         implement_task_scaffold.interrupt_routing("bogus")
+
+
+# ---------------------------------------------------------------------------
+# check_usage_thresholds / render_usage_summary (TASK-043): the context/token
+# safety-valve -- pure functions over caller-supplied usage figures (this
+# harness exposes no tool that reports exact usage, so these are estimates).
+# ---------------------------------------------------------------------------
+
+
+def test_check_usage_thresholds_under_both_is_no_halt():
+    result = implement_task_scaffold.check_usage_thresholds(
+        context_pct=40, halt_pct=85, tokens_used=1000, token_budget=100000,
+    )
+    assert result == {"halt": False, "kind": None, "message": None}
+
+
+def test_check_usage_thresholds_context_over_halts_and_names_it():
+    result = implement_task_scaffold.check_usage_thresholds(
+        context_pct=90, halt_pct=85, tokens_used=1000, token_budget=None,
+    )
+    assert result["halt"] is True
+    assert result["kind"] == "context_usage_exceeded"
+    assert "90" in result["message"]
+    assert "85" in result["message"]
+
+
+def test_check_usage_thresholds_token_budget_over_halts_and_names_it():
+    result = implement_task_scaffold.check_usage_thresholds(
+        context_pct=10, halt_pct=85, tokens_used=50000, token_budget=40000,
+    )
+    assert result["halt"] is True
+    assert result["kind"] == "token_budget_exceeded"
+    assert "50000" in result["message"]
+    assert "40000" in result["message"]
+
+
+def test_check_usage_thresholds_no_token_budget_never_triggers_it():
+    result = implement_task_scaffold.check_usage_thresholds(
+        context_pct=10, halt_pct=85, tokens_used=10_000_000, token_budget=None,
+    )
+    assert result == {"halt": False, "kind": None, "message": None}
+
+
+def test_check_usage_thresholds_context_checked_before_token_budget():
+    # both crossed at once -- context is reported, matching the checkpoint order in SKILL.md
+    result = implement_task_scaffold.check_usage_thresholds(
+        context_pct=95, halt_pct=85, tokens_used=50000, token_budget=40000,
+    )
+    assert result["kind"] == "context_usage_exceeded"
+
+
+def test_render_usage_summary_includes_context_and_tokens_with_no_cap():
+    summary = implement_task_scaffold.render_usage_summary(
+        context_pct=42, tokens_used=12345, token_budget=None,
+    )
+    assert "42" in summary
+    assert "12345" in summary
+    assert "no cap" in summary
+
+
+def test_render_usage_summary_includes_the_budget_when_set():
+    summary = implement_task_scaffold.render_usage_summary(
+        context_pct=42, tokens_used=12345, token_budget=100000,
+    )
+    assert "100000" in summary
 
 
 # ---------------------------------------------------------------------------
@@ -1001,3 +1069,34 @@ def test_cmd_classify_interrupt_refuses_unknown_kind(tmp_path):
 
     assert result.returncode != 0
     assert "bogus" in result.stderr
+
+
+def test_cmd_check_usage_thresholds_halts_on_context(tmp_path):
+    result = _run_scaffold(tmp_path, "check-usage-thresholds", {
+        "context_pct": 90, "halt_pct": 85, "tokens_used": 100, "token_budget": None,
+    })
+
+    assert result.returncode == 0, result.stderr
+    output = json.loads(result.stdout)
+    assert output["halt"] is True
+    assert output["kind"] == "context_usage_exceeded"
+
+
+def test_cmd_check_usage_thresholds_no_halt(tmp_path):
+    result = _run_scaffold(tmp_path, "check-usage-thresholds", {
+        "context_pct": 10, "halt_pct": 85, "tokens_used": 100, "token_budget": None,
+    })
+
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout) == {"halt": False, "kind": None, "message": None}
+
+
+def test_cmd_render_usage_summary(tmp_path):
+    result = _run_scaffold(tmp_path, "render-usage-summary", {
+        "context_pct": 42, "tokens_used": 12345, "token_budget": None,
+    })
+
+    assert result.returncode == 0, result.stderr
+    summary = json.loads(result.stdout)["summary"]
+    assert "42" in summary
+    assert "12345" in summary

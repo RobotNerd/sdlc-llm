@@ -158,38 +158,48 @@ On the next invocation (or when told the PR merged), run
 
 Given the batch parameter instead of a single task id, work through the whole batch with minimal
 human interaction — a human still reviews and merges every PR. Phase 1's STOP is replaced by an
-announcement (step 3.1) and phase 3's by a self-scheduled wait (step 3.4); everything else that
+announcement (step 3.2) and phase 3's by a self-scheduled wait (step 3.6); everything else that
 would stop single-task mode — a phase 2 decision, a `start` refusal, a rebase/format-command
 failure, `phase4_closed_not_merged`, `ambiguous` — is routed through "Interrupts" below instead of
-always halting the batch.
+always halting the batch, as is crossing either usage threshold (steps 3.1/3.4).
 
 1. Run `python3 .claude/skills/implement-task/batch_select.py select <answers.json>` with the
    given batch parameter as-is. It refuses (non-zero, nothing changed) on any invalid selection —
    **STOP**, show the human its message, don't guess at a fix. On success it prints
    `{"order": [task-ids...]}`: the tasks to work, in the order to work them.
-2. Start an empty outcomes accumulator (`[]`) for the whole run.
+2. Start an empty outcomes accumulator (`[]`) and a running best-effort tally of tokens spent so
+   far in this batch (`0` at the start) for the whole run.
 3. For each `task_id` in `order`, in turn:
-   1. **Phase 1:** run `start` with `{"task_id": task_id, "batch_mode": true}`. Restate the plan
+   1. **Usage checkpoint, before this task starts:** read `context_usage_halt_pct`/
+      `token_budget_per_batch` from `.tasks/config.md`, estimate your own current context-window
+      usage as a percentage as best you can (this harness exposes no tool that reports it
+      exactly — an honest estimate, not a real measurement), and run
+      `check-usage-thresholds` (`{"context_pct", "halt_pct", "tokens_used", "token_budget"}`). A
+      `halt: true` result is a systemic interrupt (see "Interrupts") — route it before starting
+      this task's phase 1, not after.
+   2. **Phase 1:** run `start` with `{"task_id": task_id, "batch_mode": true}`. Restate the plan
       (Description, Acceptance criteria, Testing strategy, implementation approach) exactly as
       single-task mode does — but its result carries `"stop_required": false`, so print the plan
       as an announcement and go straight into phase 2 without waiting for approval; the batch
       selection itself was that approval. If `start` itself refuses (this task is unexpectedly
       still blocked, most likely by an earlier batch task this run skipped rather than completed),
       that's the `unexpected_blocker` interrupt below, not a crash.
-   2. **Phase 2:** unchanged, except a decision that would stop single-task mode is routed through
+   3. **Phase 2:** unchanged, except a decision that would stop single-task mode is routed through
       "Interrupts" below instead of always stopping the batch outright.
-   3. **Phase 3:** unchanged through `wrap-up` opening the PR (a rebase/format-command failure here
+   4. **Usage checkpoint again**, same call as step 3.1 — after phase 2, before phase 3, per
+      `.tasks/config.md`'s own description of when these checks happen.
+   5. **Phase 3:** unchanged through `wrap-up` opening the PR (a rebase/format-command failure here
       is also routed through "Interrupts"). Once it succeeds, append this task's provisional
       outcome — `{"task_id", "title", "status": "in-review", "link": pr_url}` — to the accumulator
       via `record-outcome` (`{"outcomes", "entry"}`, returns the updated list; hold onto it for the
       next step).
-   4. Instead of phase 3's hard STOP: call this harness's `ScheduleWakeup` rather than stopping —
+   6. Instead of phase 3's hard STOP: call this harness's `ScheduleWakeup` rather than stopping —
       pick a delay proportionate to how quickly this project's CI/review actually completes (its
       own guidance applies: don't tight-poll), and give it a `prompt` that's self-sufficient even
       if later context gets summarized — name `task_id`, its PR url, and that the next step is
       re-running `finish-merge` for it, then continuing the batch with whatever of `order` comes
       after it. End the turn.
-   5. On that scheduled wake, run **phase 4** (`finish-merge`) exactly as single-task mode does —
+   7. On that scheduled wake, run **phase 4** (`finish-merge`) exactly as single-task mode does —
       it already returns `{"merged": false, "state", "checks_output"}` and changes nothing when
       the PR isn't `MERGED` yet, or does phase 4's full bookkeeping and returns
       `{"merged": true, "merge_commit"}` when it is:
@@ -201,7 +211,8 @@ always halting the batch.
       - `phase4_closed_not_merged` or `ambiguous` (single-task mode's own STOP conditions here):
         routed through "Interrupts" below, same as any other decision point in this loop.
 4. Once every task in `order` is accounted for (merged or the batch halted early), run
-   `render-outcome-table` with the accumulated outcomes and print the table it returns as the
+   `render-outcome-table` with the accumulated outcomes and `render-usage-summary` with your final
+   usage estimate — regardless of whether either threshold was ever crossed — and print both as the
    batch's summary. **STOP.**
 
 ### Interrupts
@@ -216,26 +227,29 @@ conditions it matches, then run
   discovered mid-implementation (today's existing bail-out reason).
 - `unexpected_blocker` — something task-specific blocks progress: a dependency assumed satisfied
   turns out not to be, a precondition specific to this task is missing, or `start` itself refused
-  for this task (see step 3.1).
+  for this task (see step 3.2).
 - `quality_gate_failure` — `test_command`/`lint_command`/`format_command`/`sync check` fails for
   the same reason 3 times in a row on this task — a bounded number of fix attempts, not indefinite
   iteration.
 - `guardrail_denial` — the same `PreToolUse` hook denies a retry on this task 3 times in a row.
 - `infra_failure` — `git`/`gh` itself is broken (auth expired, network failure, rate-limited),
   distinct from "the code is wrong" — every remaining task would hit the same wall.
+- `context_usage_exceeded` / `token_budget_exceeded` — `check-usage-thresholds` (steps 3.1/3.4)
+  already names which one in its `kind`; use that directly rather than judging it yourself.
 
-**`routing: "isolated"`** (the first four — `continue_batch: true`): write findings into the
+**`routing: "isolated"`** (the first four kinds — `continue_batch: true`): write findings into the
 interrupted task's Worklog and/or Notes yourself first (content-authoring, exactly what `bail-out`
 already expects), run `bail-out` with `{"task_id", "status": "todo"|"blocked"}`, append its
 outcome via `record-outcome` — `{"task_id", "title", "status"}` describing the interrupt (e.g.
 `"todo (needs clarification)"`), `"link": null` — then continue the loop at the next `task_id` in
 `order`. This task's own STOP-worthy problem doesn't stop the batch.
 
-**`routing: "systemic"`** (`infra_failure` — `continue_batch: false`): don't touch the interrupted
-task's status — the tooling failed, not the task, so it's left exactly as-is for a normal
-single-task `resume-state` once `git`/`gh` works again. Append its outcome noting the
-interruption, run `render-outcome-table` with everything accumulated so far, and **STOP** — nothing
-else in `order` starts.
+**`routing: "systemic"`** (`infra_failure`/`context_usage_exceeded`/`token_budget_exceeded` —
+`continue_batch: false`): don't touch the interrupted task's status — none of these three are the
+task's fault, so it's left exactly as-is for a normal single-task `resume-state` later (once
+`git`/`gh` works again, or in a fresh session with more budget). Append its outcome noting the
+interruption, run `render-outcome-table` and `render-usage-summary` with everything accumulated so
+far, and **STOP** — nothing else in `order` starts.
 
 ## Bail-out
 

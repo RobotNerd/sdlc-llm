@@ -823,6 +823,8 @@ delete_branch_after_merge: true
 allow_auto_merge: false
 ci_checks: []
 archive_done: true
+context_usage_halt_pct: 85
+token_budget_per_batch: null
 ignored_paths: []
 ---
 
@@ -848,7 +850,7 @@ def test_merge_config_schema_adds_a_single_missing_key_at_template_position():
     assert added == ["ignored_paths"]
     assert bumped is None
     lines = merged.splitlines()
-    assert lines[lines.index("archive_done: true") + 1] == "ignored_paths: []"
+    assert lines[lines.index("token_budget_per_batch: null") + 1] == "ignored_paths: []"
 
 
 def test_merge_config_schema_adds_multiple_missing_keys_at_their_own_positions():
@@ -858,7 +860,17 @@ def test_merge_config_schema_adds_multiple_missing_keys_at_their_own_positions()
     lines = merged.splitlines()
     assert lines[lines.index("docs_paths: [README.md]") + 1] == "docs_review_paths: [CLAUDE.md, README.md, .tasks/guidelines.md]"
     assert lines[lines.index("docs_review_paths: [CLAUDE.md, README.md, .tasks/guidelines.md]") + 1] == "docs_ignore_paths: []"
-    assert lines[lines.index("archive_done: true") + 1] == "ignored_paths: []"
+    assert lines[lines.index("token_budget_per_batch: null") + 1] == "ignored_paths: []"
+
+
+def test_merge_config_schema_adds_usage_safety_valve_keys_at_template_position():
+    old = _drop_keys(_CURRENT_CONFIG, "context_usage_halt_pct", "token_budget_per_batch")
+    merged, added, bumped = scaffold.merge_config_schema(old, installed_sync)
+    assert added == ["context_usage_halt_pct", "token_budget_per_batch"]
+    assert bumped is None
+    lines = merged.splitlines()
+    assert lines[lines.index("archive_done: true") + 1] == "context_usage_halt_pct: 85"
+    assert lines[lines.index("context_usage_halt_pct: 85") + 1] == "token_budget_per_batch: null"
 
 
 def test_merge_config_schema_preserves_existing_values_and_project_added_key():
