@@ -25,61 +25,21 @@ ignored_paths: [.tmp/prompts.md]
 
 # Workflow config
 
-Per-project settings every skill and `sync` (`.tasks/bin/sync`) read. This is the seam SPEC-001
-describes: the skills' logic stays identical across projects, only this file changes. See
-`.tasks/specs/SPEC-001-llm-sdlc-workflow.md` §`.tasks/config.md` for the schema.
+Settings every skill and `sync` (`.tasks/bin/sync`) read.
 
 ## Key notes
 
 - **`workflow_version`** — lets a future `upgrade` path migrate a repo whose workflow predates a
   schema change. Bump it whenever a breaking change lands in the data model or `sync`'s contract.
-- **`lint_command: null`** — no linter is configured yet. `.tasks/bin/sync` and its tests are
-  stdlib-only plus `pytest` (TASK-004's sole dev dependency); adding a linter (e.g. `ruff`) is a
-  separate decision, not bundled into this bootstrap. `null` means skills skip the lint step
-  rather than fail on a command that doesn't exist. Update this once a linter is chosen.
-- **`format_command: null`** — no formatter is configured yet. `null` means `implement-task`
-  skips the formatting step entirely. Once set, `implement-task` runs it after phase 3's rebase
-  and before the push, amending any resulting changes into the existing commit rather than adding
-  a second one.
+- **`lint_command`** — Linter command to run on the code. If null, no tool is configured.
+- **`format_command`** — Code autoformatting tool to run.  If null, no tool is configured.
 - **`docs_paths`** — files `implement-task` phase 3 considers touching as part of "update docs".
-- **`docs_review_paths`** / **`docs_ignore_paths`** — `review-docs`'s own lists: which docs it
-  always audits for staleness, and which paths it never scans into or flags. Deliberately
-  separate from `docs_paths` (a different concern — per-task doc updates, not periodic audit) and
-  from `ignored_paths` (`implement-task`'s dirty-tree/rebase-stash scope). This repo's own
-  `docs_review_paths` includes the portable-template mirror
-  (`.claude/skills/init-project/templates/guidelines.md`) that only this dogfooding repo has.
-- **`remote` / `rebase_before_pr` / `merge_strategy` / `delete_branch_after_merge`** — the git
-  automation settings from SPEC-001's `implement-task` phases 1/3/4. `merge_strategy: squash`
-  documents how the *human* merges; the skill itself never merges (see `guidelines.md`).
-- **`ci_checks: [sync-check, test]`** — the two `.github/workflows/ci.yml` job names (TASK-020):
-  `sync-check` runs `.tasks/bin/sync check` (drift detection, stdlib only), `test` runs the
-  `test_command` suite. `implement-task` phase 4 (and a human eyeballing `gh pr checks`) gates
-  merge on both being green.
-- **`allow_auto_merge: false`** — the opt-in for `implement-task` batch mode's critic-gated,
-  capped auto-merge (default `false`; nothing ever merges unless a project sets it `true`). When
-  `true`, once a PR's checks are green a cheap-model critic runs a narrow checklist over the diff
-  and must approve; only then does the scripted `auto-merge` step run `gh pr merge`, and the
-  guardrail hook allows that one merge only while its short-lived marker exists. The standing
-  "a human reviews and merges" rule applies unchanged when this is `false`, and this repo keeps it
-  `false`.
-- **`autonomous_merge_cap: 5`** — the most tasks one batch run may auto-merge. Once reached, the
-  batch halts for a human checkpoint regardless of further critic approvals. `0` never
-  auto-merges; `null` removes the cap. Only read when `allow_auto_merge` is `true`.
-- **`tdd_enforced: true`** — `implement-task` phase 2 writes each Testing strategy step's/
-  acceptance criterion's test(s) first, confirms they fail for the expected reason, then
-  implements until green — an explicit step order, not left to model discretion. `false` reverts
-  phase 2 to writing code and its tests together.
-- **`ignored_paths: [.tmp/prompts.md]`** — paths `implement-task` never treats as dirty-tree
-  blockers (phase 1's start check, phase 3's pre-rebase stash). `.tmp/prompts.md` is the human's
-  own prompt scratchpad, not part of any task's actual work — a fresh project scaffolded by
-  `init-project` starts with this empty and adds project-specific paths the same way.
-- **`context_usage_halt_pct: 85`** / **`token_budget_per_batch: null`** — `implement-task` batch
-  mode's usage safety valve (SPEC-003): crossing either halts the batch as a systemic interrupt,
-  checked at each between-task checkpoint. Token usage is an exact sum read from the session's own
-  transcript file (`session-token-usage`), not an estimate. Context usage is still the model's own
-  best-effort estimate — no file records the context-window size, so it can't be made exact — a
-  deliberately cheap stopgap, not a precise measurement. `null` token budget means no cap.
-- **`autonomous_new_task_limit: 3`** — how many follow-up tasks `implement-task` batch mode may
-  create on its own in one batch run (e.g. splitting off a task that turned out oversized) before
-  it flags further ones in the end-of-batch summary instead, for a human to handle. `0` disables
-  autonomous creation; `null` removes the cap. Reaching the limit never halts the batch.
+- **`docs_review_paths`** / **`docs_ignore_paths`** — files updated by the `review-docs` skill.
+- **`remote` / `rebase_before_pr` / `merge_strategy` / `delete_branch_after_merge`** — the git automation settings for `implement-task`.
+- **`ci_checks`** — the github actions workflows that must pass before a PR can be merged.
+- **`allow_auto_merge`** — When true, the workflow automatically merged PRs it creates as long as CI checks pass and the critic agent approves the changes. If false, the human user manually merges PRs.
+- **`autonomous_merge_cap: 5`** — the max tasks one batch run may auto-merge. Once reached, the batch halts for a human checkpoint regardless of further critic approvals. `0` never auto-merges; `null` removes the cap. Only valid when `allow_auto_merge` is `true`.
+- **`tdd_enforced: true`** — follow a test-driven development workflow when true.
+- **`ignored_paths: [.tmp/prompts.md]`** — paths the `implement-task` skill never treats as dirty-tree blockers.
+- **`context_usage_halt_pct`** / **`token_budget_per_batch`** — `implement-task` batch mode's usage safety valve: crossing either threshold halts the batch. `null` token budget means no cap.
+- **`autonomous_new_task_limit: 3`** — max follow-up tasks that can be automatically created when running the `implement-task` skill. `null` removes the cap. Reaching the limit never halts the batch.
