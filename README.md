@@ -73,7 +73,10 @@ refine-backlog → periodic: reprioritize, recompute blocked status, flag stale/
 | 4. Merge — observed | a human reviews and squash-merges; the skill records the merge, archives, cleans up | done |
 
 The skill never merges — it opens the PR and stops; phase 4 only observes the human's merge and
-records it.
+records it. The one exception is batch mode's opt-in, critic-gated, capped auto-merge
+(`allow_auto_merge: true` in `.tasks/config.md`, off by default and off in this repo): a cheap-model
+critic must approve a narrow checklist over the diff of a green PR, and at most
+`autonomous_merge_cap` tasks per batch merge this way before the batch halts for a human.
 
 - **`init-project`** — scaffold `.tasks/` in a new repo, or (if already initialized) upgrade an
   existing one: refresh every portable skill plus `guidelines.md`/templates/vendored `sync`/PR

@@ -19,6 +19,7 @@ import argparse
 import importlib.util
 import json
 import re
+import shlex
 import subprocess
 import sys
 import tempfile
@@ -239,6 +240,7 @@ def render_outcome_table(outcomes: list[dict]) -> str:
 
 
 BATCH_STATE_RELPATH = ".tmp/batch-state.json"
+AUTO_MERGE_MARKER_RELPATH = ".tmp/auto-merge-marker.json"  # must equal guardrails.AUTO_MERGE_MARKER_RELPATH
 _BATCH_STATE_KEYS = ("selection", "order", "accounted", "outcomes")
 
 
@@ -254,9 +256,10 @@ def new_batch_state(selection: dict, order: list[str]) -> dict:
     `accounted` lists task ids whose batch turn is over (merged, or bailed out by an isolated
     interrupt); `outcomes` is the same accumulator `record-outcome` builds; `follow_ups` is the
     ledger of follow-up tasks the batch created (or flagged past the limit) -- see
-    `record_follow_up`.
+    `record_follow_up`; `critic_reviews` is the auto-merge critic ledger -- see
+    `record_critic_review`.
     """
-    return {"selection": selection, "order": list(order), "accounted": [], "outcomes": [], "follow_ups": []}
+    return {"selection": selection, "order": list(order), "accounted": [], "outcomes": [], "follow_ups": [], "critic_reviews": []}
 
 
 def write_batch_state(path: Path, state: dict) -> None:
@@ -275,6 +278,7 @@ def read_batch_state(path: Path) -> dict | None:
     if not isinstance(state, dict) or any(key not in state for key in _BATCH_STATE_KEYS):
         return None
     state.setdefault("follow_ups", [])  # absent in a file written before follow-ups existed
+    state.setdefault("critic_reviews", [])  # likewise for the auto-merge critic ledger
     return state
 
 
@@ -320,10 +324,19 @@ def batch_progress(state: dict) -> dict:
         "selection": state["selection"], "order": state["order"], "accounted": state["accounted"],
         "remaining": remaining, "next_task_id": remaining[0] if remaining else None,
         "outcomes": state["outcomes"], "follow_ups": state.get("follow_ups", []),
+        "critic_reviews": state.get("critic_reviews", []),
     }
 
 
 DEFAULT_FOLLOW_UP_LIMIT = 3
+
+
+def _validate_limit(name: str, limit: object) -> None:
+    """A per-batch cap read from config must be `None` (unlimited) or a non-negative integer --
+    a mistyped value should fail loudly, not silently uncap or disable the batch.
+    """
+    if limit is not None and (isinstance(limit, bool) or not isinstance(limit, int) or limit < 0):
+        raise ValueError(f"{name} must be null or a non-negative integer, got {limit!r}")
 
 
 def check_follow_up_limit(*, created: int, limit: int | None) -> dict:
@@ -335,10 +348,7 @@ def check_follow_up_limit(*, created: int, limit: int | None) -> dict:
     non-negative integer: a mistyped config value should fail loudly, not silently uncap or
     disable the batch.
     """
-    if limit is not None and (isinstance(limit, bool) or not isinstance(limit, int) or limit < 0):
-        raise ValueError(
-            f"autonomous_new_task_limit must be null or a non-negative integer, got {limit!r}"
-        )
+    _validate_limit("autonomous_new_task_limit", limit)
     if limit is None or created < limit:
         return {"allowed": True, "message": None}
     return {
@@ -390,17 +400,18 @@ def render_follow_up_summary(follow_ups: list[dict]) -> str:
 
 
 def effective_ignored_paths(config: dict) -> tuple[str, ...]:
-    """`ignored_paths` from config plus the batch-state file, which never counts as dirty
-    whether or not the project's `.gitignore` covers it.
+    """`ignored_paths` from config plus the batch-state file and the auto-merge marker, which
+    never count as dirty whether or not the project's `.gitignore` covers them.
     """
-    return (*(config.get("ignored_paths") or []), BATCH_STATE_RELPATH)
+    return (*(config.get("ignored_paths") or []), BATCH_STATE_RELPATH, AUTO_MERGE_MARKER_RELPATH)
 
 
+_BAIL_OUT_HALT_INTERRUPT_KINDS = frozenset({"critic_rejection"})
 _ISOLATED_INTERRUPT_KINDS = frozenset({
     "needs_clarification", "unexpected_blocker", "quality_gate_failure", "guardrail_denial",
 })
 _SYSTEMIC_INTERRUPT_KINDS = frozenset({
-    "infra_failure", "context_usage_exceeded", "token_budget_exceeded",
+    "infra_failure", "context_usage_exceeded", "token_budget_exceeded", "auto_merge_cap_reached",
 })
 
 
@@ -410,8 +421,14 @@ def interrupt_routing(kind: str) -> dict:
     one task and continue the batch at its next task. `infra_failure`/`context_usage_exceeded`/
     `token_budget_exceeded` are systemic -- halt the whole batch before starting anything else,
     since none of them are this task's fault and every remaining task would hit the same wall.
-    Raises `ValueError` on any other `kind`.
+    `auto_merge_cap_reached` is also systemic: the batch's auto-merge cap forces a human
+    checkpoint. `critic_rejection` is the one kind that is neither -- `bail_out_halt`: the
+    rejected task is bailed out like an isolated one, but the batch ends there
+    (`continue_batch: False`) and its artifacts are cleaned up. Raises `ValueError` on any other
+    `kind`.
     """
+    if kind in _BAIL_OUT_HALT_INTERRUPT_KINDS:
+        return {"routing": "bail_out_halt", "continue_batch": False}
     if kind in _ISOLATED_INTERRUPT_KINDS:
         return {"routing": "isolated", "continue_batch": True}
     if kind in _SYSTEMIC_INTERRUPT_KINDS:
@@ -444,6 +461,216 @@ def check_usage_thresholds(
             "message": f"token usage {tokens_used} >= batch budget {token_budget}",
         }
     return {"halt": False, "kind": None, "message": None}
+
+
+# ---------------------------------------------------------------------------
+# Opt-in, critic-gated, capped auto-merge -- the pure logic. The critic itself is a subagent on a
+# cheap model launched by SKILL.md's instructions (this script can't call a model); everything
+# here is deterministic: the prompt it gets, a strictly fail-closed reading of its answer, the
+# fixed order the gates are checked in, and the per-batch cap.
+# ---------------------------------------------------------------------------
+
+CRITIC_MAX_DIFF_CHARS = 60000
+CRITIC_CHECKLIST = (
+    ("criteria_met", "The diff satisfies EVERY acceptance criterion listed below."),
+    ("scope_ok", "Every changed file is within the task's declared scope (listed below)."),
+    ("gates_passed", "Every quality gate listed below actually passed."),
+    ("nothing_alarming", "Nothing alarming: no secrets, no destructive or unrelated changes, no disabled tests or guardrails."),
+)
+
+
+def build_critic_prompt(
+    *, task_id: str, title: str, head_sha: str, acceptance_criteria: str, changed_files: list[str],
+    scope_paths: list[str], gates: str, diff: str,
+) -> str:
+    """The prompt for the critic subagent: a narrow, four-item checklist -- deliberately not an
+    open-ended code review (that would cost far more, and isn't this gate's job). It gets
+    everything it needs inline and must answer with one JSON object; anything it can't verify
+    from what's here it must reject.
+    """
+    truncated = len(diff) > CRITIC_MAX_DIFF_CHARS
+    shown_diff = diff[:CRITIC_MAX_DIFF_CHARS] + ("\n[... diff truncated ...]" if truncated else "")
+    checklist = "\n".join(f"{n}. `{key}` -- {text}" for n, (key, text) in enumerate(CRITIC_CHECKLIST, start=1))
+    keys = ", ".join(f'"{key}": true|false' for key, _ in CRITIC_CHECKLIST)
+    return f"""You are the merge gate's critic for {task_id}: {title} (PR head commit {head_sha}).
+
+Answer ONLY the four checklist questions below. This is NOT a general code-quality review: do not
+comment on style, naming or design preferences. If you cannot verify an item from what is given
+here (for example the diff is truncated), answer false for it -- when in doubt, reject.
+
+Checklist:
+{checklist}
+
+Reply with exactly one JSON object and nothing else:
+{{"approve": true|false, {keys}, "findings": ["one short string per concern or observation"]}}
+`approve` may be true only if all four items are true.
+
+## Acceptance criteria
+{acceptance_criteria}
+
+## Declared scope (paths this task may change; `.tasks/` bookkeeping is always allowed)
+{chr(10).join(f"- {p}" for p in scope_paths) or "(none declared)"}
+
+## Files changed in the PR
+{chr(10).join(f"- {p}" for p in changed_files) or "(none)"}
+
+## Quality gates
+{gates}
+
+## Diff
+{shown_diff}
+"""
+
+
+def evaluate_critic_verdict(verdict: object) -> dict:
+    """Read the critic's answer -- raw text (bare JSON, a fenced block, or JSON inside prose) or an
+    already-parsed dict -- and FAIL CLOSED: approval requires a well-formed object with `approve`
+    exactly `True`, every checklist item exactly `True`, and `findings` a list of strings.
+    Anything else -- unparseable text, a missing or non-boolean field, a false item alongside
+    `approve: true` -- is a rejection with a `reason`. Returns
+    `{"approve": bool, "checklist": {...}, "findings": [...], "reason": str | None}`.
+    """
+    def reject(reason: str, checklist: dict | None = None, findings: list | None = None) -> dict:
+        return {"approve": False, "checklist": checklist or {}, "findings": findings or [], "reason": reason}
+
+    obj = verdict
+    if not isinstance(obj, dict):
+        obj = None
+        text = verdict if isinstance(verdict, str) else ""
+        candidates = [text.strip()]
+        fenced = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", text, re.DOTALL)
+        if fenced:
+            candidates.append(fenced.group(1))
+        if "{" in text and "}" in text:
+            candidates.append(text[text.index("{"): text.rindex("}") + 1])
+        for candidate in candidates:
+            try:
+                parsed = json.loads(candidate)
+            except ValueError:
+                continue
+            if isinstance(parsed, dict):
+                obj = parsed
+                break
+        if obj is None:
+            return reject("critic verdict is not parseable JSON")
+
+    keys = [key for key, _ in CRITIC_CHECKLIST]
+    bad = [key for key in ["approve", *keys] if not isinstance(obj.get(key), bool)]
+    if bad:
+        return reject(f"critic verdict missing or non-boolean field(s): {', '.join(bad)}")
+    findings = obj.get("findings")
+    if not isinstance(findings, list) or not all(isinstance(f, str) for f in findings):
+        return reject("critic verdict `findings` must be a list of strings")
+    checklist = {key: obj[key] for key in keys}
+    failed = [key for key, ok in checklist.items() if not ok]
+    if failed:
+        return reject(f"critic checklist failed: {', '.join(failed)}", checklist, findings)
+    if not obj["approve"]:
+        return reject("critic did not approve", checklist, findings)
+    return {"approve": True, "checklist": checklist, "findings": findings, "reason": None}
+
+
+def pr_checks_state(returncode: int) -> str:
+    """`gh pr checks`'s exit code as a state: `0` all passing -> `green`; `8` still running ->
+    `pending`; anything else (a failure, or no checks reported at all) -> `not_green`. Only
+    `green` can ever auto-merge -- an absent CI is not a passing CI.
+    """
+    if returncode == 0:
+        return "green"
+    if returncode == 8:
+        return "pending"
+    return "not_green"
+
+
+def scope_violations(changed_files: list[str], scope_paths: list[str]) -> list[str]:
+    """PR-changed files that are neither declared task scope nor `.tasks/` bookkeeping (the
+    board, epics, the task file, archive, follow-up task files). A deterministic backstop for the
+    critic's own scope check.
+    """
+    allowed = set(scope_paths)
+    return [f for f in changed_files if f not in allowed and not f.startswith(".tasks/")]
+
+
+def check_merge_cap(*, merged: int, cap: int | None) -> dict:
+    """Whether the batch may auto-merge one more task, given how many it already has and
+    `autonomous_merge_cap` (`None` = unlimited, `0` = never). Same `{"allowed", "message"}` shape
+    and loud-on-bad-config behavior as `check_follow_up_limit`.
+    """
+    _validate_limit("autonomous_merge_cap", cap)
+    if cap is None or merged < cap:
+        return {"allowed": True, "message": None}
+    return {
+        "allowed": False,
+        "message": f"auto-merge cap reached: {merged} auto-merged, autonomous_merge_cap is {cap}",
+    }
+
+
+def evaluate_auto_merge_gates(
+    *, allow_auto_merge: object, cap_allowed: bool, checks_state: str,
+    scope_violations: list[str], verdict_approve: bool,
+) -> dict:
+    """The auto-merge gates in their fixed priority order -- the first that blocks names the
+    `reason`: `disabled` (project didn't opt in), `cap_reached` (a human checkpoint is forced
+    *regardless* of the critic or CI, and the only one that also `halt`s the batch),
+    `checks_pending` / `checks_not_green`, `scope_violation`, `critic_rejected`. Everything
+    passing returns `{"proceed": True, ...}`. Returns `{"proceed", "reason", "halt"}`.
+    """
+    if allow_auto_merge is not True:
+        return {"proceed": False, "reason": "disabled", "halt": False}
+    if not cap_allowed:
+        return {"proceed": False, "reason": "cap_reached", "halt": True}
+    if checks_state == "pending":
+        return {"proceed": False, "reason": "checks_pending", "halt": False}
+    if checks_state != "green":
+        return {"proceed": False, "reason": "checks_not_green", "halt": False}
+    if scope_violations:
+        return {"proceed": False, "reason": "scope_violation", "halt": False}
+    if not verdict_approve:
+        return {"proceed": False, "reason": "critic_rejected", "halt": False}
+    return {"proceed": True, "reason": None, "halt": False}
+
+
+def record_critic_review(state: dict, entry: dict) -> dict:
+    """Append one critic-review record (`{task_id, pr, head_sha, approve, findings, checklist,
+    outcome}`; `outcome` is `auto_merged`, `critic_rejected` or `skipped:<reason>`) to the batch
+    state's ledger -- returns a new dict.
+    """
+    return {**state, "critic_reviews": [*state.get("critic_reviews", []), dict(entry)]}
+
+
+def count_auto_merged(state: dict) -> int:
+    return sum(1 for r in state.get("critic_reviews", []) if r.get("outcome") == "auto_merged")
+
+
+def render_critic_summary(reviews: list[dict]) -> str:
+    """The critic-findings section of the end-of-batch summary: one row per reviewed task --
+    including the ones it approved, since that's the signal on whether the critic earns its cost.
+    """
+    if not reviews:
+        return "Critic reviews: none"
+    lines = ["Critic reviews:", "", "| Task | Outcome | Findings |", "|---|---|---|"]
+    for review in reviews:
+        findings = "; ".join(review.get("findings") or []) or "—"
+        lines.append(f"| {review['task_id']} | {review['outcome']} | {findings} |")
+    return "\n".join(lines)
+
+
+def render_batch_result(*, order: list[str], outcomes: list[dict], halt: dict | None) -> str:
+    """The headline of the end-of-batch summary: how many tasks the batch started with, how many
+    completed (merged, i.e. outcome status `done`), and -- if it ended early -- which task ended
+    it and why, plus the tasks that never started. `halt` is `None` for a batch that ran to
+    completion, else `{"task_id", "kind", "reason"}`.
+    """
+    completed = [o for o in outcomes if o.get("status") == "done"]
+    noun = "task" if len(order) == 1 else "tasks"
+    lines = [f"Batch: {len(order)} {noun} selected, {len(completed)} completed."]
+    if halt is not None:
+        lines.append(f"Ended early at {halt['task_id']} ({halt['kind']}): {halt['reason']}")
+        seen = {o["task_id"] for o in outcomes} | {halt["task_id"]}
+        never_started = [t for t in order if t not in seen]
+        if never_started:
+            lines.append(f"Never started: {', '.join(never_started)}")
+    return "\n".join(lines)
 
 
 class TranscriptError(Exception):
@@ -1096,6 +1323,7 @@ def cmd_batch_update(args: argparse.Namespace) -> int:
         clear_batch_state(path)
         print(json.dumps({
             "complete": True, "outcomes": state["outcomes"], "follow_ups": state["follow_ups"],
+            "critic_reviews": state["critic_reviews"],
         }))
         return 0
     write_batch_state(path, state)
@@ -1186,8 +1414,199 @@ def cmd_render_follow_up_summary(args: argparse.Namespace) -> int:
     return 0
 
 
+DEFAULT_MERGE_CAP = 5
+_MERGE_STRATEGY_FLAGS = {"squash": "--squash", "merge": "--merge", "rebase": "--rebase"}
+_REASON_INTERRUPTS = {"critic_rejected": "critic_rejection", "cap_reached": "auto_merge_cap_reached"}
+_UNRECORDED_REASONS = ("disabled", "checks_pending")  # nothing happened yet / will simply be retried
+
+
+def _pr_number(pr: str) -> int:
+    """The PR number from a task's `pr:` field (a URL ending in the number, or the bare number)."""
+    match = re.search(r"(\d+)/?$", str(pr))
+    if not match:
+        raise ValueError(f"cannot read a PR number from {pr!r}")
+    return int(match.group(1))
+
+
+def _acceptance_criteria(task_body: str) -> str:
+    """The task file's own `## Acceptance criteria` section, verbatim."""
+    match = re.search(r"^## Acceptance criteria\s*\n(.*?)(?=^## |\Z)", task_body, re.DOTALL | re.MULTILINE)
+    return match.group(1).strip() if match else "(no acceptance criteria section found)"
+
+
+def _gh(root: Path, *args: str) -> subprocess.CompletedProcess:
+    return subprocess.run(["gh", *args], cwd=root, capture_output=True, text=True)
+
+
+def _in_review_task(sync_mod, tasks_root: Path, task_id: str):
+    """The task, if it exists and is `in-review` with a PR recorded -- else `None`."""
+    artifacts = discover_or_exit(sync_mod, tasks_root)
+    task = artifacts.get(task_id)
+    if task is None or task.kind != "task":
+        return None
+    if task.fields.get("status") != "in-review" or not task.fields.get("pr"):
+        return None
+    return task
+
+
+def cmd_critic_prompt(args: argparse.Namespace) -> int:
+    """Build the critic subagent's prompt from the task file and the live PR (acceptance
+    criteria, changed files, the diff, the quality-gate results the caller reports plus CI's own).
+    """
+    answers = json.loads(Path(args.answers).read_text())
+    root = repo_root()
+    tasks_root = root / ".tasks"
+    sync_mod = load_sync_module(tasks_root)
+    task = _in_review_task(sync_mod, tasks_root, answers["task_id"])
+    if task is None:
+        print(f"implement-task: {answers['task_id']} is not an in-review task with a PR recorded", file=sys.stderr)
+        return 2
+    pr = _pr_number(task.fields["pr"])
+    view = _gh(root, "pr", "view", str(pr), "--json", "headRefOid,state")
+    names = _gh(root, "pr", "diff", str(pr), "--name-only")
+    diff = _gh(root, "pr", "diff", str(pr))
+    checks = _gh(root, "pr", "checks", str(pr))
+    for result in (view, names, diff):
+        if result.returncode != 0:
+            print(result.stderr, file=sys.stderr)
+            return result.returncode
+    changed = [line for line in names.stdout.splitlines() if line.strip()]
+    head_sha = json.loads(view.stdout)["headRefOid"]
+    gates = f"{answers.get('gates') or '(none reported)'}\n\nCI (`gh pr checks`):\n{checks.stdout.strip() or '(no output)'}"
+    prompt = build_critic_prompt(
+        task_id=task.id, title=task.fields.get("title", task.id), head_sha=head_sha,
+        acceptance_criteria=_acceptance_criteria(task.body), changed_files=changed,
+        scope_paths=answers.get("scope_paths") or [], gates=gates, diff=diff.stdout,
+    )
+    print(json.dumps({"prompt": prompt, "head_sha": head_sha, "changed_files": changed}))
+    return 0
+
+
+def cmd_auto_merge(args: argparse.Namespace) -> int:
+    """The scripted, critic-gated, capped merge -- the only code path that ever runs `gh pr merge`.
+    Every gate must pass (opt-in, cap, PR open at the reviewed head, CI green, changes within
+    scope, critic approval, evaluated fail-closed); then it writes the guardrail marker for
+    exactly this PR + head commit, asks the real guardrail evaluator whether its own merge
+    command is allowed, runs it, and always removes the marker again. Any refusal exits `0` with
+    `{"merged": false, "reason", "halt", "interrupt", "findings"}` -- `interrupt` names the
+    `classify-interrupt` kind to route it through (or `None`: fall back to the ordinary
+    human-merge wait). Errors (no batch, wrong task state, a failed `gh`) exit non-zero.
+    """
+    answers = json.loads(Path(args.answers).read_text())
+    root = repo_root()
+    tasks_root = root / ".tasks"
+    state_path = batch_state_path(root)
+    state = read_batch_state(state_path)
+    if state is None:
+        print("implement-task: auto-merge needs an active batch (no batch state found)", file=sys.stderr)
+        return 2
+    sync_mod = load_sync_module(tasks_root)
+    task = _in_review_task(sync_mod, tasks_root, answers["task_id"])
+    if task is None:
+        print(f"implement-task: {answers['task_id']} is not an in-review task with a PR recorded", file=sys.stderr)
+        return 2
+
+    config = sync_mod.load_config(tasks_root)
+    strategy = config.get("merge_strategy", "squash")
+    if strategy not in _MERGE_STRATEGY_FLAGS:
+        print(f"implement-task: unknown merge_strategy {strategy!r} in .tasks/config.md", file=sys.stderr)
+        return 2
+    try:
+        cap_verdict = check_merge_cap(
+            merged=count_auto_merged(state), cap=config.get("autonomous_merge_cap", DEFAULT_MERGE_CAP)
+        )
+    except ValueError as exc:
+        print(f"implement-task: {exc}", file=sys.stderr)
+        return 2
+
+    verdict = evaluate_critic_verdict(answers.get("verdict"))
+    pr = _pr_number(task.fields["pr"])
+    reason: str | None = None
+    if config.get("allow_auto_merge") is not True:
+        reason = "disabled"
+    elif not cap_verdict["allowed"]:
+        reason = "cap_reached"
+    else:
+        view = _gh(root, "pr", "view", str(pr), "--json", "headRefOid,state")
+        checks = _gh(root, "pr", "checks", str(pr))
+        names = _gh(root, "pr", "diff", str(pr), "--name-only")
+        for result in (view, names):
+            if result.returncode != 0:
+                print(result.stderr, file=sys.stderr)
+                return result.returncode
+        live = json.loads(view.stdout)
+        head_sha = live["headRefOid"]
+        if live["state"] != "OPEN":
+            reason = "pr_not_open"
+        elif head_sha != answers.get("head_sha"):
+            reason = "head_moved"  # the critic reviewed a different commit than the PR now has
+        else:
+            changed = [line for line in names.stdout.splitlines() if line.strip()]
+            gates = evaluate_auto_merge_gates(
+                allow_auto_merge=True, cap_allowed=True, checks_state=pr_checks_state(checks.returncode),
+                scope_violations=scope_violations(changed, answers.get("scope_paths") or []),
+                verdict_approve=verdict["approve"],
+            )
+            reason = gates["reason"]
+
+    if reason is not None:
+        if reason not in _UNRECORDED_REASONS:
+            outcome = "critic_rejected" if reason == "critic_rejected" else f"skipped:{reason}"
+            state = record_critic_review(state, {
+                "task_id": task.id, "pr": pr, "head_sha": answers.get("head_sha"), "approve": verdict["approve"],
+                "findings": verdict["findings"], "checklist": verdict["checklist"], "outcome": outcome,
+            })
+            write_batch_state(state_path, state)
+        print(json.dumps({
+            "merged": False, "reason": reason, "halt": reason == "cap_reached",
+            "interrupt": _REASON_INTERRUPTS.get(reason), "findings": verdict["findings"],
+            "detail": verdict["reason"] if reason == "critic_rejected" else (cap_verdict["message"] if reason == "cap_reached" else None),
+        }))
+        return 0
+
+    guardrails = load_guardrails_module()
+    merge_args = ["pr", "merge", str(pr), _MERGE_STRATEGY_FLAGS[strategy], "--match-head-commit", head_sha]
+    guardrails.write_auto_merge_marker(root, pr=pr, head_sha=head_sha)
+    try:
+        allowed = guardrails.evaluate_bash_command(shlex.join(["gh", *merge_args]), root)
+        if not allowed.allow:
+            print(f"implement-task: the guardrail refused the scripted merge: {allowed.reason}", file=sys.stderr)
+            return 2
+        merged = _gh(root, *merge_args)
+    finally:
+        guardrails.clear_auto_merge_marker(root)
+    if merged.returncode != 0:
+        print(merged.stderr, file=sys.stderr)
+        return merged.returncode
+
+    state = record_critic_review(state, {
+        "task_id": task.id, "pr": pr, "head_sha": head_sha, "approve": True,
+        "findings": verdict["findings"], "checklist": verdict["checklist"], "outcome": "auto_merged",
+    })
+    write_batch_state(state_path, state)
+    print(json.dumps({"merged": True, "pr": pr, "head_sha": head_sha, "findings": verdict["findings"]}))
+    return 0
+
+
+def cmd_render_critic_summary(args: argparse.Namespace) -> int:
+    answers = json.loads(Path(args.answers).read_text())
+    print(json.dumps({"summary": render_critic_summary(answers.get("critic_reviews") or [])}))
+    return 0
+
+
+def cmd_render_batch_result(args: argparse.Namespace) -> int:
+    answers = json.loads(Path(args.answers).read_text())
+    summary = render_batch_result(
+        order=answers["order"], outcomes=answers.get("outcomes") or [], halt=answers.get("halt")
+    )
+    print(json.dumps({"summary": summary}))
+    return 0
+
+
 def cmd_batch_clear(args: argparse.Namespace) -> int:
-    print(json.dumps({"cleared": clear_batch_state(batch_state_path(repo_root()))}))
+    root = repo_root()
+    load_guardrails_module().clear_auto_merge_marker(root)  # never leave a merge authorisation behind
+    print(json.dumps({"cleared": clear_batch_state(batch_state_path(root))}))
     return 0
 
 
@@ -1265,6 +1684,10 @@ def main(argv: list[str]) -> int:
         ("batch-clear", "batch mode: delete the batch-state file (batch halted)"),
         ("create-follow-up", "batch mode: create a follow-up task via add-task, up to the per-batch limit"),
         ("render-follow-up-summary", "batch mode: render the follow-up-tasks part of the end-of-batch summary"),
+        ("critic-prompt", "auto-merge: build the critic subagent's checklist prompt for a task's open PR"),
+        ("auto-merge", "auto-merge: run every gate and, if all pass, the scripted critic-approved merge"),
+        ("render-critic-summary", "auto-merge: render the critic-findings part of the end-of-batch summary"),
+        ("render-batch-result", "batch mode: render the batch headline (size, completed, what ended it early)"),
         ("render-outcome-table", "batch mode: render the end-of-batch outcome table"),
         ("classify-interrupt", "batch mode: route an interrupt kind to isolated/systemic"),
         ("check-usage-thresholds", "batch mode: check context/token usage against config thresholds"),
@@ -1288,6 +1711,10 @@ def main(argv: list[str]) -> int:
         "batch-clear": cmd_batch_clear,
         "create-follow-up": cmd_create_follow_up,
         "render-follow-up-summary": cmd_render_follow_up_summary,
+        "critic-prompt": cmd_critic_prompt,
+        "auto-merge": cmd_auto_merge,
+        "render-critic-summary": cmd_render_critic_summary,
+        "render-batch-result": cmd_render_batch_result,
         "render-outcome-table": cmd_render_outcome_table,
         "classify-interrupt": cmd_classify_interrupt,
         "check-usage-thresholds": cmd_check_usage_thresholds,

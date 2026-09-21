@@ -1,14 +1,15 @@
 <!--
   Template for .tasks/config.md, filled in by the init-project skill from
   its interview answers. `workflow_version` always starts at 1;
-  `allow_auto_merge` always starts `false` (reinforces the never-merge
-  guardrail — not something init-time should offer to turn on);
+  `allow_auto_merge` always starts `false` (the never-merge guardrail; it is
+  the opt-in for batch mode's critic-gated auto-merge — a human turns it on
+  by editing config.md, init-time never offers to);
   `docs_review_paths`/`docs_ignore_paths`/`ignored_paths` always start at
   the generic defaults below — a human adds project-specific paths later
   by editing config.md directly. `context_usage_halt_pct`/
   `token_budget_per_batch` always start at the conservative defaults below
   too — implement-task batch mode's usage safety valve, not something
-  init-time asks about. `autonomous_new_task_limit` likewise.
+  init-time asks about. `autonomous_new_task_limit` and `autonomous_merge_cap` likewise.
   Placeholders:
     {{test_command}}               e.g. `pytest`, `npm test`, or `null`
     {{lint_command}}                 e.g. `ruff check .`, or `null`
@@ -45,6 +46,7 @@ tdd_enforced: {{tdd_enforced}}
 context_usage_halt_pct: 85
 token_budget_per_batch: null
 autonomous_new_task_limit: 3
+autonomous_merge_cap: 5
 ignored_paths: []
 ---
 
@@ -72,8 +74,13 @@ skills' logic identical across projects — only this file changes.
   *human* merges; the skill itself never merges.
 - **`ci_checks`** — CI job names, so `implement-task` phase 4 (and a human eyeballing
   `gh pr checks`) can gate merge on them. Empty until CI exists.
-- **`allow_auto_merge: false`** — reinforces the never-merge guardrail; not something init-time
-  offers to change.
+- **`allow_auto_merge: false`** — the opt-in for `implement-task` batch mode's critic-gated,
+  capped auto-merge. Default `false`, and nothing ever merges unless a project deliberately sets
+  it `true` by editing this file; init-time never offers to. Off, the standing "a human reviews
+  and merges" rule applies unchanged. When `true`: once a PR's checks are green a cheap-model
+  critic must approve a narrow checklist over the diff, and only then does the scripted
+  `auto-merge` step run `gh pr merge` (the guardrail hook allows that one merge only while its
+  short-lived marker exists), up to `autonomous_merge_cap` per batch.
 - **`tdd_enforced`** — when `true`, `implement-task` phase 2 writes each Testing strategy
   step's/acceptance criterion's test(s) first, confirms they fail for the expected reason, then
   implements until green — an explicit step order, not left to model discretion. When `false`,
@@ -93,3 +100,7 @@ skills' logic identical across projects — only this file changes.
   flags further ones in the end-of-batch summary instead, for a human to handle. Default `3`;
   `0` disables autonomous creation; `null` removes the cap. Reaching the limit never halts the
   batch. Fixed default, not something init-time asks about.
+- **`autonomous_merge_cap`** — the most tasks one batch run may auto-merge, when `allow_auto_merge`
+  is `true`; once reached the batch halts for a human checkpoint regardless of further critic
+  approvals. Default `5`; `0` never auto-merges; `null` removes the cap. Fixed default, not
+  something init-time asks about.

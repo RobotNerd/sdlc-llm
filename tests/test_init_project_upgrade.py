@@ -826,6 +826,7 @@ archive_done: true
 context_usage_halt_pct: 85
 token_budget_per_batch: null
 autonomous_new_task_limit: 3
+autonomous_merge_cap: 5
 ignored_paths: []
 ---
 
@@ -851,7 +852,7 @@ def test_merge_config_schema_adds_a_single_missing_key_at_template_position():
     assert added == ["ignored_paths"]
     assert bumped is None
     lines = merged.splitlines()
-    assert lines[lines.index("autonomous_new_task_limit: 3") + 1] == "ignored_paths: []"
+    assert lines[lines.index("autonomous_merge_cap: 5") + 1] == "ignored_paths: []"
 
 
 def test_merge_config_schema_adds_multiple_missing_keys_at_their_own_positions():
@@ -861,7 +862,7 @@ def test_merge_config_schema_adds_multiple_missing_keys_at_their_own_positions()
     lines = merged.splitlines()
     assert lines[lines.index("docs_paths: [README.md]") + 1] == "docs_review_paths: [CLAUDE.md, README.md, .tasks/guidelines.md]"
     assert lines[lines.index("docs_review_paths: [CLAUDE.md, README.md, .tasks/guidelines.md]") + 1] == "docs_ignore_paths: []"
-    assert lines[lines.index("autonomous_new_task_limit: 3") + 1] == "ignored_paths: []"
+    assert lines[lines.index("autonomous_merge_cap: 5") + 1] == "ignored_paths: []"
 
 
 def test_merge_config_schema_adds_usage_safety_valve_keys_at_template_position():
@@ -881,7 +882,18 @@ def test_merge_config_schema_adds_autonomous_new_task_limit_at_template_position
     assert bumped is None
     lines = merged.splitlines()
     assert lines[lines.index("token_budget_per_batch: null") + 1] == "autonomous_new_task_limit: 3"
-    assert lines[lines.index("autonomous_new_task_limit: 3") + 1] == "ignored_paths: []"
+    assert lines[lines.index("autonomous_new_task_limit: 3") + 1] == "autonomous_merge_cap: 5"
+
+
+def test_merge_config_schema_adds_autonomous_merge_cap_at_template_position_and_never_touches_allow_auto_merge():
+    old = _drop_keys(_CURRENT_CONFIG, "autonomous_merge_cap")
+    merged, added, bumped = scaffold.merge_config_schema(old, installed_sync)
+    assert added == ["autonomous_merge_cap"]
+    assert bumped is None
+    lines = merged.splitlines()
+    assert lines[lines.index("autonomous_new_task_limit: 3") + 1] == "autonomous_merge_cap: 5"
+    assert lines[lines.index("autonomous_merge_cap: 5") + 1] == "ignored_paths: []"
+    assert "allow_auto_merge: false" in lines  # an existing project's opt-in setting is preserved as-is
 
 
 def test_merge_config_schema_preserves_existing_values_and_project_added_key():
