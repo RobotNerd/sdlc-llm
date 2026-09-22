@@ -293,6 +293,92 @@ Separate bug, not fixed: a stray .tasks/TASK-*.md without valid frontmatter make
 
 <!-- It isn't working with my manual tests. I created a new epic `EPIC-002` with 3 tasks in another repository, and I used the prompt `/implement-task EPIC-002`. For the first run, I set `allow_auto_merge: false` in config.md, and that did I expected and stopped at the PR for the first task. I deleted the PR and branch, then set `allow_auto_merge: true`. When I ran the test a second time, I expected it to attempt to complete all three tasks, but it stopped again to wait for me to approve the PR for the first task. Am I missing anything in my test setup to enable automation for all 3 tasks without my intervention? -->
 
+<!-- TODO: full rebuild of implement-task workflow
+- resume? if so, jump to where you left off
+- start task: pick next task and plan
+- write tests
+- implement task
+- run tests; if tests fail, go back to `implement task` and make adjustments based on feedback; otherwise, proceed
+- create pr
+- spawn critic agent to review pr
+- if critic rejects pr, go back to `implement task` and make adjustments based on feedback; otherwise, proceed
+- merge PR, rebase main, do project management cleanup, merge directly to main; pick next task from batch and go to `start task`; if not more tasks in batch, proceed
+- report: write summary report of the batch
+
+- addendum: creating follow-up tasks
+- addendum: interrupts
+- addendum: bailut
+- addendum: guardrails -->
+
+> TODO: plan mode, Opus 5.5, xhigh effort
+
+/plan-feature A full rewrite of the implement-task skill. Place all tasks for this new epic at the top of the board.
+
+The implement-task skill in its current state is confusing. When I attempted to manually test the last change to in in TASK-045, the automation behavior did not work. I reviewed the skill, and it's clear to me that the failure occurs because of the conflicting instructions in the skill description.
+
+I now have a better understanding of the skill requirements, and I want to create a completely new version of the skill from scratch. The new skill should be named `implement-task-2` during development. Once it's complete and I'm satisified with the behavior, I will rename it to `implement-task` to replace the existing skill.
+
+Features of the skill:
+- batch mode by default: The skill treats all task implementation as a batch of tasks. When implementing only one task--either a specific task requested by the user or the default task taken from the top of the TODO list--this is treated as a batch of one.
+
+Here is the workflow I want the skill to follow:
+- Resume detection
+  - Determine if the implement-task skill from a previous session was interrupted
+  - If interrupted, resume the batch where it left off
+  - If not interrupted, go to the `Build batch` step
+- Build batch
+  - Build a batch of tasks to implement based on the arguments (if any) provided by the user
+  - Building the batch list uses the TODO list defined in .tasks/BOARD.md
+  - Batch types
+    - single task: either a specific task provided as a parameter; choose top task from TODO list on .tasks/BOARD.md by default if no argument provided by user
+    - specific list of tasks: a list of multiple tasks provided by the user; example prompts might be `/implement-task TASK-031 TASK-33` or `implement tasks 44, 45, and 47`
+    - range: start with TASK-AAA and implement tasks up to and including TASK-BBB; all tasks between TASK-AAA and TASK-BBB are taken from the TODO section of the board in the order shown
+    - stop on task: almost the same as the range option, but with TASK-AAA automatically chosen as the very first task from the top of the TODO list
+    - epic: implement all tasks from the TODO list assigned to the given epic
+  - Batch validation: the lists of tasks in the batch is validated before work begins; some invalid states are recoverable while others will reject the batch and require user clarification; for recoverable notifications, a short message should be displayed to inform the user (e.g. `TASK-010 already implemented, skipping`)
+    - already implemented: (recoverable, inform user) the batch contains tasks that have already been implemented
+    - task does not exist: (recoverable, inform user) the user listed a task the does not exist in the TODO list
+    - task blocked: (recoverable, inform user) a task is blocked by another open task that is not part of the current batch; note that when a task is blocked by another task in the same batch, the blocking task(s) should be implemented first
+    - wrong order for range: (recoverable, inform user) the user provided a start/end task for a range where the ending task is prioritized higher on the board than the starting task; assume that the start/end tasks are correct and simply swap their order so that the range is valid; inform the user
+    - no stopping task: (unrecoverable) the stopping task provided for either the `range` or `stop on task` modes is invalid (doesn't exist, already completed, etc)
+    - no tasks found: (unrecoverable) the batch is empty, do nothing
+- Write tests
+- Implement task
+- Run tests
+- Create PR
+- Spawn critic (note: first round still w/ haiku & w/in claude code context)
+- Merge PR
+- Create summary report
+
+Development process:
+- For the initial rewrite of the skill there will be no associated python script automation--it will be prose-only in a `SKILLS.md` file. Scripting will be done in subsequent tasks.
+- Phase-naming for interruption recovery: In the previous implementation, the batch-state used names like `phase1`, `phase2`, etc. for the names of the phases where an interrupted batch could recover. In the new version, these should be named using the human-readable name of the corresponding step in the SKILLS.md file, e.g. `start task` or `create pr`.
+
+Reference file: critic
+- TODO: guidelines for critic
+- TODO: include doc review; concise, w/ minimal details
+- TODO: lists/data structures where order doesn't matter should be sorted alphanumerically (both docs & code)
+
+Reference file: summary report
+- TODO: format for summary report generated by the critic
+
+Reference file: testing strategy
+- throw away unit tests
+- commit behavioral test
+- TODO
+
+Reference file: creating follow-up tasks
+- TODO
+
+Reference file: interrupts
+- TODO
+
+Reference file: bailout
+- TODO
+
+Reference file: guardrails
+- TODO
+
 ---
 
 TODO: general
@@ -300,6 +386,7 @@ TODO: general
 - make a rewrite pass at README
 - new skill: find shared code and move it to a shared library
 - define unit testing strategy: only commit tests that test from a usability perspective; can my throwaway tests for individual functions while developing a feature; the test you commit treat each tested component as a black box, where the tests verify the **public interface** of the component; put in guidelines.md or similar document
+- add linter; include prevention of large code files
 
 ---
 
@@ -315,22 +402,3 @@ TODO: implement-task
 ---
 
 TODO: PLUGIN: group all skills as a plugin for namespacing
-
----
-
-TODO: full rebuild of implement-task workflow
-- resume? if so, jump to where you left off
-- start task: pick next task and plan
-- write tests
-- implement task
-- run tests; if tests fail, go back to `implement task` and make adjustments based on feedback; otherwise, proceed
-- create pr
-- spawn critic agent to review pr
-- if critic rejects pr, go back to `implement task` and make adjustments based on feedback; otherwise, proceed
-- merge PR, rebase main, do project management cleanup, merge directly to main; pick next task from batch and go to `start task`; if not more tasks in batch, proceed
-- report: write summary report of the batch
-
-- addendum: creating follow-up tasks
-- addendum: interrupts
-- addendum: bailut
-- addendum: guardrails
