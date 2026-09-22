@@ -284,6 +284,53 @@ The new task ensures that batch progress can be recovered from the repo state al
 
 Separate bug, not fixed: a stray .tasks/TASK-*.md without valid frontmatter makes sync crash with a traceback instead of a clear error. That could be its own task. -->
 
+<!-- Approve. For each of your notes that need clarification:
+1. OK
+2. OK
+3. OK
+4. Change the behavior to bail out on rejection. This should end the batch and remove any artifacts. The summaryt should contain details about how many tasks were in the original batch, how many were completed, and which one fail to cause the batch to end prematurely.
+5. List it as pending in the PR body. -->
+
+<!-- It isn't working with my manual tests. I created a new epic `EPIC-002` with 3 tasks in another repository, and I used the prompt `/implement-task EPIC-002`. For the first run, I set `allow_auto_merge: false` in config.md, and that did I expected and stopped at the PR for the first task. I deleted the PR and branch, then set `allow_auto_merge: true`. When I ran the test a second time, I expected it to attempt to complete all three tasks, but it stopped again to wait for me to approve the PR for the first task. Am I missing anything in my test setup to enable automation for all 3 tasks without my intervention? -->
+
 ---
 
-Rewrite README to be more human-readable; right now it seems geared more towards AI, with some sections being too dense; focus on simplifying by removing technical details and focus on usage from a human user perspective; [TODO] provide examples to the LLM of good READMEs from other projects to use as a guide
+TODO: general
+- prevent claude from inserting line breaks in markdown: https://mcpservers.org/agent-skills/prisma/markdown-no-artificial-line-wraps
+- make a rewrite pass at README
+- new skill: find shared code and move it to a shared library
+- define unit testing strategy: only commit tests that test from a usability perspective; can my throwaway tests for individual functions while developing a feature; the test you commit treat each tested component as a black box, where the tests verify the **public interface** of the component; put in guidelines.md or similar document
+
+---
+
+TODO: remove stuff
+- remove tdd_enforced from config.md and all references to it in the code; TDD is always followed
+- remove workflow_version references from entire project
+
+---
+
+TODO: implement-task
+- refactor batch-select to move logic for selecting top ticket from the TODO list here
+
+---
+
+TODO: PLUGIN: group all skills as a plugin for namespacing
+
+---
+
+TODO: full rebuild of implement-task workflow
+- resume? if so, jump to where you left off
+- start task: pick next task and plan
+- write tests
+- implement task
+- run tests; if tests fail, go back to `implement task` and make adjustments based on feedback; otherwise, proceed
+- create pr
+- spawn critic agent to review pr
+- if critic rejects pr, go back to `implement task` and make adjustments based on feedback; otherwise, proceed
+- merge PR, rebase main, do project management cleanup, merge directly to main; pick next task from batch and go to `start task`; if not more tasks in batch, proceed
+- report: write summary report of the batch
+
+- addendum: creating follow-up tasks
+- addendum: interrupts
+- addendum: bailut
+- addendum: guardrails
