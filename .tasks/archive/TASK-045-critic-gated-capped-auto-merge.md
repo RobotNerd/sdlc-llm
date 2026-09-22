@@ -2,12 +2,12 @@
 id: TASK-045
 title: Opt-in, critic-gated, per-batch-capped auto-merge
 type: feature
-status: in-review
+status: done
 epic: EPIC-003
 created: 2026-09-14
 branch: task-045-critic-gated-capped-auto-merge
 pr: "https://github.com/RobotNerd/sdlc-llm/pull/90"
-merge_commit: null
+merge_commit: 8ae87bc2779f19d4962177a5656659114952b18b
 blocked_by: [TASK-041, TASK-032]
 blocks: [TASK-054, TASK-055]
 ---
