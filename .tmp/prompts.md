@@ -311,28 +311,34 @@ Separate bug, not fixed: a stray .tasks/TASK-*.md without valid frontmatter make
 - addendum: guardrails -->
 
 > TODO: plan mode, Opus 5.5, xhigh effort
+> TODO: create/find a guidelines doc for how to write a skill that keeps it short and clean
 
 /plan-feature A full rewrite of the implement-task skill. Place all tasks for this new epic at the top of the board.
 
 The implement-task skill in its current state is confusing. When I attempted to manually test the last change to in in TASK-045, the automation behavior did not work. I reviewed the skill, and it's clear to me that the failure occurs because of the conflicting instructions in the skill description.
 
-I now have a better understanding of the skill requirements, and I want to create a completely new version of the skill from scratch. The new skill should be named `implement-task-2` during development. Once it's complete and I'm satisified with the behavior, I will rename it to `implement-task` to replace the existing skill.
+I now have a better understanding of the skill requirements, and I want to create a completely new version of the skill from scratch. The new skill should be named `implement-task-v2` during development. Once it's complete and I'm satisified with the behavior, I will rename it to `implement-task` to replace the existing skill.
 
 Features of the skill:
 - batch mode by default: The skill treats all task implementation as a batch of tasks. When implementing only one task--either a specific task requested by the user or the default task taken from the top of the TODO list--this is treated as a batch of one.
+- critic agent: A less expensive agent is spawned to review each PR, and the critic must approve the changes before merging is allowed.
+- TDD: use test driven development
 
-Here is the workflow I want the skill to follow:
+Parameters:
+- "[tasks|range|stopping-task|epic]"
+
+Here is the workflow I want the skill to follow in the order that it should occur:
 - Resume detection
   - Determine if the implement-task skill from a previous session was interrupted
-  - If interrupted, resume the batch where it left off
+  - If interrupted, recover the batch state and resume the batch where it left off
   - If not interrupted, go to the `Build batch` step
 - Build batch
   - Build a batch of tasks to implement based on the arguments (if any) provided by the user
   - Building the batch list uses the TODO list defined in .tasks/BOARD.md
   - Batch types
-    - single task: either a specific task provided as a parameter; choose top task from TODO list on .tasks/BOARD.md by default if no argument provided by user
-    - specific list of tasks: a list of multiple tasks provided by the user; example prompts might be `/implement-task TASK-031 TASK-33` or `implement tasks 44, 45, and 47`
-    - range: start with TASK-AAA and implement tasks up to and including TASK-BBB; all tasks between TASK-AAA and TASK-BBB are taken from the TODO section of the board in the order shown
+    - no argument provided: choose the top task from TODO list on .tasks/BOARD.md by default if no argument provided by user, effectively making a batch of one task
+    - specific list of tasks: a list of one or more tasks provided by the user; example prompts might be `/implement-task TASK-031 TASK-033` or `implement tasks 44, 45, and 47`
+    - range: start with TASK-AAA and implement tasks up to and including TASK-BBB; all tasks between TASK-AAA and TASK-BBB are taken from the TODO section of the board in the order defined on the board
     - stop on task: almost the same as the range option, but with TASK-AAA automatically chosen as the very first task from the top of the TODO list
     - epic: implement all tasks from the TODO list assigned to the given epic
   - Batch validation: the lists of tasks in the batch is validated before work begins; some invalid states are recoverable while others will reject the batch and require user clarification; for recoverable notifications, a short message should be displayed to inform the user (e.g. `TASK-010 already implemented, skipping`)
@@ -342,17 +348,39 @@ Here is the workflow I want the skill to follow:
     - wrong order for range: (recoverable, inform user) the user provided a start/end task for a range where the ending task is prioritized higher on the board than the starting task; assume that the start/end tasks are correct and simply swap their order so that the range is valid; inform the user
     - no stopping task: (unrecoverable) the stopping task provided for either the `range` or `stop on task` modes is invalid (doesn't exist, already completed, etc)
     - no tasks found: (unrecoverable) the batch is empty, do nothing
+- Start task
+  - pick the next task from the batch and set it to the active task
+  - create a new local git branch for the task; see reference doc for git branch naming conventions
+  - update the state of the task, its epic, and the board to reflect that the task is in progress
 - Write tests
+  - follow test-driven development
+  - follow behavior-driven development
+  - unit tests are not committed to the repository except for special cases; most unit test are considered throwaway
+  - behavioral tests are committed to the repository
+  - refer to the testing strategy reference document for full details of the testing strategy
 - Implement task
+  - make changes to the repository to meet the acceptance criteria of the task
 - Run tests
-- Create PR
+  - verify that the entire test suite passes, including the newly written tests from the `Write tests` step above
+  - if tests fail, return to the `Implement task` step to address the failures or to the `Write tests` step if the tests need to be modified
 - Spawn critic (note: first round still w/ haiku & w/in claude code context)
-- Merge PR
+- Merge changes
+  - squash merge to main
+  - push changes to remote
 - Create summary report
+  - create new file in `reports/` that contains a summary of the task
+  - see reference doc for git branch naming conventions and use the sample convention for naming the report file
+- Batch complete
+  - reach this step when all tasks in the batch are complete or the batch bailed out early
+  - write a new summary file in `reports/` following this python strftime pattern: `batch-%Y-%m-%d-%H-%M-%S.md`
+  - summary contains details about the entire batch, including tasks implemented, tasks not implemented, and reason for bailing out early if a bailout occurred
 
 Development process:
-- For the initial rewrite of the skill there will be no associated python script automation--it will be prose-only in a `SKILLS.md` file. Scripting will be done in subsequent tasks.
-- Phase-naming for interruption recovery: In the previous implementation, the batch-state used names like `phase1`, `phase2`, etc. for the names of the phases where an interrupted batch could recover. In the new version, these should be named using the human-readable name of the corresponding step in the SKILLS.md file, e.g. `start task` or `create pr`.
+- For the initial rewrite of the skill there will not be any associated python script automation--it will be prose-only in the `SKILLS.md` file. The delegation of a subset of behaviors to python scripts will be done in subsequent tasks.
+- Phase-naming for interruption recovery: In the previous implementation, the batch-state used names like `phase1`, `phase2`, etc for the names of the phases where an interrupted batch could recover. In the new version, these should use the human-readable name of the corresponding step in the SKILLS.md file, e.g. `write tests` or `create pr`.
+
+Reference doc: git branch naming conventions
+- TODO
 
 Reference file: critic
 - TODO: guidelines for critic
