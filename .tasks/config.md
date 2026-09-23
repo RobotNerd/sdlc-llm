@@ -12,7 +12,7 @@ remote: origin
 rebase_before_pr: true
 merge_strategy: squash
 delete_branch_after_merge: true
-allow_auto_merge: false
+allow_auto_merge: true
 ci_checks: [sync-check, test]
 archive_done: true
 tdd_enforced: true
@@ -39,7 +39,7 @@ Settings every skill and `sync` (`.tasks/bin/sync`) read.
 - **`docs_review_paths`** / **`docs_ignore_paths`** — files updated by the `review-docs` skill.
 - **`remote` / `rebase_before_pr` / `merge_strategy` / `delete_branch_after_merge`** — the git automation settings for `implement-task`.
 - **`ci_checks`** — the github actions workflows that must pass before a PR can be merged.
-- **`allow_auto_merge`** — When true, the workflow automatically merged PRs it creates as long as CI checks pass and the critic agent approves the changes. If false, the human user manually merges PRs.
+- **`allow_auto_merge`** — When true, the workflow automatically merges PRs it creates as long as CI checks pass and the critic agent approves the changes. If false, the human user manually merges PRs.
 <!-- - **`autonomous_merge_cap`** — the max tasks one batch run may auto-merge. Once reached, the batch halts for a human checkpoint regardless of further critic approvals. `0` never auto-merges; `null` removes the cap. Only valid when `allow_auto_merge` is `true`. -->
 - **`tdd_enforced: true`** — follow a test-driven development workflow when true.
 - **`ignored_paths: [.tmp/prompts.md]`** — paths the `implement-task` skill never treats as dirty-tree blockers.

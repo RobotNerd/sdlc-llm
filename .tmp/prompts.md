@@ -313,21 +313,21 @@ Separate bug, not fixed: a stray .tasks/TASK-*.md without valid frontmatter make
 > TODO: plan mode, Opus 5.5, xhigh effort
 > TODO: create/find a guidelines doc for how to write a skill that keeps it short and clean
 
-/plan-feature A full rewrite of the implement-task skill. Place all tasks for this new epic at the top of the board.
+/plan-feature A full rewrite of the implement-task skill. All tasks for this new epic will be placed at the top of the board.
 
-The implement-task skill @.claude/skills/implement-task/ in its current state is confusing. When I attempted to manually test the most recent change to it from TASK-045, the automation behavior did not work. I reviewed the SKILL.md content, and it's clear to me that the failure occurs because of conflicting instructions.
+The implement-task skill @.claude/skills/implement-task/ in its current state is confusing. When I attempted to manually test the most recent change made in TASK-045, the automation behavior did not work. I reviewed the SKILL.md content, and it's clear to me that the failure occurs because of conflicting instructions.
 
-I now have a better understanding of the skill requirements, and I want to create a completely new version of the skill from scratch. The new skill should be named `implement-task-v2` during development. Once it's complete and I'm satisified with the behavior, I will rename it to `implement-task` to replace the existing skill.
+I now have a better understanding of the skill requirements, and I want to create a completely new version of the skill from scratch. The new skill should be named `implement-task-v2` during development. Once the epic is complete and I'm satisified with the behavior, I will rename it to `implement-task` to replace the existing skill.
 
 ## Features
 
 Some specific features of the new version that differ from the original:
 
 - batch mode by default: The skill treats all task implementation as a batch of tasks. When implementing only one task--either a specific task requested by the user or the default task taken from the top of the TODO list--this is treated as a batch of one.
-- critic agent enabled by default: A less expensive agent is spawned to review each PR, and the critic must approve the changes before merging is allowed.
+- critic agent enabled by default: A less expensive agent is spawned to review each PR, and the critic must approve the changes before merging is allowed. The allow_auto_merge config field is no longer needed.
 - TDD: use test-driven development
 - BDD: follow behavior-driven development
-- Phase-naming for interruption recovery: In the original implementation, the batch-state used names like `phase1`, `phase2`, etc for the names of the phases where an interrupted batch could recover. In the new version, these should use the human-readable name of the corresponding step in the SKILLS.md file, e.g. `write tests` or `create pr`.
+- Phase-naming for interruption recovery: In the original implementation, the batch-state used names like `phase1`, `phase2`, etc for the names of the phases where an interrupted batch could recover. In the new version, these should use the human-readable name of the corresponding step in the SKILLS.md file, e.g. `write tests` or `merge changes`.
 
 ## Parameters
 
@@ -335,7 +335,7 @@ Some specific features of the new version that differ from the original:
 
 ## Development process
 
-- For the initial rewrite of the skill there will not be any associated python script automation--it will be prose-only in the `SKILLS.md` file. The delegation of a subset of behaviors to python scripts will be done in subsequent tasks.
+- For the initial rewrite of the skill there will not be any associated python script automation--it will be prose-only in the `SKILLS.md` file. The delegation of a subset of behaviors to python scripts will be done in subsequent tasks. In order for the new version of the skill to run, the hooks defined in this repository may need to be disabled.
 - All development can be done on a local branch per task. Once changes are reviewed and finalized, the local branch should be squashed and merged into main. At that point, the main branch should be pushed to remote.
 
 ## Creating follow-up tasks
@@ -355,7 +355,7 @@ Here is the workflow I want the skill to follow in the order that it should occu
 - Interrupted batch detection
   - Determine if the implement-task skill from a previous session was interrupted
   - If interrupted and the user provided a batch parameter, stop and get clarification from the user; determine if the user wants to delete the interrupted batch to start the new one, or if the interrupted batch should be resumed
-  - If interrupted, recover the batch state and resume the batch where it left off
+  - If continuing an interrupted batch, recover the batch state and resume the batch where it left off
   - If not interrupted, go to the `Build batch` step
 - Build batch
   - Build a batch of tasks to implement based on the arguments (if any) provided by the user
@@ -364,19 +364,19 @@ Here is the workflow I want the skill to follow in the order that it should occu
     - no argument provided: choose the top task from TODO list on .tasks/BOARD.md by default if no argument provided by user, effectively making a batch of one task
     - specific list of tasks: a list of one or more tasks provided by the user; example prompts might be `/implement-task TASK-031 TASK-033` or `implement tasks 44, 45, and 47`
     - range: start with TASK-AAA and implement tasks up to and including TASK-BBB; all tasks between TASK-AAA and TASK-BBB are taken from the TODO section of the board in the order defined on the board
-    - stop on task: almost the same as the range option, but with TASK-AAA automatically chosen as the very first task from the top of the TODO list
+    - stop on task: basically the same as the range option, but with TASK-AAA automatically chosen as the very first task from the top of the TODO list
     - epic: implement all tasks from the TODO list assigned to the given epic
-  - Batch validation: the lists of tasks in the batch is validated before work begins; some invalid states are recoverable while others will reject the batch and require user clarification; for recoverable notifications, a short message should be displayed to inform the user (e.g. `TASK-010 already implemented, skipping`)
-    - already implemented: (recoverable, inform user) the batch contains tasks that have already been implemented
-    - task does not exist: (recoverable, inform user) the user listed a task the does not exist in the TODO list
-    - task blocked: (recoverable, inform user) a task is blocked by another open task that is not part of the current batch; note that when a task is blocked by another task in the same batch, the blocking task(s) should be implemented first
-    - wrong order for range: (recoverable, inform user) the user provided a start/end task for a range where the ending task is prioritized higher on the board than the starting task; assume that the start/end tasks are correct and simply swap their order so that the range is valid; inform the user
-    - no stopping task: (unrecoverable) the stopping task provided for either the `range` or `stop on task` modes is invalid (doesn't exist, already completed, etc)
-    - no tasks found: (unrecoverable) the batch is empty, do nothing
+  - Batch validation: the list of tasks in the batch is validated before work begins; if the batch state is invalid, stop work and get clarification from the user
+    - already implemented: the batch contains tasks that have already been implemented
+    - task does not exist: the user listed a task the does not exist in the TODO list
+    - task blocked: a task is blocked by another open task that is not part of the current batch
+    - wrong order for range: the user provided a start/end task for a range where the ending task is prioritized higher on the board than the starting task
+    - no stopping task: the stopping task provided for either the `range` or `stop on task` modes is invalid (doesn't exist, already completed, etc)
+    - no tasks found: the generated batch is empty
 - Start task
-  - pick the next task from the batch and set it to the active task
-  - create a new local git branch for the task; see reference doc for git branch naming conventions
-  - update the state of the task, its epic, and the board to reflect that the task is in progress
+  - pick the next task from the batch and set it as the active task
+  - create a new local git branch for the task; see reference doc for naming conventions
+  - update the state of the task, its epic if it has one, and the board to reflect that the task is in progress
 - Write tests
   - follow test-driven development
   - follow behavior-driven development
@@ -395,23 +395,26 @@ Here is the workflow I want the skill to follow in the order that it should occu
   - NOTE: the previous implement-task skill created a PR on github for a human to review, but that is unnecessary now; the critic can perform that review using the details on the local branch; in this new workflow, the agent will not create PRs
   - perform the bookkeeping behaviors used in the previous version of the skill at this point: updating BOARD.md, archving the task file, updating the epic details, etc; all changes should be done on the local task branch
   - squash merge to main
-  - push changes to remote
+  - push changes from main to remote
+  - delete the local feature branch for the task
 - Create summary report
   - create new file in `reports/` that contains a summary of the task
-  - see reference doc for git branch naming conventions and use the sample convention for naming the report file
+  - see reference doc that defines naming conventions
 - Batch complete
   - reach this step when all tasks in the batch are complete or the batch bailed out early
   - write a new summary file in `reports/` following this python strftime pattern: `batch-%Y-%m-%d-%H-%M-%S.md`
-  - summary contains details about the entire batch, including tasks implemented, tasks not implemented, new tasks created, recommended tasks not yet created, and reason for bailing out early if a bailout occurred
+  - see the reference doc for summary report
 
 ## Reference documents
 
-All of the documents described below should be created in the `references/` subdirectory of the skill. The SKILL.md instructions should refer to these documents. The intent is to offload reference material out of the main skill description to keep it clean and only use reference docs when the agent needs additional details for a given step.
+All of the documents described below should be created in the `references/` subdirectory of the skill. The SKILL.md instructions should refer to these documents in the individual steps where this reference information is needed. The intent is to offload reference material out of the main skill description to keep it clean and only use reference docs when the agent needs additional details for a given step.
 
-I have outlined some of the basic details for each of these reference documents. As part of the feature planning process, I would like you to further populate the content of each reference document using details that exist in the implement-task SKILL.md as well as the associated python scripts, batch_select.py and scaffold.py. Make changes as necessary where my instructions in this prompt diverge from the original version. I will review these reference docs once you have generated the proposed content in the spec for this epic.
+I have outlined some of the basic details for each of these reference documents. As part of the feature planning process, I would like you to further populate the content of each reference document using details that exist in the implement-task SKILL.md as well as the associated python scripts, batch_select.py and scaffold.py. Make changes as necessary where my instructions in this prompt diverge from the original version. I will review these reference docs once you have generated the proposed content of each doc in the spec for this epic.
 
-### Reference doc: git branch naming conventions
-- task-<NNN>-<slug>
+### Reference doc: naming conventions
+- use the same basic format for git branches and for per-task summary reports
+- git branch: task-<NNN>-<slug>
+- summary report: task-<NNN>-<slug>.md
 - `NNN` and `slug` are taken from the `.tasks/TASK-*` file for the task being worked
 - `NNN` is the numeric portion of the task from the task id
 - `slug` is a kebab-case representation of the task title
@@ -423,6 +426,8 @@ I have outlined some of the basic details for each of these reference documents.
 
 ### Reference doc: summary report
 - TODO: propose format for summary reports, both per-task and per-batch, based on the existing report structure
+- Each summary report should include instructions for any manual tests that need to be run by the human user.
+- the full batch summary report contains details about the entire batch, including tasks implemented, tasks not implemented, new tasks created, recommended tasks not yet created, manual testing steps if any, and reason for bailing out early if a bailout occurred
 
 ### Reference doc: testing strategy
 - write throwaway unit tests; delete them once the branch for the task is squashed and merged into main
@@ -430,7 +435,7 @@ I have outlined some of the basic details for each of these reference documents.
 - commit behavioral tests
 - the goal is to keep code that tests the surface area of the code rather than the internals--behavior-driven development (BDD)
 - unit tests often go stale, making them a burden
-- unit tests can quickly balloon without providing much value per test, introducing unnecessary context bloat
+- unit test counts can quickly balloon without providing much value per test, introducing unnecessary context bloat
 
 ### Reference doc: creating follow-up tasks
 - Reasons for creating a new task:
@@ -438,7 +443,7 @@ I have outlined some of the basic details for each of these reference documents.
   - A new bug or necessary feature is discovered while working on a ticket and it is outside the scope of the current ticket
 - New tasks are created using the add-task skill and added to the board at the bottom of the TODO list
 - Assign the new task to an existing epic only if it's clear that it naturually fits into one. Otherwise, leave it as unassigned to an epic.
-- The `autonomous_new_task_limit` from `.tasks/config.md` sets a hard limit for the number of tasks that can be automatically created while implementing a batch; once this limit is reached, new tasks recommendations are included in the summary reports generated for each task as well as the batch summary report
+- The `autonomous_new_task_limit` from `.tasks/config.md` sets a hard limit for the number of tasks that can be automatically created while implementing a batch; once this limit is reached, new task recommendations are included in the summary reports generated for each task as well as the batch summary report
 - Creating new tasks during a batch run is completely autonomous without any human involvement; the user will review new tasks after the batch run is complete
 
 ### Reference doc: interrupts and bailout
@@ -451,10 +456,16 @@ Situations where the agent determines that the batch must be paused and wait for
 - `guardrail_denial` — the same `PreToolUse` hook denies a retry on a task multiple times in a row; `guardrail_denial_attempts` in .tasks/config.md sets the max allowed attempts
 - `infra_failure` — `git`/`gh` itself is broken (auth expired, network failure, rate-limited, etc)
 - `critic_rejection` — the critic rejects the change multiple times; `critic_rejection_attempts` in .tasks/config.md sets the max allowed attempts
-- `context_usage_exceeded` / `token_budget_exceeded` — usage thresholds are exceeded; see the existing `check-usage-thresholds` implementation in .claude/skills/implement-task/scaffold.py for the behavior, which will be reimplemented in v2 of the skill
+- `context_usage_exceeded` / `token_budget_exceeded` — usage thresholds are exceeded; see the existing `check-usage-thresholds` implementation in .claude/skills/implement-task/scaffold.py for the behavior, which will need to be reimplemented in v2 of the skill
 
 ### Reference doc: guardrails
-- NOTE: none of the guardrails listed in the implement-task skill apply for now, and these will be rebuilt from the ground up
+- NOTE: none of the guardrails listed in the implement-task skill apply for now; guardrails will be rebuilt from the ground up
+
+## Additional updates
+
+- Docs and the config.md need to be updated to reflect these changes.
+- The spec includes any of the behaviors above that are candidates for automation. The initial implementation is prose-only in SKILL.md. Subsequent tasks will refactor SKILL.md and migrate those behaviors to an associated python script.
+- Plan to reimplement the usage thresholds check from the original version of the skill.
 
 ---
 
