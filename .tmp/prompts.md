@@ -313,7 +313,7 @@ Separate bug, not fixed: a stray .tasks/TASK-*.md without valid frontmatter make
 > TODO: plan mode, Opus 5.5, xhigh effort
 > TODO: create/find a guidelines doc for how to write a skill that keeps it short and clean
 
-/plan-feature A full rewrite of the implement-task skill. All tasks for this new epic will be placed at the top of the board.
+<!-- /plan-feature A full rewrite of the implement-task skill. All tasks for this new epic will be placed at the top of the board.
 
 The implement-task skill @.claude/skills/implement-task/ in its current state is confusing. When I attempted to manually test the most recent change made in TASK-045, the automation behavior did not work. I reviewed the SKILL.md content, and it's clear to me that the failure occurs because of conflicting instructions.
 
@@ -465,7 +465,18 @@ Situations where the agent determines that the batch must be paused and wait for
 
 - Docs and the config.md need to be updated to reflect these changes.
 - The spec includes any of the behaviors above that are candidates for automation. The initial implementation is prose-only in SKILL.md. Subsequent tasks will refactor SKILL.md and migrate those behaviors to an associated python script.
-- Plan to reimplement the usage thresholds check from the original version of the skill.
+- Plan to reimplement the usage thresholds check from the original version of the skill. -->
+
+Make these changes first:
+- Clarify that the task to update config.md removes deprecated keys that are only used by v1 but not by v2 of implement-task.
+- Change the hook denial behavior. Since only one hook actually blocks v2, disable only that hook and keep the other two active.
+
+Once those changes are made, go ahead and create the tasks. Also, move TASK-071 to wont-do as you suggested.
+
+---
+
+TODO: Create a new EPIC for automating implement-task-v2.
+TODO: Epic to rewrite existing `tests/`; find behavioral tests to keep and throw away the rest; write new tests to cover any missing behavioral test gaps
 
 ---
 
