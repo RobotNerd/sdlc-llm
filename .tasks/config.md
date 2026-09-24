@@ -19,7 +19,6 @@ tdd_enforced: true
 context_usage_halt_pct: 85
 token_budget_per_batch: null
 autonomous_new_task_limit: 3
-# autonomous_merge_cap: 5
 ignored_paths: [.tmp/prompts.md]
 quality_gate_attempts: 3
 guardrail_denial_attempts: 3
@@ -40,7 +39,6 @@ Settings every skill and `sync` (`.tasks/bin/sync`) read.
 - **`remote` / `rebase_before_pr` / `merge_strategy` / `delete_branch_after_merge`** — the git automation settings for `implement-task`.
 - **`ci_checks`** — the github actions workflows that must pass before a PR can be merged.
 - **`allow_auto_merge`** — When true, the workflow automatically merges PRs it creates as long as CI checks pass and the critic agent approves the changes. If false, the human user manually merges PRs.
-<!-- - **`autonomous_merge_cap`** — the max tasks one batch run may auto-merge. Once reached, the batch halts for a human checkpoint regardless of further critic approvals. `0` never auto-merges; `null` removes the cap. Only valid when `allow_auto_merge` is `true`. -->
 - **`tdd_enforced: true`** — follow a test-driven development workflow when true.
 - **`ignored_paths: [.tmp/prompts.md]`** — paths the `implement-task` skill never treats as dirty-tree blockers.
 - **`context_usage_halt_pct`** / **`token_budget_per_batch`** — `implement-task` batch mode's usage safety valve: crossing either threshold halts the batch. `null` token budget means no cap.

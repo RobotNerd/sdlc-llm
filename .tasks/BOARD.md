@@ -10,10 +10,20 @@ between `<!-- BEGIN -->` / `<!-- END -->` markers — change the task/epic file 
 | Epic | Status | Progress |
 |---|---|---|
 | EPIC-004 | todo | 0/11 done |
+| EPIC-005 | todo | 0/9 done |
 <!-- END:epics -->
 
 ## TODO
 
+- TASK-073 — implement-task-v2 skeleton: 11-step SKILL.md with a single-task happy path  `EPIC-005`
+- TASK-074 — implement-task-v2: per-task and per-batch summary reports  `EPIC-005` ⛔ blocked_by TASK-073
+- TASK-075 — implement-task-v2: haiku critic gate with a bounded rework loop  `EPIC-005` ⛔ blocked_by TASK-074
+- TASK-076 — implement-task-v2: build and validate batches from every argument form  `EPIC-005` ⛔ blocked_by TASK-074
+- TASK-077 — implement-task-v2: pause the batch on interrupts, with attempt counters  `EPIC-005` ⛔ blocked_by TASK-075, TASK-076
+- TASK-078 — implement-task-v2: detect and resume an interrupted batch by step name  `EPIC-005` ⛔ blocked_by TASK-077
+- TASK-079 — implement-task-v2: context and token usage safety valve  `EPIC-005` ⛔ blocked_by TASK-077
+- TASK-080 — implement-task-v2: autonomous follow-up tasks with a creation limit  `EPIC-005` ⛔ blocked_by TASK-076
+- TASK-081 — implement-task-v2: docs updates and drop v1-only config keys  `EPIC-005` ⛔ blocked_by TASK-078, TASK-079, TASK-080
 - TASK-054 — Agent roster: per-role config keys and generated .claude/agents/*.md  `EPIC-004`
 - TASK-055 — OpenRouter client: live model catalog, pricing, and balance  `EPIC-004`
 - TASK-056 — Critic client: diff to structured findings JSON  `EPIC-004` ⛔ blocked_by TASK-054, TASK-055
@@ -25,7 +35,6 @@ between `<!-- BEGIN -->` / `<!-- END -->` markers — change the task/epic file 
 - TASK-062 — Worker scope fence: SubagentStop hook denying out-of-scope diffs  `EPIC-004` ⛔ blocked_by TASK-054
 - TASK-063 — orchestrate-batch skill: wire orchestrator/worker/critic into implement-task's loop  `EPIC-004` ⛔ blocked_by TASK-056, TASK-057, TASK-058, TASK-059, TASK-060, TASK-061, TASK-062, TASK-064
 - TASK-064 — Context compaction/reset: proactive orchestrator checkpoint-clear + worker mid-task guard  `EPIC-004` ⛔ blocked_by TASK-054, TASK-060
-- TASK-071 — Simplify implement-task/SKILL.md: cut stale/duplicated/over-explained content
 
 ## In Progress
 

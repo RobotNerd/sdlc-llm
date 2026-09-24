@@ -467,14 +467,35 @@ Situations where the agent determines that the batch must be paused and wait for
 - The spec includes any of the behaviors above that are candidates for automation. The initial implementation is prose-only in SKILL.md. Subsequent tasks will refactor SKILL.md and migrate those behaviors to an associated python script.
 - Plan to reimplement the usage thresholds check from the original version of the skill. -->
 
-Make these changes first:
-- Clarify that the task to update config.md removes deprecated keys that are only used by v1 but not by v2 of implement-task.
+<!-- Make these changes to the spec:
+- Clarify that the task to update config.md removes deprecated keys that are only used by v1 and ignored by v2 of implement-task.
 - Change the hook denial behavior. Since only one hook actually blocks v2, disable only that hook and keep the other two active.
 
-Once those changes are made, go ahead and create the tasks. Also, move TASK-071 to wont-do as you suggested.
+Once those changes are made, go ahead and create the tasks. Also, move TASK-071 to wont-do as you suggested. -->
+
+Some feedback on the tasks you created:
+
+## TASK-073-v2-skeleton.md
+
+Under `Testing strategy`, I would categorize the proposed test `tests/test_implement_task_v2_skill.py` as a throwaway unit test. As proposed, it's fragile and could easily fail if the number of step headings changes over time as we iterate on the skill, the order of steps could be adjusted, references change, etc. Same with the other criteria for this test case.
+
+## TASK-074-v2-summary-reports.md
+
+Under `Testing strategy`, the same note as above: `tests/test_implement_task_v2_skill.py` would be a throwaway unit test as described here.
 
 ---
 
+> TODO: have LLM interview me on BDD
+
+I would like to discuss BDD test criteria in more detail with you so that we can lock in a definition of it. We both need to be aligned on what I'm asking for out of behavioral tests before you begin implementing the tasks to build v2 of the skill.
+
+Tthe manual test cases you added to the tasks in this epic are the behavioral tests. It's fine that we don't have any behavioral tests to check in for this epic. My gut feeling is that all behavioral tests will be manual and we will only be able to implement automated behavioral tests of implement-task-v2 once we start moving functionality into scripts.
+
+Perform a web search on best practices for behavioral tests, and use that to define a list of clear, simple behavioral test rules that can be added to the testing strategy reference doc. Show them to me first, and interview me with questions about them so I can provide clarifications.
+
+---
+
+TODO: Update /add-task to include plans for comprehensive BDD test cases in each task; covers new test, changes to existing tests, and/or deprecations to existing tests; include expected inputs and outputs for each test case; clarify each test case as a either behavioral test or a throwaway unit test
 TODO: Create a new EPIC for automating implement-task-v2.
 TODO: Epic to rewrite existing `tests/`; find behavioral tests to keep and throw away the rest; write new tests to cover any missing behavioral test gaps
 
