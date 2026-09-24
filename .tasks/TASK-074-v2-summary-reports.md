@@ -37,7 +37,7 @@ The Manual testing section collects every Testing strategy step the agent couldn
 
 ## Testing strategy
 
-1. Extend `tests/test_implement_task_v2_skill.py` if a new reference doc needs to be listed there. The existing reference-integrity checks cover it.
+1. Write a throwaway unit test under `tests/throwaway/` (not committed; deleted after the merge). It checks that `references/summary-report.md` exists and that `SKILL.md` points to it from `create summary report` and `batch complete`.
 2. Manual, in a scratch repo: `init-project --target <tmp>`, a local bare repo as `origin`, a few dummy `todo` tasks, and `.claude/skills/implement-task-v2/` copied in: run a no-argument batch on a dummy task that has one manual Testing strategy step. Check both report filenames, all sections, and the Manual testing content.
 3. `git status` is clean after the batch.
 4. `.venv/bin/pytest` and `python3 .tasks/bin/sync check` pass.

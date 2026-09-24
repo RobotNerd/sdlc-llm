@@ -473,7 +473,7 @@ Situations where the agent determines that the batch must be paused and wait for
 
 Once those changes are made, go ahead and create the tasks. Also, move TASK-071 to wont-do as you suggested. -->
 
-Some feedback on the tasks you created:
+Some feedback below on the tasks you created. Please update the tasks to reflec these notes.
 
 ## TASK-073-v2-skeleton.md
 

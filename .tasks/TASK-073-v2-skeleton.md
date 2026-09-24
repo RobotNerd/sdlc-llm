@@ -57,7 +57,7 @@ Repo changes that come with the skeleton:
 
 ## Testing strategy
 
-1. Commit a new behavioral test, `tests/test_implement_task_v2_skill.py`: `SKILL.md`'s step headings equal the 11 names, in order; every `references/*.md` named in `SKILL.md` exists; and every file in `references/` is named in `SKILL.md`.
+1. Write a throwaway unit test under `tests/throwaway/` (not committed; deleted after the merge). It checks that `SKILL.md`'s step headings are the 11 names in order, that every `references/*.md` named in `SKILL.md` exists, and that every file in `references/` is named in `SKILL.md`. It's throwaway because it's fragile: step names, their order and the set of references will change as the skill is iterated on.
 2. Update the settings-parity test in `tests/test_guardrails.py`. `.venv/bin/pytest` passes in full.
 3. `python3 .tasks/bin/sync check` exits 0.
 4. Manual, in a scratch repo: `init-project --target <tmp>`, a local bare repo as `origin`, a few dummy `todo` tasks, and `.claude/skills/implement-task-v2/` copied in: run `/implement-task-v2` with no argument. Confirm that `origin/main` has one squash commit citing the task, the task is archived, the local branch is gone, and `tests/throwaway/` is empty.
