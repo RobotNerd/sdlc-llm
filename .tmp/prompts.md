@@ -473,7 +473,7 @@ Situations where the agent determines that the batch must be paused and wait for
 
 Once those changes are made, go ahead and create the tasks. Also, move TASK-071 to wont-do as you suggested. -->
 
-Some feedback below on the tasks you created. Please update the tasks to reflec these notes.
+<!-- Some feedback below on the tasks you created. Please update the tasks to reflec these notes.
 
 ## TASK-073-v2-skeleton.md
 
@@ -481,40 +481,66 @@ Under `Testing strategy`, I would categorize the proposed test `tests/test_imple
 
 ## TASK-074-v2-summary-reports.md
 
-Under `Testing strategy`, the same note as above: `tests/test_implement_task_v2_skill.py` would be a throwaway unit test as described here.
+Under `Testing strategy`, the same note as above: `tests/test_implement_task_v2_skill.py` would be a throwaway unit test as described here. -->
 
----
-
-> TODO: have LLM interview me on BDD
-
-I would like to discuss BDD test criteria in more detail with you so that we can lock in a definition of it. We both need to be aligned on what I'm asking for out of behavioral tests before you begin implementing the tasks to build v2 of the skill.
+<!-- I would like to discuss BDD test criteria in more detail with you so that we can lock in a definition of it. We both need to be aligned on what I'm asking for out of behavioral tests before you begin implementing the tasks to build v2 of the skill.
 
 Tthe manual test cases you added to the tasks in this epic are the behavioral tests. It's fine that we don't have any behavioral tests to check in for this epic. My gut feeling is that all behavioral tests will be manual and we will only be able to implement automated behavioral tests of implement-task-v2 once we start moving functionality into scripts.
 
-Perform a web search on best practices for behavioral tests, and use that to define a list of clear, simple behavioral test rules that can be added to the testing strategy reference doc. Show them to me first, and interview me with questions about them so I can provide clarifications.
+Perform a web search on best practices for behavioral tests, and use your findings to define a list of clear, simple behavioral test rules that can be added to the testing strategy reference doc. Show them to me first, and interview me with questions about them so I can provide clarifications. -->
+
+<!-- My answers to your questions:
+
+1. It counts as observable behavior.
+2. The testing section should start with a short simplified summary that uses the labels Given: / When: / Then: followed by the numbered steps that describe the details of the propsed test procedure.Manual testing steps follow the same pattern and are included in the task description after the automated testing plan.
+3. Task files and reports are enough for now.
+4. Some manual tests can be marked as "must pass before merge" and this should be done during the planning stage when I review the tasks that you generated. When the implement-task skill is invoked, it should check all tasks in the batch for these blocking manual tests. If any are found, ask the user if they want to proceed or if they want to adjust the batch.
+5. Faking is acceptable for now.
+6. This is good as is.
+
+Given that feedback, create a new document @doc/testing-strategy.md with plan. -->
+
+Notes on the additional decisions:
+
+1. Agreed
+2. On pass it merged. On failure, it stops the batch.
+3. Agreed
+4. Agreed
+
+Keep doc/testing-strategy.md as the master copy for right now. I'll revisit this later.
+
+Don't implement the steps that you outlined in `Plan: applying this strategy to EPIC-005` yet. I have something else I want to do first.
 
 ---
 
-TODO: Update /add-task to include plans for comprehensive BDD test cases in each task; covers new test, changes to existing tests, and/or deprecations to existing tests; include expected inputs and outputs for each test case; clarify each test case as a either behavioral test or a throwaway unit test
-TODO: Create a new EPIC for automating implement-task-v2.
-TODO: Epic to rewrite existing `tests/`; find behavioral tests to keep and throw away the rest; write new tests to cover any missing behavioral test gaps
+I've spent some time reconsidering my design of this system. My main conclusion is that managing epics and tasks as part of each project is a bad design decision. It's overly cumbersome, reinvents the wheel, and it leaves a lot of unnecessary stale data in the project in the archived files. I want to use these lessons to rethink the design.
+
+Here are my current thoughts on how I want to change things up:
+- Use [kaneo](https://kaneo.app) for project management. It handles all task management, the kanban board, etc. It appears to come with an MCP server for agent connectivity, and I plan to self-host it. Leverage as many of its features as possible for task management rather than the agent doing the work.
+- Keep most skills but update them to work with kaneo: add-task, implement-task, plan-feature, refine-backlog, review-docs
+- Drop these skills: init-project (users install skills as a plugin or manually per-skill)
+- The goal is still to automate as much as possible. This means that building implement-task-v2 will still happen mostly as designed, and it will be most complex skill.
+- Skill behavior should continue to be offloaded to a deterministic script wherever possible. Keep the iterative development process where the first round is prose-only, and then behavior is offloaded in small testable chunks in separate tasks.
+- I noticed that what we've built so far feels more unstructured than I would like. I think the correct way to resolve this is a combination of multiple changes I should make: more upfront planning on my part of testing procedures and architecture direction in my prompts, defining style guide documents (architecture, testing strategy, linting rules, etc), and provide a solid style guide of how I want the tasks you generate to be formatted and worded.
+- Guideline reference docs, like @doc/testing-strategy.md, should be independent of the tasks managed by the project. For example, right now the testing strategy doc includes references to things like implement-task-v2 and EPIC-005. These types of references should be limited only to the tasks stored in kaneo and not exist in any of the generated artifiacts that are committed to the repo.
+
+Given this new direction, I want you to start by performing a full analysis of the project in its current state. Compile a new spec document/PRD that captures the features the new version should implement, and write it to @doc/PRD-v2.md. Take into account existing features, planned features (in current specs, epics, and tasks in @.tasks/), and the changes I mentioned above. Fill in any gaps you notice with your suggestions. Finally, put any questions you need me to clarify in a new file @doc/questions.md.
+
+We'll iterate on that document.
+
 
 ---
 
 TODO: general
+- update CLAUDE.md to make sure unnecessary line breaks aren't added to generated markdown
 - prevent claude from inserting line breaks in markdown: https://mcpservers.org/agent-skills/prisma/markdown-no-artificial-line-wraps
 - make a rewrite pass at README
 - new skill: find shared code and move it to a shared library
 - add linter; include prevention of large code files
 - Add refactoring check for plan-feature and add-task
 - Figure out the right way to choose model as orchestrator w/ different workers; ensure plan mode is always opus; make opus write the plan and tasks instead of switching to sonnet
-
----
-
-TODO: remove stuff
-- remove tdd_enforced from config.md and all references to it in the code; TDD is always followed
-- remove workflow_version references from entire project
-
----
-
-TODO: PLUGIN: group all skills as a plugin for namespacing
+- Update /add-task to include plans for comprehensive BDD test cases in each task; covers new test, changes to existing tests, and/or deprecations to existing tests; include expected inputs and outputs for each test case; clarify each test case as a either behavioral test or a throwaway unit test
+- Create a new EPIC for automating implement-task-v2.
+- Epic to rewrite existing `tests/`; find behavioral tests to keep and throw away the rest; write new tests to cover any missing behavioral test gaps; use the testing guide doce that's part of the `implement-task` for guidance
+- move shared references to a single location in the repo and use symlinks to them within each skill (if supported)
+- TODO: PLUGIN: group all skills as a plugin for namespacing
