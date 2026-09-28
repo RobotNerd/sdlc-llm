@@ -284,6 +284,263 @@ The new task ensures that batch progress can be recovered from the repo state al
 
 Separate bug, not fixed: a stray .tasks/TASK-*.md without valid frontmatter makes sync crash with a traceback instead of a clear error. That could be its own task. -->
 
+<!-- Approve. For each of your notes that need clarification:
+1. OK
+2. OK
+3. OK
+4. Change the behavior to bail out on rejection. This should end the batch and remove any artifacts. The summaryt should contain details about how many tasks were in the original batch, how many were completed, and which one fail to cause the batch to end prematurely.
+5. List it as pending in the PR body. -->
+
+<!-- It isn't working with my manual tests. I created a new epic `EPIC-002` with 3 tasks in another repository, and I used the prompt `/implement-task EPIC-002`. For the first run, I set `allow_auto_merge: false` in config.md, and that did I expected and stopped at the PR for the first task. I deleted the PR and branch, then set `allow_auto_merge: true`. When I ran the test a second time, I expected it to attempt to complete all three tasks, but it stopped again to wait for me to approve the PR for the first task. Am I missing anything in my test setup to enable automation for all 3 tasks without my intervention? -->
+
+<!-- TODO: full rebuild of implement-task workflow
+- resume? if so, jump to where you left off
+- start task: pick next task and plan
+- write tests
+- implement task
+- run tests; if tests fail, go back to `implement task` and make adjustments based on feedback; otherwise, proceed
+- create pr
+- spawn critic agent to review pr
+- if critic rejects pr, go back to `implement task` and make adjustments based on feedback; otherwise, proceed
+- merge PR, rebase main, do project management cleanup, merge directly to main; pick next task from batch and go to `start task`; if not more tasks in batch, proceed
+- report: write summary report of the batch
+
+- addendum: creating follow-up tasks
+- addendum: interrupts
+- addendum: bailut
+- addendum: guardrails -->
+
+> TODO: plan mode, Opus 5.5, xhigh effort
+> TODO: create/find a guidelines doc for how to write a skill that keeps it short and clean
+
+<!-- /plan-feature A full rewrite of the implement-task skill. All tasks for this new epic will be placed at the top of the board.
+
+The implement-task skill @.claude/skills/implement-task/ in its current state is confusing. When I attempted to manually test the most recent change made in TASK-045, the automation behavior did not work. I reviewed the SKILL.md content, and it's clear to me that the failure occurs because of conflicting instructions.
+
+I now have a better understanding of the skill requirements, and I want to create a completely new version of the skill from scratch. The new skill should be named `implement-task-v2` during development. Once the epic is complete and I'm satisified with the behavior, I will rename it to `implement-task` to replace the existing skill.
+
+## Features
+
+Some specific features of the new version that differ from the original:
+
+- batch mode by default: The skill treats all task implementation as a batch of tasks. When implementing only one task--either a specific task requested by the user or the default task taken from the top of the TODO list--this is treated as a batch of one.
+- critic agent enabled by default: A less expensive agent is spawned to review each PR, and the critic must approve the changes before merging is allowed. The allow_auto_merge config field is no longer needed.
+- TDD: use test-driven development
+- BDD: follow behavior-driven development
+- Phase-naming for interruption recovery: In the original implementation, the batch-state used names like `phase1`, `phase2`, etc for the names of the phases where an interrupted batch could recover. In the new version, these should use the human-readable name of the corresponding step in the SKILLS.md file, e.g. `write tests` or `merge changes`.
+
+## Parameters
+
+- optional batch argument: "[tasks|range|stopping-task|epic]"
+
+## Development process
+
+- For the initial rewrite of the skill there will not be any associated python script automation--it will be prose-only in the `SKILLS.md` file. The delegation of a subset of behaviors to python scripts will be done in subsequent tasks. In order for the new version of the skill to run, the hooks defined in this repository may need to be disabled.
+- All development can be done on a local branch per task. Once changes are reviewed and finalized, the local branch should be squashed and merged into main. At that point, the main branch should be pushed to remote.
+
+## Creating follow-up tasks
+
+- New tasks can be created at any point during a batch run
+- The `autonomous_new_task_limit` from `.tasks/config.md` sets a hard limit for the number of tasks that can be automatically created
+- see reference doc for creating follow-up tasks for more details
+
+## Skill workflow
+
+Here is the workflow I want the skill to follow in the order that it should occur:
+- Ensure clean working repo
+  - Stop immediately if any of the following states are discovered:
+    - the `gh` cli tool is not installed
+    - the git working tree is dirty
+  - Pull the latest changes to main from remote
+- Interrupted batch detection
+  - Determine if the implement-task skill from a previous session was interrupted
+  - If interrupted and the user provided a batch parameter, stop and get clarification from the user; determine if the user wants to delete the interrupted batch to start the new one, or if the interrupted batch should be resumed
+  - If continuing an interrupted batch, recover the batch state and resume the batch where it left off
+  - If not interrupted, go to the `Build batch` step
+- Build batch
+  - Build a batch of tasks to implement based on the arguments (if any) provided by the user
+  - Building the batch list uses the TODO list defined in .tasks/BOARD.md
+  - Batch types
+    - no argument provided: choose the top task from TODO list on .tasks/BOARD.md by default if no argument provided by user, effectively making a batch of one task
+    - specific list of tasks: a list of one or more tasks provided by the user; example prompts might be `/implement-task TASK-031 TASK-033` or `implement tasks 44, 45, and 47`
+    - range: start with TASK-AAA and implement tasks up to and including TASK-BBB; all tasks between TASK-AAA and TASK-BBB are taken from the TODO section of the board in the order defined on the board
+    - stop on task: basically the same as the range option, but with TASK-AAA automatically chosen as the very first task from the top of the TODO list
+    - epic: implement all tasks from the TODO list assigned to the given epic
+  - Batch validation: the list of tasks in the batch is validated before work begins; if the batch state is invalid, stop work and get clarification from the user
+    - already implemented: the batch contains tasks that have already been implemented
+    - task does not exist: the user listed a task the does not exist in the TODO list
+    - task blocked: a task is blocked by another open task that is not part of the current batch
+    - wrong order for range: the user provided a start/end task for a range where the ending task is prioritized higher on the board than the starting task
+    - no stopping task: the stopping task provided for either the `range` or `stop on task` modes is invalid (doesn't exist, already completed, etc)
+    - no tasks found: the generated batch is empty
+- Start task
+  - pick the next task from the batch and set it as the active task
+  - create a new local git branch for the task; see reference doc for naming conventions
+  - update the state of the task, its epic if it has one, and the board to reflect that the task is in progress
+- Write tests
+  - follow test-driven development
+  - follow behavior-driven development
+  - unit tests are not committed to the repository except for special cases; most unit test are considered throwaway
+  - behavioral tests are committed to the repository
+  - refer to the testing strategy reference document for full details of the testing strategy
+- Implement task
+  - make changes to the repository to meet the acceptance criteria of the task
+- Run tests
+  - verify that the entire test suite passes, including the newly written tests from the `Write tests` step above
+  - if tests fail, return to the `Implement task` step to address the failures or to the `Write tests` step if the tests need to be modified
+- Spawn critic
+  - lauch a subagent using the Agent tool with `model: "haiku"`
+  - see reference doc for `critic`
+- Merge changes
+  - NOTE: the previous implement-task skill created a PR on github for a human to review, but that is unnecessary now; the critic can perform that review using the details on the local branch; in this new workflow, the agent will not create PRs
+  - perform the bookkeeping behaviors used in the previous version of the skill at this point: updating BOARD.md, archving the task file, updating the epic details, etc; all changes should be done on the local task branch
+  - squash merge to main
+  - push changes from main to remote
+  - delete the local feature branch for the task
+- Create summary report
+  - create new file in `reports/` that contains a summary of the task
+  - see reference doc that defines naming conventions
+- Batch complete
+  - reach this step when all tasks in the batch are complete or the batch bailed out early
+  - write a new summary file in `reports/` following this python strftime pattern: `batch-%Y-%m-%d-%H-%M-%S.md`
+  - see the reference doc for summary report
+
+## Reference documents
+
+All of the documents described below should be created in the `references/` subdirectory of the skill. The SKILL.md instructions should refer to these documents in the individual steps where this reference information is needed. The intent is to offload reference material out of the main skill description to keep it clean and only use reference docs when the agent needs additional details for a given step.
+
+I have outlined some of the basic details for each of these reference documents. As part of the feature planning process, I would like you to further populate the content of each reference document using details that exist in the implement-task SKILL.md as well as the associated python scripts, batch_select.py and scaffold.py. Make changes as necessary where my instructions in this prompt diverge from the original version. I will review these reference docs once you have generated the proposed content of each doc in the spec for this epic.
+
+### Reference doc: naming conventions
+- use the same basic format for git branches and for per-task summary reports
+- git branch: task-<NNN>-<slug>
+- summary report: task-<NNN>-<slug>.md
+- `NNN` and `slug` are taken from the `.tasks/TASK-*` file for the task being worked
+- `NNN` is the numeric portion of the task from the task id
+- `slug` is a kebab-case representation of the task title
+
+### Reference doc: critic
+- TODO: parse the guidelines for critic from the existing implement-task SKILL.md and python code
+- ensure that and documentation changes are included in the review as well; documentation should be concise and clean
+- check that lists and data structures in the code and documentation are sorted alphanumerically if the actual order doesn't matter
+
+### Reference doc: summary report
+- TODO: propose format for summary reports, both per-task and per-batch, based on the existing report structure
+- Each summary report should include instructions for any manual tests that need to be run by the human user.
+- the full batch summary report contains details about the entire batch, including tasks implemented, tasks not implemented, new tasks created, recommended tasks not yet created, manual testing steps if any, and reason for bailing out early if a bailout occurred
+
+### Reference doc: testing strategy
+- write throwaway unit tests; delete them once the branch for the task is squashed and merged into main
+- committing unit tests to the repository is allowed in rare circumstances, e.g. testing a function that is likely to change often, code that is deemed likely to cause a regression
+- commit behavioral tests
+- the goal is to keep code that tests the surface area of the code rather than the internals--behavior-driven development (BDD)
+- unit tests often go stale, making them a burden
+- unit test counts can quickly balloon without providing much value per test, introducing unnecessary context bloat
+
+### Reference doc: creating follow-up tasks
+- Reasons for creating a new task:
+  - An individual task is too large and needs to be split up
+  - A new bug or necessary feature is discovered while working on a ticket and it is outside the scope of the current ticket
+- New tasks are created using the add-task skill and added to the board at the bottom of the TODO list
+- Assign the new task to an existing epic only if it's clear that it naturually fits into one. Otherwise, leave it as unassigned to an epic.
+- The `autonomous_new_task_limit` from `.tasks/config.md` sets a hard limit for the number of tasks that can be automatically created while implementing a batch; once this limit is reached, new task recommendations are included in the summary reports generated for each task as well as the batch summary report
+- Creating new tasks during a batch run is completely autonomous without any human involvement; the user will review new tasks after the batch run is complete
+
+### Reference doc: interrupts and bailout
+
+Situations where the agent determines that the batch must be paused and wait for a decision from the user.
+
+- `needs_clarification` — the task is ambiguous, or its acceptance criteria contradict something discovered mid-implementation
+- `unexpected_blocker` — something task-specific blocks progress
+- `quality_gate_failure` — `test_command`/`lint_command`/`format_command`/`sync check` fails for the same reason multiple times in a row for a given task; `quality_gate_attempts` in .tasks/config.md sets the max allowed attempts
+- `guardrail_denial` — the same `PreToolUse` hook denies a retry on a task multiple times in a row; `guardrail_denial_attempts` in .tasks/config.md sets the max allowed attempts
+- `infra_failure` — `git`/`gh` itself is broken (auth expired, network failure, rate-limited, etc)
+- `critic_rejection` — the critic rejects the change multiple times; `critic_rejection_attempts` in .tasks/config.md sets the max allowed attempts
+- `context_usage_exceeded` / `token_budget_exceeded` — usage thresholds are exceeded; see the existing `check-usage-thresholds` implementation in .claude/skills/implement-task/scaffold.py for the behavior, which will need to be reimplemented in v2 of the skill
+
+### Reference doc: guardrails
+- NOTE: none of the guardrails listed in the implement-task skill apply for now; guardrails will be rebuilt from the ground up
+
+## Additional updates
+
+- Docs and the config.md need to be updated to reflect these changes.
+- The spec includes any of the behaviors above that are candidates for automation. The initial implementation is prose-only in SKILL.md. Subsequent tasks will refactor SKILL.md and migrate those behaviors to an associated python script.
+- Plan to reimplement the usage thresholds check from the original version of the skill. -->
+
+<!-- Make these changes to the spec:
+- Clarify that the task to update config.md removes deprecated keys that are only used by v1 and ignored by v2 of implement-task.
+- Change the hook denial behavior. Since only one hook actually blocks v2, disable only that hook and keep the other two active.
+
+Once those changes are made, go ahead and create the tasks. Also, move TASK-071 to wont-do as you suggested. -->
+
+<!-- Some feedback below on the tasks you created. Please update the tasks to reflec these notes.
+
+## TASK-073-v2-skeleton.md
+
+Under `Testing strategy`, I would categorize the proposed test `tests/test_implement_task_v2_skill.py` as a throwaway unit test. As proposed, it's fragile and could easily fail if the number of step headings changes over time as we iterate on the skill, the order of steps could be adjusted, references change, etc. Same with the other criteria for this test case.
+
+## TASK-074-v2-summary-reports.md
+
+Under `Testing strategy`, the same note as above: `tests/test_implement_task_v2_skill.py` would be a throwaway unit test as described here. -->
+
+<!-- I would like to discuss BDD test criteria in more detail with you so that we can lock in a definition of it. We both need to be aligned on what I'm asking for out of behavioral tests before you begin implementing the tasks to build v2 of the skill.
+
+Tthe manual test cases you added to the tasks in this epic are the behavioral tests. It's fine that we don't have any behavioral tests to check in for this epic. My gut feeling is that all behavioral tests will be manual and we will only be able to implement automated behavioral tests of implement-task-v2 once we start moving functionality into scripts.
+
+Perform a web search on best practices for behavioral tests, and use your findings to define a list of clear, simple behavioral test rules that can be added to the testing strategy reference doc. Show them to me first, and interview me with questions about them so I can provide clarifications. -->
+
+<!-- My answers to your questions:
+
+1. It counts as observable behavior.
+2. The testing section should start with a short simplified summary that uses the labels Given: / When: / Then: followed by the numbered steps that describe the details of the propsed test procedure.Manual testing steps follow the same pattern and are included in the task description after the automated testing plan.
+3. Task files and reports are enough for now.
+4. Some manual tests can be marked as "must pass before merge" and this should be done during the planning stage when I review the tasks that you generated. When the implement-task skill is invoked, it should check all tasks in the batch for these blocking manual tests. If any are found, ask the user if they want to proceed or if they want to adjust the batch.
+5. Faking is acceptable for now.
+6. This is good as is.
+
+Given that feedback, create a new document @doc/testing-strategy.md with plan. -->
+
+<!-- Notes on the additional decisions:
+
+1. Agreed
+2. On pass it merged. On failure, it stops the batch.
+3. Agreed
+4. Agreed
+
+Keep doc/testing-strategy.md as the master copy for right now. I'll revisit this later.
+
+Don't implement the steps that you outlined in `Plan: applying this strategy to EPIC-005` yet. I have something else I want to do first. -->
+
 ---
 
-Rewrite README to be more human-readable; right now it seems geared more towards AI, with some sections being too dense; focus on simplifying by removing technical details and focus on usage from a human user perspective; [TODO] provide examples to the LLM of good READMEs from other projects to use as a guide
+I've spent some time reconsidering my design of this system. My main conclusion is that managing epics and tasks as part of each project is a bad design decision. It's overly cumbersome, reinvents the wheel, and it leaves a lot of unnecessary stale data in the project in the archived files. I want to use these lessons to rethink the design.
+
+Here are my current thoughts on how I want to change things up:
+- Use [kaneo](https://kaneo.app) for project management. It handles all task management, the kanban board, etc. It appears to come with an MCP server for agent connectivity, and I plan to self-host it. Leverage as many of its features as possible for task management rather than the agent doing the work.
+- Keep most skills but update them to work with kaneo: add-task, implement-task, plan-feature, refine-backlog, review-docs
+- Drop these skills: init-project (users install skills as a plugin or manually per-skill)
+- The goal is still to automate as much as possible. This means that building implement-task-v2 will still happen mostly as designed, and it will be most complex skill.
+- Skill behavior should continue to be offloaded to a deterministic script wherever possible. Keep the iterative development process where the first round is prose-only, and then behavior is offloaded in small testable chunks in separate tasks.
+- I noticed that what we've built so far feels more unstructured than I would like. I think the correct way to resolve this is a combination of multiple changes I should make: more upfront planning on my part of testing procedures and architecture direction in my prompts, defining style guide documents (architecture, testing strategy, linting rules, etc), and provide a solid style guide of how I want the tasks you generate to be formatted and worded.
+- Guideline reference docs, like @doc/testing-strategy.md, should be independent of the tasks managed by the project. For example, right now the testing strategy doc includes references to things like implement-task-v2 and EPIC-005. These types of references should be limited only to the tasks stored in kaneo and not exist in any of the generated artifiacts that are committed to the repo.
+
+Given this new direction, I want you to start by performing a full analysis of the project in its current state. Compile a new spec document/PRD that captures the features the new version should implement, and write it to @doc/PRD-v2.md. Take into account existing features, planned features (in current specs, epics, and tasks in @.tasks/), and the changes I mentioned above. Fill in any gaps you notice with your suggestions. Finally, put any questions you need me to clarify in a new file @doc/questions.md.
+
+We'll iterate on that document.
+
+
+---
+
+TODO: general
+- update CLAUDE.md to make sure unnecessary line breaks aren't added to generated markdown
+- prevent claude from inserting line breaks in markdown: https://mcpservers.org/agent-skills/prisma/markdown-no-artificial-line-wraps
+- make a rewrite pass at README
+- new skill: find shared code and move it to a shared library
+- add linter; include prevention of large code files
+- Add refactoring check for plan-feature and add-task
+- Figure out the right way to choose model as orchestrator w/ different workers; ensure plan mode is always opus; make opus write the plan and tasks instead of switching to sonnet
+- Update /add-task to include plans for comprehensive BDD test cases in each task; covers new test, changes to existing tests, and/or deprecations to existing tests; include expected inputs and outputs for each test case; clarify each test case as a either behavioral test or a throwaway unit test
+- Create a new EPIC for automating implement-task-v2.
+- Epic to rewrite existing `tests/`; find behavioral tests to keep and throw away the rest; write new tests to cover any missing behavioral test gaps; use the testing guide doce that's part of the `implement-task` for guidance
+- move shared references to a single location in the repo and use symlinks to them within each skill (if supported)
+- TODO: PLUGIN: group all skills as a plugin for namespacing

@@ -2,7 +2,7 @@
 id: TASK-071
 title: "Simplify implement-task/SKILL.md: cut stale/duplicated/over-explained content"
 type: docs
-status: todo
+status: wont-do
 epic: null
 created: 2026-09-19
 branch: task-071-simplify-implement-task-skill-md-cut-stale-duplicated-over-explained-content
@@ -94,3 +94,4 @@ _(empty — appended during implementation)_
   files, even though some carry the same "historical decision" phrasing style.
 - Not urgent: a pure readability/maintainability cleanup with no behavior change, hence end of
   TODO rather than competing with queued feature work.
+- Won't do (2026-09-23): superseded by the from-scratch rewrite in EPIC-005 / SPEC-005.
