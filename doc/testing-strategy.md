@@ -99,7 +99,8 @@ Then: ...
   - The pause kind is `manual_test_required`.
   - The agent presents the test and waits for the human's pass or fail.
   - Pass → merge.
-  - Fail → the failure is recorded in the Worklog, and the agent returns to `implement task`.
+  - Fail → the failure is recorded in the Worklog, the task isn't merged, and the batch stops.
+    The batch report records the failure.
 
 ## Unit tests
 
@@ -120,11 +121,10 @@ Then: ...
 | 3 | `references/testing-strategy.md` is written from this document. | TASK-073 (acceptance criterion updated) |
 | 4 | The report's Manual testing section uses the Given/When/Then + steps format. | TASK-074 (acceptance criterion updated) |
 | 5 | After validation, `build batch` scans for `[blocks merge]` tests and ASKs whether to proceed or adjust the batch. | TASK-076 (new acceptance criterion and manual test) |
-| 6 | The `manual_test_required` pause at `merge changes`, with the pass → merge and fail → rework paths. | TASK-077 (new acceptance criterion and manual test) |
+| 6 | The `manual_test_required` pause at `merge changes`: pass → merge; fail → the batch stops. | TASK-077 (new acceptance criterion and manual test) |
 | 7 | `plan-feature` and `add-task` write Testing strategy sections in this format. `plan-feature`'s review STOP prompts the human to mark `[blocks merge]` tests. | New follow-up task, outside EPIC-005 (v1 and the other skills aren't in the epic's scope) |
 | 8 | The task template's `## Testing strategy` placeholder shows the new format. | Same follow-up as #7 |
 
-Open decision: whether this document stays in `doc/` as the repo-level source, with the skill's
-reference doc pointing at it, or whether the skill's `references/testing-strategy.md` becomes
-the only copy. Vendored projects don't get `doc/`, which argues for the reference doc being
-self-contained.
+For now this document is the master copy, and the skill's reference doc is derived from it.
+Whether that stays the arrangement, since vendored projects don't get `doc/`, will be revisited
+later.

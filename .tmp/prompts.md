@@ -500,7 +500,7 @@ Perform a web search on best practices for behavioral tests, and use your findin
 
 Given that feedback, create a new document @doc/testing-strategy.md with plan. -->
 
-Notes on the additional decisions:
+<!-- Notes on the additional decisions:
 
 1. Agreed
 2. On pass it merged. On failure, it stops the batch.
@@ -509,7 +509,7 @@ Notes on the additional decisions:
 
 Keep doc/testing-strategy.md as the master copy for right now. I'll revisit this later.
 
-Don't implement the steps that you outlined in `Plan: applying this strategy to EPIC-005` yet. I have something else I want to do first.
+Don't implement the steps that you outlined in `Plan: applying this strategy to EPIC-005` yet. I have something else I want to do first. -->
 
 ---
 
