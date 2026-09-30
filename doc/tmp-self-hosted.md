@@ -296,7 +296,8 @@ sudo apt purge obsidian && sudo apt autoremove
    docker compose up -d
    docker compose ps -a        # affine_migration_job: Exited (0); affine_server: Up
    docker compose logs -f affine   # wait for the server to report it's listening, then Ctrl-C
-   curl -fsS -o /dev/null -w '%{http_code}\n' http://127.0.0.1:3010/   # 200
+   curl -sS -o /dev/null -w '%{http_code}\n' http://127.0.0.1:3010/
+   # 302 on a fresh server (it redirects to the initial admin setup); 200 once set up
    ```
 6. **Expose it** (AFFiNE syncs over WebSockets, which `tailscale serve` proxies automatically):
    ```bash
@@ -312,13 +313,156 @@ sudo apt purge obsidian && sudo apt autoremove
 9. **Verify:** edit a doc on the phone and confirm the change appears in the desktop browser
    within a few seconds, then test the reverse direction and a whiteboard (edgeless) page.
 
-### 5c. LLM / MCP access (optional, later)
+### 5c. LLM agent access (MCP)
 
-AFFiNE has a built-in MCP server (Settings → Integrations → MCP Server). It's read-only by
-default, and on self-hosted installs it needs **AI features enabled**, which means configuring
-an LLM provider under the `copilot` section of `config.json` or in the admin panel. Until then,
-community MCP servers that use AFFiNE's API are an alternative (e.g.
-[`DAWNCR0W/affine-mcp-server`](https://github.com/DAWNCR0W/affine-mcp-server)).
+**Verdict (checked against AFFiNE `v0.27.4` source, 2026-09-30):**
+
+| Option | Read | Create / update | Needs an AI provider key? | Use it? |
+|---|---|---|---|---|
+| A. Built-in MCP server | ✅ `read_document`, `doc_search` | ❌ write tools are compiled in but only registered on dev/canary builds | No; only the `copilot.enabled` switch | Read-only fallback |
+| B. [`DAWNCR0W/affine-mcp-server`](https://github.com/DAWNCR0W/affine-mcp-server) | ✅ | ✅ (Markdown create, append, block edits, databases, canvas) | No | **Yes, primary** |
+
+Why the built-in server is read-only on self-hosted: in
+`packages/backend/server/src/plugins/copilot/mcp/provider.ts`, `create_document`,
+`update_document`, and `update_document_meta` are registered only when
+`accessMode === READ_WRITE && (env.dev || env.namespaces.canary)`, and the same check blocks
+issuing read-write credentials. Upstream tracks lifting this in
+[toeverything/AFFiNE#15112](https://github.com/toeverything/AFFiNE/issues/15112) (open as of
+2026-09). Option B avoids the limitation because it signs in as a normal user (email/password →
+session cookie) and writes through the same WebSocket sync channel the web app uses.
+
+**Pivot criterion:** if Option B's smoke test (step B6) can't create, read back, and edit a doc,
+AFFiNE fails the "agent can read and write" requirement. Fall back per the
+[appendix](#appendix-documentation-tool-comparison) (Outline first: its built-in MCP server
+supports writes on self-hosted).
+
+**Prerequisites for both options:**
+
+- The workspace must be **server-backed**, not "local". Neither option can see browser-local
+  workspaces.
+- Claude Code runs on the MacBook, which reaches AFFiNE over the tailnet at
+  `https://rainbow-flame.taila02055.ts.net:8444`. Check with
+  `curl -sS -o /dev/null -w '%{http_code}\n' https://rainbow-flame.taila02055.ts.net:8444/`.
+- Optional but recommended: a dedicated agent account. In the admin panel
+  (`https://rainbow-flame.taila02055.ts.net:8444/admin` → Accounts), create a user such as
+  `claude-agent@…` with a password, then invite it to the workspace (Workspace settings →
+  Members). Docs it creates will show it in **Created by**, and you can revoke it without touching
+  your own login. Using your own account works too for testing.
+
+#### Option A: built-in MCP server (read-only)
+
+1. **Turn on AI features server-wide.** The MCP endpoint is behind the `copilot.enabled` switch.
+   It doesn't need a provider key; BYOK keys only power AI chat and semantic search. Use either:
+   - Admin panel → Settings → AI → enable AI features, **or**
+   - add this to `/home/mib/app/affine/config/config.json`, then run
+     `docker compose restart affine`:
+     ```json
+     "copilot": { "enabled": true }
+     ```
+2. **Find the Integrations page.** It's a **workspace** setting, not an account setting. Open
+   Settings (sidebar → workspace name menu → Settings). In the settings dialog's left column,
+   under the **workspace** group (Preferences, Properties, Members, **Integrations**, Storage,
+   …), pick **Integrations**.
+   - The **MCP Server** card is hidden when the workspace is local. That's the usual reason it's
+     missing.
+   - **AI BYOK** appears here too, only for the workspace owner/admin. Skip it; MCP doesn't need
+     it.
+3. **Create a credential:** MCP Server → create credential → name it (`claude-code`), access
+   mode **Read only** (read-write isn't offered on stable), and pick an expiry. Copy the
+   `aff_mcp_v1…` token and the workspace ID from the JSON snippet it shows. The token is shown
+   only once.
+4. **Test the endpoint directly** from the Mac:
+   ```bash
+   WS=<workspace-id>; TOKEN=aff_mcp_v1...
+   URL=https://rainbow-flame.taila02055.ts.net:8444/api/workspaces/$WS/mcp
+   curl -sS "$URL" -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+     -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
+   # expect: read_document and doc_search only
+   ```
+   A 403 `Copilot is disabled` means step 1 didn't take effect. `Authentication failed` means the
+   token is wrong, expired, or belongs to a different workspace.
+5. **Register it in Claude Code:**
+   ```bash
+   claude mcp add --scope user --transport http affine-builtin "$URL" \
+     --header "Authorization: Bearer $TOKEN"
+   claude mcp list   # affine-builtin … ✓ Connected
+   ```
+6. **Verify in a Claude Code session:** run `/mcp` (shows `affine-builtin` with 2 tools), then ask
+   *"Use affine-builtin to search for <a word in one of your docs> and read the top result."*
+
+`doc_search` depends on AFFiNE's search indexer, which the stock compose file disables
+(`AFFINE_INDEXER_ENABLED=false`). If search comes back empty, `read_document` with a known doc
+ID still works. The doc ID is the last path segment of the doc's URL.
+
+Not recommended: setting `AFFINE_ENV=dev` on the server would unlock the write tools, but that
+namespace also changes auth guards, sync, static-file serving, and more across the backend.
+
+#### Option B: `affine-mcp-server` (read + write) — recommended
+
+A community, MIT-licensed server, very active (v3.8.4 released 2026-09-29), ~290 GitHub stars,
+with an end-to-end test suite that runs against a Docker AFFiNE stack. It runs on the Mac as a
+local stdio process that Claude Code starts, so nothing new runs on rainbow-flame.
+
+1. **Check Node.js** (20.18.1+ required): `node --version`
+2. **Install**, pinned:
+   ```bash
+   npm i -g affine-mcp-server@3.8.4
+   affine-mcp --version
+   ```
+3. **Log in.** This stores the URL, credentials, and default workspace in
+   `~/.config/affine-mcp/config` (mode 600):
+   ```bash
+   affine-mcp login --save-credentials
+   # URL:        https://rainbow-flame.taila02055.ts.net:8444
+   # Method:     email/password (use the agent account, or your own for testing)
+   # Workspace:  pick the server-backed workspace
+   ```
+   `--save-credentials` stores the password so the server can renew its session on its own.
+   Without it, you'll have to re-run `login` whenever the session expires.
+4. **Check it from the CLI:**
+   ```bash
+   affine-mcp status        # config resolves, sign-in works
+   affine-mcp doctor        # connectivity diagnostics
+   affine-mcp workspaces    # your workspace is listed and marked default
+   ```
+5. **Register it in Claude Code.** User scope makes it available in every project. The
+   `authoring` profile exposes create/edit tools but leaves out destructive ones
+   (`delete_doc`, `replace_doc_with_markdown`) and admin tools:
+   ```bash
+   claude mcp add --scope user -e AFFINE_TOOL_PROFILE=authoring affine -- affine-mcp
+   claude mcp list   # affine … ✓ Connected
+   ```
+   Switch to `AFFINE_TOOL_PROFILE=full` later if you want the agent to delete or fully replace
+   docs.
+6. **Smoke test in a Claude Code session.** Run `/mcp` and confirm `affine` is connected with its
+   tools listed. Then run these prompts in order:
+   1. *"Using the affine MCP server, list my workspaces and the 5 most recently updated docs."*
+   2. *"Create a doc titled `MCP smoke test` from this markdown: a heading, a bulleted list of 3
+      items, and a fenced code block. Return its doc ID."* (`create_doc_from_markdown`)
+   3. *"Read that doc back and export it as markdown."* (`read_doc`, `export_doc_markdown`)
+   4. *"Append a section `## Update` with one paragraph, then change the first bullet's text to
+      `edited by agent`."* (`append_markdown`, `update_block`)
+   5. Open the doc in the browser **and** on the phone. Confirm the heading, list, code block,
+      appended section, and edited bullet all render, and that edits you make there are visible
+      when you ask Claude to read the doc again.
+   6. Delete `MCP smoke test` by hand in the AFFiNE UI (the `authoring` profile can't delete).
+
+   **Pass** = steps 2–5 all succeed. **Fail** = any write errors out or doesn't appear in the UI.
+   First try `affine-mcp doctor`; if it still fails, pivot (see the pivot criterion above).
+
+#### Other AFFiNE MCP options found (2026-09-30)
+
+- [`emmabyte-engineering/affine-mcp`](https://github.com/emmabyte-engineering/affine-mcp)
+  (`@emmabyte-eng/affine-mcp` on npm): self-hosted-focused, read/write, mermaid and table helpers.
+  But it was created and last pushed on 2026-03-06, with 0 stars. Treat it as abandoned; only a
+  fallback if Option B breaks.
+- Forks of DAWNCR0W's server (HughArch, anpavlov, vadzhipov, werring, …): no advantage over
+  upstream.
+- Direct HTTP read, no MCP: `GET /workspace/<workspace-id>/<doc-id>` with
+  `Accept: text/markdown` returns a doc as markdown for an authenticated caller. It's read-only
+  and good for scripts.
+- Built-in write tools (Option A with read-write): wait for upstream #15112. Re-check after each
+  AFFiNE upgrade (§5d) by creating a credential and looking for a **Read & write** access mode.
 
 ### 5d. Upgrading
 
@@ -367,6 +511,7 @@ Keep this table accurate. It's the checklist for moving everything to a new host
 | SparkyFitness | `/home/mib/app/sparkyfitness` | Postgres + uploads (check `docker-compose.yml` for volume/bind names) | DB password, API encryption key, `BETTER_AUTH_SECRET` | `SPARKY_FITNESS_FRONTEND_URL`, `SPARKY_FITNESS_EXTRA_TRUSTED_ORIGINS`; loopback bind in `docker-compose.yml` | `:3004 → 127.0.0.1:3004` |
 | Kaneo | `/home/mib/app/kaneo` | Docker volume `kaneo_postgres_data` | `POSTGRES_PASSWORD`, `AUTH_SECRET` | `KANEO_CLIENT_URL` | `:8443 → 127.0.0.1:5173` |
 | AFFiNE | `/home/mib/app/affine` | `./data/postgres`, `./data/storage` (uploads/blobs), `./config` | none by default (Postgres uses trust auth); LLM API key if AI is enabled | `server.externalUrl` in `config/config.json`; server URL in each mobile app; loopback bind in `compose.yml` | `:8444 → 127.0.0.1:3010` |
+| AFFiNE MCP (on the Mac, not the server) | `~/.config/affine-mcp/config`; Claude Code user MCP config (`claude mcp list`) | none | agent account password (in the affine-mcp config); built-in `aff_mcp_v1…` token if Option A is used | AFFiNE URL: re-run `affine-mcp login`; built-in endpoint URL: `claude mcp remove affine-builtin` and re-add | n/a |
 
 ### Moving to a new host
 
@@ -382,8 +527,8 @@ Keep this table accurate. It's the checklist for moving everything to a new host
 4. Restore the dumps into the new Postgres containers.
 5. Update the host-specific URLs in the table above, run `docker compose up -d`, and re-run the
    `tailscale serve` commands.
-6. If the host name changed, update AFFiNE's `externalUrl` and re-add the server in the AFFiNE
-   mobile app.
+6. If the host name changed, update AFFiNE's `externalUrl`, re-add the server in the AFFiNE
+   mobile app, and on the Mac re-run `affine-mcp login` (plus re-add `affine-builtin` if used).
 7. Remove the old host's serve config with `sudo tailscale serve reset`.
 
 ---
@@ -420,7 +565,7 @@ Legend: ✅ strong, 🟡 partial or with caveats, ❌ missing.
 | WYSIWYG in the browser | ✅ | ✅ | ✅ | ✅ (older-style editor) | ✅ | ✅ | ❌ streamed desktop app only |
 | Mobile web | 🟡 | 🟡 good for reading, OK for editing | 🟡 | 🟡 fine | 🟡 | 🟡 separate mobile layout | ❌ |
 | Native app for your own server | ✅ iOS/Android | ❌ | ❌ | ❌ | ✅ | ❌ | ✅ but syncs via LiveSync, not the server |
-| LLM / MCP access | 🟡 built-in, but self-hosted needs AI features on; read-only by default | ✅ built-in `/mcp` endpoint, works self-hosted | 🟡 built-in one needs a paid licence; community servers use the free API | 🟡 community server over a solid REST API | 🟡 community | 🟡 API + community | 🟡 via a community plugin, or just read the files |
+| LLM / MCP access | 🟡 built-in is read-only on stable self-hosted; read/write via the community `affine-mcp-server` (§5c) | ✅ built-in `/mcp` endpoint, works self-hosted | 🟡 built-in one needs a paid licence; community servers use the free API | 🟡 community server over a solid REST API | 🟡 community | 🟡 API + community | 🟡 via a community plugin, or just read the files |
 | Stability | 🟡 rapid releases, rough edges | ✅ mature, several years in production | 🟡 young (2024), moving fast | ✅ very mature (2015–) | 🟡 complex server stack | ✅ | ✅ app, 🟡 self-hosted setup |
 | Community | ✅ large | ✅ large | 🟡 growing fast | ✅ steady | ✅ large | 🟡 | ✅ huge |
 | Plugins | 🟡 limited | ❌ integrations only | ❌ | 🟡 theme/hook system | ❌ | ✅ scripting | ✅ best in class |

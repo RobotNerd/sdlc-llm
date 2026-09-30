@@ -606,7 +606,17 @@ Update @doc/tmp-self-hosted.md:
 - Add AFFiNE install instructions.
 - Add a section capturing your comparison of documentation tools. Include a note that if AFFiNE falls through, I will try Outline, Docmost, and/or BookStack. -->
 
-One change to the doc. The command `curl -fsS -o /dev/null -w '%{http_code}\n' http://127.0.0.1:3010/` when setting up affine will return a 302. This is because it redirects you to create the initial user account when first accessing the site.
+<!-- Make some updates to @doc/tmp-self-hosted.md.
+
+First of all, the command `curl -fsS -o /dev/null -w '%{http_code}\n' http://127.0.0.1:3010/` when setting up affine will return a 302. This is because it redirects you to create the initial user account when first accessing the site. I was able to reach the URL in the browser and configure it just fine.
+
+The bigger change: I want you to add step-by-step instructions for setting up an MCP server along with steps to test and verify it via claude code. This is a critical feature for me, because I want the LLM agent to read and write (create, update) docs in affine. I want to know if this will work now so that I can pivot to another tool if it doesn't.
+
+Create two sets of instructions for using AFFiNE MCP:
+1. Using the built-in MCP server. I tried enabling AI support in the AFFiNE settings under the `AI BYOK` section, but I'm not sure what exactly I need to configure. This section references `Settings > Integrations` but I don't see that section anywhere in the AFFiNE settings.
+2. Using this MCP server: https://github.com/DAWNCR0W/affine-mcp-server. It looks like a community plugin to me, so I'm hoping it gets around the need to sign up with a provider in the AFFiNE configuration in order to enable MCP access.
+
+Also perform a web search to determine if there are any other options for setting up AFFiNE MCP beyond the two approaches I listed above. -->
 
 ---
 
