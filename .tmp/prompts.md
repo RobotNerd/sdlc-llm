@@ -584,6 +584,30 @@ api-BQ-8BZLf.js:1:1359
 
 Give me instructions to resolve this issue and update the document to include the steps. -->
 
+<!-- I got obsidian running...and I think I hate it. It seems to be the hot new documentation tool for self-hosting that everyone is using alongside AI agents, but I do not like the UX. The setup process was not streamlined, which makes me worry about the longetivity of this product.
+
+Here are the features I'm looking for in a self-hosted documentation tool:
+- Acts as the source of truth for documentation: docs for multiple projects like sdlc, my personal notes, etc.
+- Has a WYSIWYG in-browser editor.
+- Can be used from a desktop browser or mobile.
+- Ideally has a mobile app that connects to my self-hosted server, but I'm willing to use mobile-web if the UX is solid.
+- Easy for an LLM agent to interact with it, e.g. MCP.
+- Stable
+- There's an active community.
+- Nice to have: supports plugins/extensions.
+- Similar services I've used and liked: Notion, Confluence.
+
+Perform an analysis of popular documentation tools to compare and contrast them on these features. Include Obsidian in the analysis. -->
+
+<!-- I reviewed those options and decided to give AFFiNE a try. It seems stable enough, and the mobile app makes it worth a shot. The miro-style canvas seems like it could come in handy. If it doesn't work out, I can try falling back to other options, like Outline, Docmost, or BookStack, which all look good.
+
+Update @doc/tmp-self-hosted.md:
+- Remove obsidian.
+- Add AFFiNE install instructions.
+- Add a section capturing your comparison of documentation tools. Include a note that if AFFiNE falls through, I will try Outline, Docmost, and/or BookStack. -->
+
+One change to the doc. The command `curl -fsS -o /dev/null -w '%{http_code}\n' http://127.0.0.1:3010/` when setting up affine will return a 302. This is because it redirects you to create the initial user account when first accessing the site.
+
 ---
 
 Suggestions:

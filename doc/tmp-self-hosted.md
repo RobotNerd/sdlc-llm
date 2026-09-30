@@ -1,7 +1,6 @@
 # Self-hosted services on `rainbow-flame`: installation plan
 
-Temporary plan for hosting **SparkyFitness**, **Kaneo**, and **Obsidian with LiveSync** on
-`rainbow-flame`. It also records where each service lives, so they can be moved to another host
+Temporary plan for hosting **SparkyFitness**, **Kaneo**, and **AFFiNE** on `rainbow-flame`. It also records where each service lives, so they can be moved to another host
 later (see [Migration inventory](#migration-inventory)).
 
 | | |
@@ -42,8 +41,7 @@ number is both served by Tailscale and bound by Docker on all interfaces (Sparky
 |---|---|---|
 | SparkyFitness | `127.0.0.1:3004` | `https://rainbow-flame.taila02055.ts.net:3004/` |
 | Kaneo | `127.0.0.1:5173` | `https://rainbow-flame.taila02055.ts.net:8443/` |
-| Obsidian (web UI) | `127.0.0.1:3001` (HTTPS, self-signed) | `https://rainbow-flame.taila02055.ts.net:8444/` |
-| CouchDB (LiveSync) | `127.0.0.1:5984` | `https://rainbow-flame.taila02055.ts.net:6984/` |
+| AFFiNE | `127.0.0.1:3010` | `https://rainbow-flame.taila02055.ts.net:8444/` |
 
 ---
 
@@ -228,161 +226,112 @@ remove the stale containers before step 4.
 
 ---
 
-## 5. Obsidian (web) + LiveSync
+## 5. AFFiNE (docs, notes, whiteboards)
 
-LiveSync syncs through a **CouchDB** server, not through the hosted Obsidian. The phone, the
-hosted Obsidian, and any desktop Obsidian are all clients of CouchDB. The hosted Obsidian just
-gives you a browser-accessible, always-on vault.
+AFFiNE is the self-hosted documentation tool: a Notion-style doc editor plus a Miro-style canvas,
+in the browser and in native iOS/Android apps that connect to this server. See
+[Appendix: documentation tool comparison](#appendix-documentation-tool-comparison) for why it was
+picked and what to fall back to.
 
+The stack is four containers from AFFiNE's official self-host compose file (release `v0.27.4`):
+`affine_server` (web UI + API), a one-shot `affine_migration` job, Postgres (with pgvector), and
+Redis.
+
+### 5a. Tear down the Obsidian attempt
+
+Skip any command whose target doesn't exist.
+
+```bash
+# Obsidian web container (and CouchDB, if you got as far as LiveSync)
+cd /home/mib/app/obsidian && docker compose down
+cd /home/mib/app/couchdb 2>/dev/null && docker compose down
+sudo tailscale serve --https=8444 off
+sudo tailscale serve --https=6984 off 2>/dev/null
+# Keep any notes you want to carry over, then delete the dirs
+ls /home/mib/app/obsidian/config
+rm -rf /home/mib/app/obsidian /home/mib/app/couchdb
+# The apt-installed desktop app, if it's still there
+sudo apt purge obsidian && sudo apt autoremove
 ```
- phone Obsidian ─┐
- web Obsidian  ──┼──► CouchDB (https://…:6984) ◄── desktop Obsidian (optional)
-                 └─ all sync the same end-to-end-encrypted database
-```
 
-### 5a. Remove the `apt`-installed Obsidian
+### 5b. Install
 
-The current install is the desktop app from `apt`. It only shows on the machine's own display,
-so other devices can't reach it in a browser. Replace it with the container in 5b.
-
-1. **Back up any vaults it created** (usually none yet, since it was never configured). The
-   desktop app lists its vault paths in its config file:
+1. **Create the directory** and pull the official compose file, pinned to a release:
    ```bash
-   cat ~/.config/obsidian/obsidian.json 2>/dev/null   # "vaults": { … "path": "…" }
-   # copy any listed vault dirs somewhere safe, e.g.
-   # cp -a "<vault path>" ~/obsidian-vault-backup/
+   mkdir -p /home/mib/app/affine/{config,data} && cd /home/mib/app/affine
+   curl -fsSL -o compose.yml \
+     https://github.com/toeverything/affine/releases/download/v0.27.4/docker-compose.yml
    ```
-2. **Uninstall the package and its settings:**
-   ```bash
-   apt list --installed 2>/dev/null | grep -i obsidian   # confirm the package name
-   sudo apt purge obsidian
-   sudo apt autoremove
-   rm -rf ~/.config/obsidian   # desktop app settings only; vault dirs are separate
-   ```
+2. **Edit `compose.yml`** in two places:
+   - Bind the server to loopback. Under `affine:`, change `'3010:3010'` to:
+     ```yaml
+         ports:
+           - '127.0.0.1:3010:3010'
+     ```
+   - Pin the image by replacing both `ghcr.io/toeverything/affine:stable` lines with
+     `ghcr.io/toeverything/affine:${AFFINE_REVISION:-stable}`. Then `AFFINE_REVISION` in `.env`
+     controls upgrades.
 
-### 5b. Install Obsidian with Docker
-
-This uses the [`lscr.io/linuxserver/obsidian`](https://docs.linuxserver.io/images/docker-obsidian/)
-image, which runs the Obsidian desktop app inside the container and streams it to a browser tab.
-
-1. **Create the directory and look up your IDs:**
-   ```bash
-   mkdir -p /home/mib/app/obsidian/config && cd /home/mib/app/obsidian
-   id -u; id -g   # use these for PUID / PGID below
-   ```
-2. **`/home/mib/app/obsidian/.env`:**
+   Leave the rest as shipped. Postgres uses `trust` auth, which is safe here only because it
+   publishes no ports and is reachable only on the compose network.
+3. **`/home/mib/app/affine/.env`:**
    ```env
-   PUID=1000
-   PGID=1000
+   AFFINE_REVISION=stable
    TZ=America/Los_Angeles
-   OBSIDIAN_USER=mib
-   OBSIDIAN_PASSWORD=<openssl rand -hex 16>
    ```
-   `OBSIDIAN_USER` and `OBSIDIAN_PASSWORD` are the basic-auth login for the web UI.
-3. **`/home/mib/app/obsidian/compose.yml`:**
-   ```yaml
-   services:
-     obsidian:
-       image: lscr.io/linuxserver/obsidian:latest
-       container_name: obsidian
-       security_opt:
-         - seccomp:unconfined
-       environment:
-         - PUID=${PUID}
-         - PGID=${PGID}
-         - TZ=${TZ}
-         - CUSTOM_USER=${OBSIDIAN_USER}
-         - PASSWORD=${OBSIDIAN_PASSWORD}
-       volumes:
-         - ./config:/config         # vaults + Obsidian settings live here
-       ports:
-         - "127.0.0.1:3001:3001"    # HTTPS (self-signed) web UI
-       shm_size: "1gb"
-       restart: unless-stopped
+4. **`/home/mib/app/affine/config/config.json`.** This sets the public URL. It has to match the
+   URL the browser and apps use, port included. If it doesn't, links, invites, and sign-in
+   redirects break.
+   ```json
+   {
+     "$schema": "https://github.com/toeverything/affine/releases/latest/download/config.schema.json",
+     "server": {
+       "name": "rainbow-flame",
+       "externalUrl": "https://rainbow-flame.taila02055.ts.net:8444"
+     }
+   }
    ```
-4. **Start it and expose it:**
+5. **Start it.** The migration job runs first and exits, then the server starts:
    ```bash
    docker compose up -d
-   docker compose logs -f obsidian   # wait for the web server to come up, then Ctrl-C
-   # upstream is self-signed HTTPS, so tell serve not to verify it
-   sudo tailscale serve --bg --https=8444 https+insecure://127.0.0.1:3001
+   docker compose ps -a        # affine_migration_job: Exited (0); affine_server: Up
+   docker compose logs -f affine   # wait for the server to report it's listening, then Ctrl-C
+   curl -fsS -o /dev/null -w '%{http_code}\n' http://127.0.0.1:3010/   # 200
    ```
-5. **Verify:** open `https://rainbow-flame.taila02055.ts.net:8444/`, log in with the basic-auth
-   credentials, and confirm the Obsidian window appears. Create a vault under the container's
-   `/config` path so it's stored in `/home/mib/app/obsidian/config/` on the host. If you backed
-   up a vault in 5a, copy it into `/home/mib/app/obsidian/config/` first and open it as an
-   existing vault.
-
-Upgrading: `docker compose pull && docker compose up -d`. The data in `./config` stays in place.
-
-### 5c. CouchDB for LiveSync (`/home/mib/app/couchdb/`)
-
-1. **Compose file** (`/home/mib/app/couchdb/compose.yml`):
-   ```yaml
-   services:
-     couchdb:
-       image: couchdb:3
-       container_name: couchdb-livesync
-       environment:
-         - COUCHDB_USER=${COUCHDB_USER}
-         - COUCHDB_PASSWORD=${COUCHDB_PASSWORD}
-       volumes:
-         - ./data:/opt/couchdb/data
-         - ./etc:/opt/couchdb/etc/local.d
-       ports:
-         - "127.0.0.1:5984:5984"
-       restart: unless-stopped
-   ```
-   `.env` in the same directory:
-   ```env
-   COUCHDB_USER=livesync-admin
-   COUCHDB_PASSWORD=<openssl rand -hex 24>
-   ```
-2. **Start it and provision it for LiveSync.** The init script sets single-node mode,
-   `require_valid_user`, CORS for `app://obsidian.md` / `capacitor://localhost` /
-   `http://localhost`, and the request-size limits:
+6. **Expose it** (AFFiNE syncs over WebSockets, which `tailscale serve` proxies automatically):
    ```bash
-   cd /home/mib/app/couchdb && docker compose up -d
-   # the upstream provisioning script requires Deno 2
-   curl -fsSL https://deno.land/install.sh | sh
-   export hostname=http://127.0.0.1:5984
-   export username=livesync-admin
-   export password=<COUCHDB_PASSWORD>
-   export database=obsidiannotes
-   curl -s https://raw.githubusercontent.com/vrtmrz/obsidian-livesync/main/utils/couchdb/couchdb-init.sh | bash
-   # expect: "CouchDB provisioning completed."
+   sudo tailscale serve --bg --https=8444 http://127.0.0.1:3010
    ```
-3. **Expose it over HTTPS.** Obsidian mobile requires a valid certificate. The Tailscale cert is
-   valid, and this stays tailnet-only, so no internet exposure is needed:
-   ```bash
-   sudo tailscale serve --bg --https=6984 http://127.0.0.1:5984
-   curl -u livesync-admin:<pw> https://rainbow-flame.taila02055.ts.net:6984/_up   # {"status":"ok"}
-   ```
-4. **Generate a Setup URI** (works on any machine with Deno):
-   ```bash
-   export hostname=https://rainbow-flame.taila02055.ts.net:6984
-   export database=obsidiannotes
-   export username=livesync-admin
-   export password=<COUCHDB_PASSWORD>
-   export passphrase=<vault E2E encryption passphrase — store it in your password manager>
-   deno run --minimum-dependency-age=0 --allow-env \
-     https://raw.githubusercontent.com/vrtmrz/obsidian-livesync/main/utils/setup/generate_setup_uri.ts
-   ```
-   Save the `obsidian://setuplivesync?settings=…` URI and the passphrase it prints, both in your
-   password manager.
+7. **Create the admin account.** Open `https://rainbow-flame.taila02055.ts.net:8444/` from
+   another tailnet device. A fresh server sends you to the admin setup (`/admin`). Create the
+   first account there; it becomes the server admin. Then create a workspace and **choose this
+   server as its location, not "local"**. Local workspaces live only in that browser.
+8. **Connect the phone:** make sure the Tailscale app is connected → install AFFiNE from the App
+   Store / Play Store → sign in → add a self-hosted server with
+   `https://rainbow-flame.taila02055.ts.net:8444` → log in with the account from step 7.
+9. **Verify:** edit a doc on the phone and confirm the change appears in the desktop browser
+   within a few seconds, then test the reverse direction and a whiteboard (edgeless) page.
 
-### 5d. Connect the clients
+### 5c. LLM / MCP access (optional, later)
 
-1. **Web Obsidian (first, since it seeds the database):** open the vault → Settings → Community
-   plugins → turn on community plugins → Browse → install and enable **Self-hosted LiveSync** →
-   run the command palette's "Use the copied setup URI" (or the plugin's setup wizard) → paste
-   the URI and passphrase → choose that this device is the **first/main** device and let it
-   upload.
-2. **Phone:** make sure the Tailscale app is connected → install Obsidian → create an empty vault
-   with the same name → install and enable Self-hosted LiveSync → apply the same setup URI →
-   choose to fetch from the remote.
-3. **Verify:** edit a note on the phone and confirm the change appears in the web UI within a few
-   seconds, then test the reverse direction.
+AFFiNE has a built-in MCP server (Settings → Integrations → MCP Server). It's read-only by
+default, and on self-hosted installs it needs **AI features enabled**, which means configuring
+an LLM provider under the `copilot` section of `config.json` or in the admin panel. Until then,
+community MCP servers that use AFFiNE's API are an alternative (e.g.
+[`DAWNCR0W/affine-mcp-server`](https://github.com/DAWNCR0W/affine-mcp-server)).
+
+### 5d. Upgrading
+
+Back up first (see [Moving to a new host](#moving-to-a-new-host), step 2), then:
+
+```bash
+cd /home/mib/app/affine
+# set AFFINE_REVISION in .env if pinned, then:
+docker compose pull && docker compose up -d   # migration job runs again automatically
+```
+
+Also grab the newer release's `docker-compose.yml` and diff it against yours, keeping your two
+edits from step 2.
 
 ---
 
@@ -400,9 +349,7 @@ https://rainbow-flame.taila02055.ts.net:3004 (tailnet only)
 https://rainbow-flame.taila02055.ts.net:8443 (tailnet only)
 |-- / proxy http://127.0.0.1:5173
 https://rainbow-flame.taila02055.ts.net:8444 (tailnet only)
-|-- / proxy https+insecure://127.0.0.1:3001
-https://rainbow-flame.taila02055.ts.net:6984 (tailnet only)
-|-- / proxy http://127.0.0.1:5984
+|-- / proxy http://127.0.0.1:3010
 ```
 
 `--bg` keeps the config across reboots. Docker's `restart: unless-stopped` covers the
@@ -419,19 +366,98 @@ Keep this table accurate. It's the checklist for moving everything to a new host
 |---|---|---|---|---|---|
 | SparkyFitness | `/home/mib/app/sparkyfitness` | Postgres + uploads (check `docker-compose.yml` for volume/bind names) | DB password, API encryption key, `BETTER_AUTH_SECRET` | `SPARKY_FITNESS_FRONTEND_URL`, `SPARKY_FITNESS_EXTRA_TRUSTED_ORIGINS`; loopback bind in `docker-compose.yml` | `:3004 → 127.0.0.1:3004` |
 | Kaneo | `/home/mib/app/kaneo` | Docker volume `kaneo_postgres_data` | `POSTGRES_PASSWORD`, `AUTH_SECRET` | `KANEO_CLIENT_URL` | `:8443 → 127.0.0.1:5173` |
-| Obsidian web | `/home/mib/app/obsidian` | `./config` (vault + app settings) | `OBSIDIAN_PASSWORD` | none (URL only in bookmarks) | `:8444 → https+insecure://127.0.0.1:3001` |
-| CouchDB | `/home/mib/app/couchdb` | `./data`, `./etc` | `COUCHDB_PASSWORD`, LiveSync E2E passphrase | Setup URI `hostname` (regenerate it; re-apply on each client) | `:6984 → 127.0.0.1:5984` |
+| AFFiNE | `/home/mib/app/affine` | `./data/postgres`, `./data/storage` (uploads/blobs), `./config` | none by default (Postgres uses trust auth); LLM API key if AI is enabled | `server.externalUrl` in `config/config.json`; server URL in each mobile app; loopback bind in `compose.yml` | `:8444 → 127.0.0.1:3010` |
 
 ### Moving to a new host
 
 1. On the old host, run `docker compose down` in each `/home/mib/app/*` directory.
-2. Dump the databases that live in named volumes: for Kaneo, run
-   `docker compose exec postgres pg_dump -U kaneo kaneo > kaneo.sql` (before the `down`), and do
-   the same for SparkyFitness's Postgres.
+2. Before the `down`, dump every Postgres database:
+   - Kaneo: `docker compose exec postgres pg_dump -U kaneo kaneo > kaneo.sql`
+   - AFFiNE: `docker compose exec postgres pg_dump -U affine affine > affine.sql`
+   - SparkyFitness: do the same for its Postgres.
+
+   Bind-mounted data dirs copy fine when the stack is stopped, but a dump is the version-safe
+   backup.
 3. Copy all of `/home/mib/app/` with `rsync -aHAX`, which preserves ownership for bind mounts.
 4. Restore the dumps into the new Postgres containers.
 5. Update the host-specific URLs in the table above, run `docker compose up -d`, and re-run the
    `tailscale serve` commands.
-6. If the host name changed, regenerate the LiveSync Setup URI and re-apply it on every client.
-   The data in CouchDB carries over as-is.
+6. If the host name changed, update AFFiNE's `externalUrl` and re-add the server in the AFFiNE
+   mobile app.
 7. Remove the old host's serve config with `sudo tailscale serve reset`.
+
+---
+
+## Appendix: documentation tool comparison
+
+**Decision (2026-09): AFFiNE.** Obsidian was tried and rejected. Its "self-hosted" mode is the
+desktop app streamed into a browser tab (plus a separate CouchDB for LiveSync), and the setup
+felt clumsy and fragile. AFFiNE won because it has a native mobile app that connects to a
+self-hosted server, plus a Miro-style canvas.
+
+**Fallback plan:** if AFFiNE doesn't work out, try **Outline**, then **Docmost**, and/or
+**BookStack**. All three are Docker Compose installs that fit the same pattern as §5 (loopback
+port, `tailscale serve` on `:8444`).
+
+### Requirements
+
+- Source of truth for docs across projects (sdlc-llm, personal notes, …)
+- WYSIWYG in-browser editor
+- Usable from a desktop browser and from mobile
+- Ideally a native mobile app that talks to the self-hosted server; otherwise a solid mobile web UI
+- Easy for LLM agents to use (MCP)
+- Stable, with an active community
+- Nice to have: plugins/extensions
+- Reference points: Notion, Confluence
+
+### Scorecard
+
+Legend: ✅ strong, 🟡 partial or with caveats, ❌ missing.
+
+| | AFFiNE | Outline | Docmost | BookStack | AppFlowy | TriliumNext | Obsidian |
+|---|---|---|---|---|---|---|---|
+| Feels like | Notion + whiteboard | Notion + Confluence | Confluence | Structured wiki | Notion | Personal notes tree | Local markdown vault |
+| WYSIWYG in the browser | ✅ | ✅ | ✅ | ✅ (older-style editor) | ✅ | ✅ | ❌ streamed desktop app only |
+| Mobile web | 🟡 | 🟡 good for reading, OK for editing | 🟡 | 🟡 fine | 🟡 | 🟡 separate mobile layout | ❌ |
+| Native app for your own server | ✅ iOS/Android | ❌ | ❌ | ❌ | ✅ | ❌ | ✅ but syncs via LiveSync, not the server |
+| LLM / MCP access | 🟡 built-in, but self-hosted needs AI features on; read-only by default | ✅ built-in `/mcp` endpoint, works self-hosted | 🟡 built-in one needs a paid licence; community servers use the free API | 🟡 community server over a solid REST API | 🟡 community | 🟡 API + community | 🟡 via a community plugin, or just read the files |
+| Stability | 🟡 rapid releases, rough edges | ✅ mature, several years in production | 🟡 young (2024), moving fast | ✅ very mature (2015–) | 🟡 complex server stack | ✅ | ✅ app, 🟡 self-hosted setup |
+| Community | ✅ large | ✅ large | 🟡 growing fast | ✅ steady | ✅ large | 🟡 | ✅ huge |
+| Plugins | 🟡 limited | ❌ integrations only | ❌ | 🟡 theme/hook system | ❌ | ✅ scripting | ✅ best in class |
+| Multiple projects | ✅ workspaces | ✅ collections + permissions | ✅ spaces + permissions | ✅ shelves/books | ✅ workspaces | 🟡 one tree | 🟡 one vault per project |
+| Setup effort | ✅ Docker Compose | 🟡 needs a login provider (OIDC/Google/Slack, or email via SMTP) | ✅ Docker Compose, simple | ✅ simple | ❌ many services | ✅ one container | ❌ |
+| Licence | Open source (MIT) + paid tier | Source-available (BSL; self-hosting allowed) | Open source (AGPL) | Open source (MIT) | Open source (AGPL) | Open source (AGPL) | Proprietary app, open file format |
+
+Left out because they don't let you edit in the browser: Joplin, Anytype, Logseq. Notion and
+Confluence themselves can't realistically be self-hosted (Confluence Data Center is
+enterprise-priced).
+
+### Notes on the fallbacks
+
+- **Outline**
+  - The closest to Notion, in both editing and organisation (collections, nested docs).
+  - Its built-in MCP server works on self-hosted installs without a paid tier (Settings → AI),
+    and it has a good REST API.
+  - Costs: you must set up a login provider (a self-hosted OIDC provider such as Pocket ID,
+    Authentik, or Authelia fits the home-network plan), and there's no native mobile app.
+- **Docmost**
+  - The most Confluence-like: spaces, page trees, permissions, and built-in diagrams (draw.io,
+    Excalidraw, Mermaid).
+  - The easiest of the three to install.
+  - Its built-in MCP server needs the paid Business licence, so you'd use a community MCP server.
+  - It's younger than Outline, so a bigger bet on longevity.
+- **BookStack**
+  - Very stable, easy to run, with a good API and a capable community MCP server.
+  - The trade-off is a traditional wiki look and feel, not Notion's.
+
+Whichever tool is in use, sdlc-llm's `.tasks/` specs stay as markdown in the repo, because the
+workflow depends on them. The docs tool holds notes and longer-form docs, reached by agents over
+MCP.
+
+Sources (checked 2026-09):
+[Outline MCP guide](https://mcp.directory/blog/outline-mcp-complete-guide-2026),
+[Docmost MCP docs](https://docmost.com/docs/user-guide/mcp),
+[docmost-mcp-oss](https://github.com/abelsr/docmost-mcp-oss),
+[AFFiNE MCP](https://affine.pro/mcp),
+[AFFiNE self-host](https://affine.pro/self-host),
+[bookstack-mcp-server](https://github.com/pnocera/bookstack-mcp-server).
