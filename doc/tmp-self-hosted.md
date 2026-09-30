@@ -1,7 +1,8 @@
 # Self-hosted services on `rainbow-flame`: installation plan
 
-Temporary plan for hosting **SparkyFitness**, **Kaneo**, and **AFFiNE** on `rainbow-flame`. It also records where each service lives, so they can be moved to another host
-later (see [Migration inventory](#migration-inventory)).
+Temporary plan for hosting **SparkyFitness**, **Kaneo**, **AFFiNE**, and **Outline** (on trial,
+with **Pocket ID** for sign-in) on `rainbow-flame`. It also records where each service lives, so
+they can be moved to another host later (see [Migration inventory](#migration-inventory)).
 
 | | |
 |---|---|
@@ -42,6 +43,8 @@ number is both served by Tailscale and bound by Docker on all interfaces (Sparky
 | SparkyFitness | `127.0.0.1:3004` | `https://rainbow-flame.taila02055.ts.net:3004/` |
 | Kaneo | `127.0.0.1:5173` | `https://rainbow-flame.taila02055.ts.net:8443/` |
 | AFFiNE | `127.0.0.1:3010` | `https://rainbow-flame.taila02055.ts.net:8444/` |
+| Outline | `127.0.0.1:3000` | `https://rainbow-flame.taila02055.ts.net:8445/` |
+| Pocket ID (sign-in for Outline) | `127.0.0.1:1411` | `https://rainbow-flame.taila02055.ts.net:8446/` |
 
 ---
 
@@ -479,7 +482,290 @@ edits from step 2.
 
 ---
 
-## 6. Final serve config and checks
+## 6. Outline (trial alongside AFFiNE)
+
+Outline runs next to AFFiNE so the two can be compared. Unlike AFFiNE, its **built-in MCP
+server supports writes on self-hosted installs**. It's on by default and accepts a plain API key,
+so no community server or workarounds are needed. Mobile is a PWA ("Add to Home Screen") rather
+than a native app, per [Outline's mobile guide](https://docs.getoutline.com/s/guide/doc/mobile-Ez4bmY6VDD).
+
+Versions checked (2026-09-30): Outline `v1.10.1`, Pocket ID `v2.16.0`.
+
+### 6a. Why Pocket ID: Outline has no passwords
+
+Outline has no local username/password login. The first account **must** come from an SSO
+provider (Slack, Google, Microsoft, Discord, or generic OIDC). Email magic-link sign-in exists,
+but only when SMTP is configured, and it only works for users of an already-created workspace.
+
+[Pocket ID](https://github.com/pocket-id/pocket-id) is a small self-hosted OIDC provider (one
+container, SQLite, ~9k stars) that signs you in with **passkeys**. Passkeys need HTTPS and a stable
+host name, and the Tailscale cert provides both. A passkey saved to iCloud Keychain works on both
+the Mac and the iPhone. Pocket ID lives in its own directory so other services (Kaneo, a future
+Docmost, …) can reuse it later.
+
+The two stacks share a Docker network named `sso`. Outline's server-to-server OIDC calls (token
+and userinfo) go straight to `http://pocket-id:1411` over that network. Only the browser-facing
+login page uses the tailnet URL. This avoids relying on containers resolving MagicDNS names.
+
+```bash
+docker network create sso
+```
+
+### 6b. Pocket ID
+
+1. **Directory and secret:**
+   ```bash
+   mkdir -p /home/mib/app/pocket-id/data && cd /home/mib/app/pocket-id
+   openssl rand -base64 32   # ENCRYPTION_KEY
+   ```
+2. **`/home/mib/app/pocket-id/.env`:**
+   ```env
+   APP_URL=https://rainbow-flame.taila02055.ts.net:8446
+   ENCRYPTION_KEY=<the value from step 1>
+   TRUST_PROXY=true
+   PUID=1000
+   PGID=1000
+   ```
+   `APP_URL` must match the browser URL exactly. Passkeys are bound to this host name.
+3. **`/home/mib/app/pocket-id/compose.yml`:**
+   ```yaml
+   services:
+     pocket-id:
+       image: ghcr.io/pocket-id/pocket-id:v2.16.0
+       container_name: pocket-id
+       restart: unless-stopped
+       env_file: .env
+       ports:
+         - "127.0.0.1:1411:1411"
+       volumes:
+         - ./data:/app/data
+       networks: [default, sso]
+       healthcheck:
+         test: ["CMD", "/app/pocket-id", "healthcheck"]
+         interval: 1m30s
+         timeout: 5s
+         retries: 2
+         start_period: 10s
+
+   networks:
+     sso:
+       external: true
+   ```
+4. **Start it and expose it:**
+   ```bash
+   docker compose up -d
+   docker compose ps   # healthy
+   sudo tailscale serve --bg --https=8446 http://127.0.0.1:1411
+   ```
+5. **Create the admin user.** On the Mac, open
+   `https://rainbow-flame.taila02055.ts.net:8446/setup`, create your user, and register a
+   passkey. Save it to iCloud Keychain so the phone gets it too.
+6. **Register Outline as an OIDC client:** Pocket ID admin → **OIDC Clients** → Add:
+   - Name: `Outline`
+   - Callback URL: `https://rainbow-flame.taila02055.ts.net:8445/auth/oidc.callback`
+   - Save, then copy the **Client ID** and **Client secret**. The secret is shown once.
+
+Lost-passkey recovery: `docker compose exec pocket-id /app/pocket-id one-time-access-token <username>`
+prints a one-time login link.
+
+### 6c. Outline
+
+1. **Directory and secrets:**
+   ```bash
+   mkdir -p /home/mib/app/outline && cd /home/mib/app/outline
+   echo "SECRET_KEY=$(openssl rand -hex 32)"
+   echo "UTILS_SECRET=$(openssl rand -hex 32)"
+   echo "POSTGRES_PASSWORD=$(openssl rand -hex 24)"
+   ```
+2. **`/home/mib/app/outline/.env`.** This is trimmed from the upstream `.env.sample`; anything not
+   listed keeps its default:
+   ```env
+   OUTLINE_VERSION=1.10.1
+   NODE_ENV=production
+   URL=https://rainbow-flame.taila02055.ts.net:8445
+   PORT=3000
+   SECRET_KEY=<hex 32>
+   UTILS_SECRET=<hex 32>
+   DEFAULT_LANGUAGE=en_US
+
+   POSTGRES_PASSWORD=<hex 24>
+   DATABASE_URL=postgres://outline:<same POSTGRES_PASSWORD>@postgres:5432/outline
+   PGSSLMODE=disable
+   REDIS_URL=redis://redis:6379
+
+   FILE_STORAGE=local
+   FILE_STORAGE_LOCAL_ROOT_DIR=/var/lib/outline/data
+
+   # TLS is terminated by tailscale serve; Outline itself only sees HTTP.
+   FORCE_HTTPS=false
+
+   # Pocket ID (browser goes to the tailnet URL; server-to-server calls use the sso network)
+   OIDC_CLIENT_ID=<from 6b step 6>
+   OIDC_CLIENT_SECRET=<from 6b step 6>
+   OIDC_AUTH_URI=https://rainbow-flame.taila02055.ts.net:8446/authorize
+   OIDC_TOKEN_URI=http://pocket-id:1411/api/oidc/token
+   OIDC_USERINFO_URI=http://pocket-id:1411/api/oidc/userinfo
+   OIDC_LOGOUT_URI=https://rainbow-flame.taila02055.ts.net:8446/api/oidc/end-session
+   OIDC_USERNAME_CLAIM=preferred_username
+   OIDC_DISPLAY_NAME=Pocket ID
+   OIDC_SCOPES=openid profile email
+
+   ENABLE_UPDATES=false
+   LOG_LEVEL=info
+   ```
+3. **`/home/mib/app/outline/compose.yml`:**
+   ```yaml
+   services:
+     outline:
+       image: docker.getoutline.com/outlinewiki/outline:${OUTLINE_VERSION}
+       env_file: .env
+       ports:
+         - "127.0.0.1:3000:3000"
+       volumes:
+         - storage-data:/var/lib/outline/data
+       depends_on:
+         postgres:
+           condition: service_healthy
+         redis:
+           condition: service_healthy
+       networks: [default, sso]
+       restart: unless-stopped
+
+     redis:
+       image: redis:7
+       healthcheck:
+         test: ["CMD", "redis-cli", "ping"]
+         interval: 10s
+         timeout: 30s
+         retries: 3
+       restart: unless-stopped
+
+     postgres:
+       image: postgres:16
+       environment:
+         POSTGRES_USER: outline
+         POSTGRES_DB: outline
+         POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+       volumes:
+         - database-data:/var/lib/postgresql/data
+       healthcheck:
+         test: ["CMD", "pg_isready", "-d", "outline", "-U", "outline"]
+         interval: 30s
+         timeout: 20s
+         retries: 3
+       restart: unless-stopped
+
+   volumes:
+     storage-data:
+     database-data:
+
+   networks:
+     sso:
+       external: true
+   ```
+4. **Start it and expose it.** Database migrations run automatically on first start:
+   ```bash
+   docker compose up -d
+   docker compose logs -f outline   # wait for "Listening on http://localhost:3000", then Ctrl-C
+   curl -sS -o /dev/null -w '%{http_code}\n' http://127.0.0.1:3000/   # 200
+   docker compose exec outline wget -qO- http://pocket-id:1411/.well-known/openid-configuration | head -c 200   # sso network works
+   sudo tailscale serve --bg --https=8445 http://127.0.0.1:3000
+   ```
+5. **First sign-in.** Open `https://rainbow-flame.taila02055.ts.net:8445/` → **Continue with
+   Pocket ID** → sign in with the passkey. The first user to sign in creates the workspace and
+   becomes its admin.
+   - Redirect error at Pocket ID: the callback URL in 6b step 6 doesn't exactly match `URL` +
+     `/auth/oidc.callback`.
+   - Back at Outline with an auth error: check `docker compose logs outline`. If the token call
+     failed, rerun the `wget` check from step 4.
+6. **Set up the workspace:** create a collection per project (e.g. `sdlc-llm`, `Personal`).
+   Collections are Outline's top level, with nested docs under them.
+7. **Phone (PWA):** with the Tailscale app connected, open
+   `https://rainbow-flame.taila02055.ts.net:8445` in **Safari** (iOS) or **Chrome** (Android) →
+   sign in → Share → **Add to Home Screen** (Chrome: ⋮ → **Install app**). Launch it from the icon
+   so it runs full-screen.
+8. **Verify:** edit a doc in the PWA and watch it update live in the desktop browser, then the
+   reverse. Outline uses real-time collaboration over WebSockets, which `tailscale serve`
+   proxies.
+
+### 6d. MCP (built-in, read + write)
+
+Checked against the `v1.10.1` source: the `/mcp` endpoint accepts OAuth tokens **or** API keys.
+It's gated by a workspace toggle (**Settings → Features → MCP**) that is **on by default**. It
+exposes tools by the key's scopes, and a key with no scope restrictions gets everything. Document
+tools include `list_documents`, `create_document`, `update_document`, `move_document`,
+`delete_document`, and `restore_document`, plus collection, comment, attachment, template, user,
+and fetch tools. Each call runs with the key owner's permissions.
+
+1. **Confirm MCP is on:** Settings → **Features** → **MCP** is enabled.
+2. **Create an API key:** Settings → **API & Apps** (API keys) → New → name it `claude-code`,
+   leave scopes empty for full access (or restrict it later), and set an expiry. Copy the key.
+   It's shown once.
+   - Optional: create a dedicated agent user in Pocket ID, sign it into Outline once, give it
+     access only to the collections the agent should touch, and create the key while signed in
+     as that user.
+3. **Test the endpoint directly** from the Mac:
+   ```bash
+   KEY=ol_api_...   # the key from step 2
+   URL=https://rainbow-flame.taila02055.ts.net:8445/mcp
+   curl -sS "$URL" -H "Authorization: Bearer $KEY" \
+     -H 'Content-Type: application/json' -H 'Accept: application/json, text/event-stream' \
+     -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' | grep -o '"name":"[a-z_]*"' | sort -u
+   # expect create_document, update_document, list_documents, …
+   ```
+   A 401 means the key is wrong or expired. A 404 means MCP is turned off in Settings → Features.
+4. **Register it in Claude Code:**
+   ```bash
+   claude mcp add --scope user --transport http outline "$URL" \
+     --header "Authorization: Bearer $KEY"
+   claude mcp list   # outline … ✓ Connected
+   ```
+   Alternative: omit `--header` and run `/mcp` → **outline** → Authenticate to use Outline's
+   OAuth flow in the browser instead of a stored key.
+5. **Smoke test in a Claude Code session.** Run `/mcp` and confirm `outline` is connected with its
+   tools listed. Then run these prompts in order:
+   1. *"Using the outline MCP server, list my collections and the 5 most recently updated docs."*
+   2. *"In the `sdlc-llm` collection, create a doc titled `MCP smoke test` with a heading, a
+      bulleted list of 3 items, and a fenced code block. Return its ID/URL."* (`create_document`)
+   3. *"Read that doc back."*
+   4. *"Update it: append a section `## Update` with one paragraph and change the first bullet
+      to `edited by agent`."* (`update_document`)
+   5. *"Create a child doc `MCP smoke test – child` under it, then move it to the top level of the
+      collection."* (`create_document`, `move_document`)
+   6. Open both docs in the desktop browser **and** the PWA. Confirm the formatting and edits
+      rendered, then edit something by hand and ask Claude to read it again.
+   7. *"Delete both smoke-test docs."* (`delete_document`; Outline keeps them in Trash, so they can
+      be restored.)
+
+   **Pass** = steps 2–7 succeed with no workarounds. That's the bar AFFiNE only clears through the
+   community server (§5c).
+
+### 6e. Upgrading
+
+Check the [release notes](https://github.com/outline/outline/releases) first, back up (see
+[Moving to a new host](#moving-to-a-new-host), step 2), then bump `OUTLINE_VERSION` in `.env`
+and run `docker compose pull && docker compose up -d`. Migrations run on start. Pocket ID works
+the same way: bump the image tag in its `compose.yml`.
+
+### 6f. Removing whichever tool loses
+
+```bash
+# Outline loses:
+cd /home/mib/app/outline && docker compose down -v && sudo tailscale serve --https=8445 off
+# Pocket ID too, if nothing else uses it:
+cd /home/mib/app/pocket-id && docker compose down && sudo tailscale serve --https=8446 off
+docker network rm sso
+claude mcp remove outline
+# AFFiNE loses:
+cd /home/mib/app/affine && docker compose down && sudo tailscale serve --https=8444 off
+claude mcp remove affine; claude mcp remove affine-builtin 2>/dev/null
+```
+
+Delete the loser's directory under `/home/mib/app/` and its rows in the migration inventory.
+
+---
+
+## 7. Final serve config and checks
 
 ```bash
 tailscale serve status
@@ -494,6 +780,10 @@ https://rainbow-flame.taila02055.ts.net:8443 (tailnet only)
 |-- / proxy http://127.0.0.1:5173
 https://rainbow-flame.taila02055.ts.net:8444 (tailnet only)
 |-- / proxy http://127.0.0.1:3010
+https://rainbow-flame.taila02055.ts.net:8445 (tailnet only)
+|-- / proxy http://127.0.0.1:3000
+https://rainbow-flame.taila02055.ts.net:8446 (tailnet only)
+|-- / proxy http://127.0.0.1:1411
 ```
 
 `--bg` keeps the config across reboots. Docker's `restart: unless-stopped` covers the
@@ -511,6 +801,9 @@ Keep this table accurate. It's the checklist for moving everything to a new host
 | SparkyFitness | `/home/mib/app/sparkyfitness` | Postgres + uploads (check `docker-compose.yml` for volume/bind names) | DB password, API encryption key, `BETTER_AUTH_SECRET` | `SPARKY_FITNESS_FRONTEND_URL`, `SPARKY_FITNESS_EXTRA_TRUSTED_ORIGINS`; loopback bind in `docker-compose.yml` | `:3004 → 127.0.0.1:3004` |
 | Kaneo | `/home/mib/app/kaneo` | Docker volume `kaneo_postgres_data` | `POSTGRES_PASSWORD`, `AUTH_SECRET` | `KANEO_CLIENT_URL` | `:8443 → 127.0.0.1:5173` |
 | AFFiNE | `/home/mib/app/affine` | `./data/postgres`, `./data/storage` (uploads/blobs), `./config` | none by default (Postgres uses trust auth); LLM API key if AI is enabled | `server.externalUrl` in `config/config.json`; server URL in each mobile app; loopback bind in `compose.yml` | `:8444 → 127.0.0.1:3010` |
+| Outline | `/home/mib/app/outline` | Docker volumes `outline_database-data` (Postgres), `outline_storage-data` (attachments) | `SECRET_KEY`, `UTILS_SECRET`, `POSTGRES_PASSWORD`, `OIDC_CLIENT_SECRET` | `URL`, `OIDC_AUTH_URI`, `OIDC_LOGOUT_URI`; external `sso` network | `:8445 → 127.0.0.1:3000` |
+| Pocket ID | `/home/mib/app/pocket-id` | `./data` (SQLite DB + keys) | `ENCRYPTION_KEY` | `APP_URL`; each OIDC client's callback URL; **passkeys are bound to the host name**, so a new name means re-registering them (use `one-time-access-token`) | `:8446 → 127.0.0.1:1411` |
+| Outline MCP (on the Mac) | Claude Code user MCP config (`claude mcp list`) | none | Outline API key (in the Claude Code config) | endpoint URL: `claude mcp remove outline` and re-add | n/a |
 | AFFiNE MCP (on the Mac, not the server) | `~/.config/affine-mcp/config`; Claude Code user MCP config (`claude mcp list`) | none | agent account password (in the affine-mcp config); built-in `aff_mcp_v1…` token if Option A is used | AFFiNE URL: re-run `affine-mcp login`; built-in endpoint URL: `claude mcp remove affine-builtin` and re-add | n/a |
 
 ### Moving to a new host
@@ -519,6 +812,9 @@ Keep this table accurate. It's the checklist for moving everything to a new host
 2. Before the `down`, dump every Postgres database:
    - Kaneo: `docker compose exec postgres pg_dump -U kaneo kaneo > kaneo.sql`
    - AFFiNE: `docker compose exec postgres pg_dump -U affine affine > affine.sql`
+   - Outline: `docker compose exec postgres pg_dump -U outline outline > outline.sql`. Also copy
+     the `outline_storage-data` volume (e.g.
+     `docker run --rm -v outline_storage-data:/d -v "$PWD":/b alpine tar czf /b/outline-storage.tgz -C /d .`).
    - SparkyFitness: do the same for its Postgres.
 
    Bind-mounted data dirs copy fine when the stack is stopped, but a dump is the version-safe
@@ -529,7 +825,10 @@ Keep this table accurate. It's the checklist for moving everything to a new host
    `tailscale serve` commands.
 6. If the host name changed, update AFFiNE's `externalUrl`, re-add the server in the AFFiNE
    mobile app, and on the Mac re-run `affine-mcp login` (plus re-add `affine-builtin` if used).
-7. Remove the old host's serve config with `sudo tailscale serve reset`.
+7. Run `docker network create sso` on the new host before starting Pocket ID and Outline. If
+   the host name changed, update Pocket ID's `APP_URL`, Outline's OIDC client callback URL, and
+   Outline's `URL`/`OIDC_*` values, then re-register passkeys.
+8. Remove the old host's serve config with `sudo tailscale serve reset`.
 
 ---
 
@@ -539,6 +838,9 @@ Keep this table accurate. It's the checklist for moving everything to a new host
 desktop app streamed into a browser tab (plus a separate CouchDB for LiveSync), and the setup
 felt clumsy and fragile. AFFiNE won because it has a native mobile app that connects to a
 self-hosted server, plus a Miro-style canvas.
+
+**Now trialling Outline side by side (§6)** because its built-in MCP server supports writes on
+self-hosted installs with no workarounds, and its PWA may be good enough on mobile.
 
 **Fallback plan:** if AFFiNE doesn't work out, try **Outline**, then **Docmost**, and/or
 **BookStack**. All three are Docker Compose installs that fit the same pattern as §5 (loopback
@@ -564,8 +866,8 @@ Legend: ✅ strong, 🟡 partial or with caveats, ❌ missing.
 | Feels like | Notion + whiteboard | Notion + Confluence | Confluence | Structured wiki | Notion | Personal notes tree | Local markdown vault |
 | WYSIWYG in the browser | ✅ | ✅ | ✅ | ✅ (older-style editor) | ✅ | ✅ | ❌ streamed desktop app only |
 | Mobile web | 🟡 | 🟡 good for reading, OK for editing | 🟡 | 🟡 fine | 🟡 | 🟡 separate mobile layout | ❌ |
-| Native app for your own server | ✅ iOS/Android | ❌ | ❌ | ❌ | ✅ | ❌ | ✅ but syncs via LiveSync, not the server |
-| LLM / MCP access | 🟡 built-in is read-only on stable self-hosted; read/write via the community `affine-mcp-server` (§5c) | ✅ built-in `/mcp` endpoint, works self-hosted | 🟡 built-in one needs a paid licence; community servers use the free API | 🟡 community server over a solid REST API | 🟡 community | 🟡 API + community | 🟡 via a community plugin, or just read the files |
+| Native app for your own server | ✅ iOS/Android | ❌ (official PWA instead) | ❌ | ❌ | ✅ | ❌ | ✅ but syncs via LiveSync, not the server |
+| LLM / MCP access | 🟡 built-in is read-only on stable self-hosted; read/write via the community `affine-mcp-server` (§5c) | ✅ built-in `/mcp`, read + write on self-hosted, API key or OAuth, on by default (§6d) | 🟡 built-in one needs a paid licence; community servers use the free API | 🟡 community server over a solid REST API | 🟡 community | 🟡 API + community | 🟡 via a community plugin, or just read the files |
 | Stability | 🟡 rapid releases, rough edges | ✅ mature, several years in production | 🟡 young (2024), moving fast | ✅ very mature (2015–) | 🟡 complex server stack | ✅ | ✅ app, 🟡 self-hosted setup |
 | Community | ✅ large | ✅ large | 🟡 growing fast | ✅ steady | ✅ large | 🟡 | ✅ huge |
 | Plugins | 🟡 limited | ❌ integrations only | ❌ | 🟡 theme/hook system | ❌ | ✅ scripting | ✅ best in class |

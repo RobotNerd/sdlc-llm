@@ -618,6 +618,8 @@ Create two sets of instructions for using AFFiNE MCP:
 
 Also perform a web search to determine if there are any other options for setting up AFFiNE MCP beyond the two approaches I listed above. -->
 
+<!-- Update the document to include a section with in similar instructions for Outline: installing, configuring, enabling MCP, and testing MCP. I'd like to play with it now just in case I like it better, considering that it requires fewer workarounds than AFFiNE for my use case. I noticed from their official docs that the recommended way to use it on mobile is with [PWA](https://docs.getoutline.com/s/guide/doc/mobile-Ez4bmY6VDD). This might be acceptable for my mobile usage and I will test it. -->
+
 ---
 
 Suggestions:
