@@ -513,21 +513,82 @@ Don't implement the steps that you outlined in `Plan: applying this strategy to 
 
 ---
 
-I've spent some time reconsidering my design of this system. My main conclusion is that managing epics and tasks as part of each project is a bad design decision. It's overly cumbersome, reinvents the wheel, and it leaves a lot of unnecessary stale data in the project in the archived files. I want to use these lessons to rethink the design.
+<!-- I've spent some time reconsidering my design of this system. My main conclusion is that managing epics and tasks as part of each project is a bad design decision. It's overly cumbersome, reinvents the wheel, and it leaves a lot of unnecessary stale data in the project as archived files. I want to use these lessons to rethink the design.
 
 Here are my current thoughts on how I want to change things up:
-- Use [kaneo](https://kaneo.app) for project management. It handles all task management, the kanban board, etc. It appears to come with an MCP server for agent connectivity, and I plan to self-host it. Leverage as many of its features as possible for task management rather than the agent doing the work.
-- Keep most skills but update them to work with kaneo: add-task, implement-task, plan-feature, refine-backlog, review-docs
-- Drop these skills: init-project (users install skills as a plugin or manually per-skill)
-- The goal is still to automate as much as possible. This means that building implement-task-v2 will still happen mostly as designed, and it will be most complex skill.
-- Skill behavior should continue to be offloaded to a deterministic script wherever possible. Keep the iterative development process where the first round is prose-only, and then behavior is offloaded in small testable chunks in separate tasks.
-- I noticed that what we've built so far feels more unstructured than I would like. I think the correct way to resolve this is a combination of multiple changes I should make: more upfront planning on my part of testing procedures and architecture direction in my prompts, defining style guide documents (architecture, testing strategy, linting rules, etc), and provide a solid style guide of how I want the tasks you generate to be formatted and worded.
+- Use [kaneo](https://kaneo.app) for project management. It handles all task management, the kanban board, etc. It appears to come with an MCP server for agent connectivity. Leverage as many of its features as possible for task management rather than the agent doing the work. I plan to self-host it on my home network. As part of this planning phase, I want you to evaluate kaneo to ensure that it will meet all of the needs for what I want to accomplish with this project.
+- I still want to keep the functionality of most skills. They need to work with kaneo instead of repo-managed tasks. I'm open to changing they way skills are organized, i.e. we don't have to keep exact same grouping of behavior by skill if something else makes more sense (new skills, splitting up skills, merging skills, etc). These tasks have behavior I want to keep: add-task, implement-task, plan-feature, refine-backlog, review-docs
+- Drop the init-project skill. Users can install skills as a plugin or manually per-skill, which seems to be industry best practice. Also consider making these installble using vercel labs npx skills, which I think is a way to share skills across multiple agent platforms.
+- The goal is still to automate the process of implementing batches of tasks. This means that building implement-task-v2 will still happen mostly as designed. It will be most complex skill.
+- Skill behavior should continue to be offloaded to deterministic scripts wherever possible. Keep the iterative development process where the first round is prose-only, and then behavior is offloaded in small testable chunks.
+- I noticed that what we've built so far feels more unstructured than I would like. I think the correct way to resolve this is a combination of multiple changes I should make: more upfront planning on my part of testing procedures and architecture direction in my prompts, defining style guide documents (architecture, testing strategy, linting rules, etc), and providing a solid style guide of how I want the tasks you generate to be formatted and worded.
 - Guideline reference docs, like @doc/testing-strategy.md, should be independent of the tasks managed by the project. For example, right now the testing strategy doc includes references to things like implement-task-v2 and EPIC-005. These types of references should be limited only to the tasks stored in kaneo and not exist in any of the generated artifiacts that are committed to the repo.
 
 Given this new direction, I want you to start by performing a full analysis of the project in its current state. Compile a new spec document/PRD that captures the features the new version should implement, and write it to @doc/PRD-v2.md. Take into account existing features, planned features (in current specs, epics, and tasks in @.tasks/), and the changes I mentioned above. Fill in any gaps you notice with your suggestions. Finally, put any questions you need me to clarify in a new file @doc/questions.md.
 
-We'll iterate on that document.
+We'll iterate on the new PRD document. -->
 
+<!-- TODO: self-hosted tmp
+- write step-by-step plan to deploy obsidian, kaneo, and sparkyfitness
+- make notes about what I've already tried and problems I ran into
+- keep doc around as a reference so it can be used to migrate data for these services later when I finalize my home network -->
+
+<!-- Write up an installation plan for me in a new file @doc/tmp-self-hosted.md that provides step-by-step instructions to install each of the following services:
+
+- [obsidian](https://obsidian.md/)
+- [kaneo](https://kaneo.app)
+- [sparkyfitness](https://github.com/CodeWithCJ/SparkyFitness)
+
+## Goals
+- I'm installing kaneo and obsidian to unblock progress on the sdlc-llm project, since I want to use both services as part of this workflow.
+- The sparkyfitness service is already running on that machine and I want to keep using it, but it's conflicting with the other services I'm trying to host (more details below).
+- I'm working on a more comprehensive plan for my self-hosted home network, and these services will likely need to be migrated to another host machine. The output document should include all the details necessary to know how and where these services are installed to make it easier to know what needs to be migrated in the future.
+- For obsidian, I want to install the LiveSync plugin to keep data synced between the hosted service and the obsidian mobile app on my phone.
+
+## Platform
+- OS: Ubuntu 24.04
+- Machine name: rainbow-flame
+- Networking: tailscale
+  - MagicDNS url: rainbow-flame.taila02055.ts.net
+  - IP: 100.105.75.3
+
+## Background
+I initially installed sparkyfitness on rainbow-flame. To make it accessible from my other devices on the tailscale network, I enabled MagicDNS and ran `sudo tailscale serve --bg 3004`. The problems started later when I tried to install kaneo on the same machine. I tried running these commands:
+
+```
+sudo tailscale serve reset
+sudo tailscale serve --bg --set-path=/kaneo http://127.0.0.1:5173
+sudo tailscale serve --bg --set-path=/sparkyfitness http://127.0.0.1:3004
+```
+
+When I try to access either of the above URLs, I get a blank screen in the browser. In the browser dev tools console, there are a bunch of disallowed MIME type errors, like this: `Loading module from “https://rainbow-flame.taila02055.ts.net/assets/useSearch-BSm_91uI.js” was blocked because of a disallowed MIME type (“text/plain”).`. My guess is that neither of these services are playing nice with the paths where I'm trying to serve them. I've installed obsidian on rainbow-flame, but I haven't tried to configure it yet until I can resolve the serving issue. -->
+
+<!-- Make adjustments to the document given this feedback:
+- Modify sparkyfitness to be served on port 3004 externally instead of defaulting to port 443.
+- The path to sparkyfitness: `$HOME/app/sparkyfitness` (full path `/home/mib/app/sparkyfitness`)
+- I installed obsidian with the `apt` package manager. Make sure the docs include instructions to install it using docker since I'll need to reinstall. -->
+
+<!-- I'm following the sparkyfitness setup. I tried accessing it from my macbook, which I hadn't done before. It's showing me the error: `Authentication Failed Invalid Origin`. I'm also getting the same error when trying to reach it from the mobile app. I see these errors in the debug console:
+
+```
+[Auth Client] Error: 
+Object { response: Response, responseText: '{"message":"Invalid origin","code":"INVALID_ORIGIN"}', request: {…}, error: {…} }
+auth-client-BStSoeHw.js:1:236
+[ERROR] Mutation Error:  
+Object { message: "Invalid origin", code: "INVALID_ORIGIN", status: 403, statusText: "" }
+api-BQ-8BZLf.js:1:1359
+[ERROR] Auth: Sign in failed: 
+Object { message: "Invalid origin", code: "INVALID_ORIGIN", status: 403, statusText: "" }
+api-BQ-8BZLf.js:1:1359
+```
+
+Give me instructions to resolve this issue and update the document to include the steps. -->
+
+---
+
+Suggestions:
+- Section 4. I agree with this: `Keep the tracker calls behind one client module anyway, so a second backend stays possible.`.
+- Section 6. Agreed: `The core data model (§7) uses only features that the MCP server exposes, so prose-only skills never hit a wall. Only the one-time project setup needs REST or the web UI.`
 
 ---
 
