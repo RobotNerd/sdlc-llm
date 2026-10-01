@@ -643,6 +643,13 @@ Also a slight variation to your instructions: I'm using 1password. I saved the p
 
 When testing the MCP commands in claude code, I was prompted to allow the MCP requests. How can I allow all MCP requests to the outline server in claude code? -->
 
+<!-- I successfully uninstalled affine and committed all changes to git. Update @doc/tmp-self-hosted.md to meet these criteria:
+- Remove all references to affine.
+- Remove all references to obsidian.
+- Remove the documentation tool comparisions appendix. Outline should work just fine, and if I ever need to return to this analysis, I can find it in the git history.
+
+The goal of this update is to make the document contain only the details that describe the current state of the self-hosted services and to not include any historical decisions. -->
+
 ---
 
 Suggestions:
