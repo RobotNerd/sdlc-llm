@@ -635,7 +635,9 @@ outline-postgres-1   postgres:16                                        "docker-
 outline-redis-1      redis:7 
 ``` -->
 
-It's failing on step 6c. 5 when I navigate to https://rainbow-flame.taila02055.ts.net:8445/ and it's redirected to the URL https://rainbow-flame.taila02055.ts.net:8446/interaction/error?error=The+requested+OAuth+2.0+Client+does+not+exist. I double-checked the OIDC client settings in pocket-id. I added only one callback url with the value `https://rainbow-flame.taila02055.ts.net:8445/auth/oidc.callback`.
+<!-- It's failing on step 6c. 5 when I navigate to https://rainbow-flame.taila02055.ts.net:8445/ and it's redirected to the URL https://rainbow-flame.taila02055.ts.net:8446/interaction/error?error=You+are+not+allowed+to+access+this+service. I ran `docker compose logs outline` and don't see any errors.
+
+Also a slight variation to your instructions: I'm using 1password. I saved the passkey there instead of the icloud keychain. -->
 
 
 ---

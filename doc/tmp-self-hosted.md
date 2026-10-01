@@ -499,8 +499,8 @@ but only when SMTP is configured, and it only works for users of an already-crea
 
 [Pocket ID](https://github.com/pocket-id/pocket-id) is a small self-hosted OIDC provider (one
 container, SQLite, ~9k stars) that signs you in with **passkeys**. Passkeys need HTTPS and a stable
-host name, and the Tailscale cert provides both. A passkey saved to iCloud Keychain works on both
-the Mac and the iPhone. Pocket ID lives in its own directory so other services (Kaneo, a future
+host name, and the Tailscale cert provides both. Passkeys are stored in **1Password**, which
+syncs them to the Mac and the phone. Pocket ID lives in its own directory so other services (Kaneo, a future
 Docmost, …) can reuse it later.
 
 The two stacks share a Docker network named `sso`. Outline's server-to-server OIDC calls (token
@@ -559,11 +559,22 @@ docker network create sso
    ```
 5. **Create the admin user.** On the Mac, open
    `https://rainbow-flame.taila02055.ts.net:8446/setup`, create your user, and register a
-   passkey. Save it to iCloud Keychain so the phone gets it too.
+   passkey. Save it to **1Password** when the browser extension offers. For the phone, turn on
+   1Password as a passkey provider: iOS Settings → General → AutoFill & Passwords → 1Password
+   (Android: Settings → Passwords & accounts → 1Password).
 6. **Register Outline as an OIDC client:** Pocket ID admin → **OIDC Clients** → Add:
    - Name: `Outline`
    - Callback URL: `https://rainbow-flame.taila02055.ts.net:8445/auth/oidc.callback`
    - Save, then copy the **Client ID** and **Client secret**. The secret is shown once.
+7. **Allow your user to use the client.** Pocket ID v2 creates new OIDC clients **restricted to
+   user groups, with no groups selected**, so nobody can sign in. Outline's login then bounces
+   to `…:8446/interaction/error?error=You+are+not+allowed+to+access+this+service`. Fix it with a
+   group (recommended, since it also controls which accounts, such as an agent user, can reach
+   Outline):
+   - Pocket ID admin → **User Groups** → Add → name `outline-users` → add your user.
+   - **OIDC Clients** → `Outline` → **Allowed user groups** → select `outline-users` → Save.
+
+   Or open the `Outline` client and choose **Unrestrict** to let every Pocket ID user in.
 
 Lost-passkey recovery: `docker compose exec pocket-id /app/pocket-id one-time-access-token <username>`
 prints a one-time login link.
@@ -703,6 +714,8 @@ prints a one-time login link.
 5. **First sign-in.** Open `https://rainbow-flame.taila02055.ts.net:8445/` → **Continue with
    Pocket ID** → sign in with the passkey. The first user to sign in creates the workspace and
    becomes its admin.
+   - `You are not allowed to access this service` at Pocket ID: the client is group-restricted
+     and your user isn't in an allowed group (6b step 7).
    - Redirect error at Pocket ID: the callback URL in 6b step 6 doesn't exactly match `URL` +
      `/auth/oidc.callback`.
    - Back at Outline with an auth error: check `docker compose logs outline`. If the token call
@@ -730,7 +743,8 @@ and fetch tools. Each call runs with the key owner's permissions.
 2. **Create an API key:** Settings → **API & Apps** (API keys) → New → name it `claude-code`,
    leave scopes empty for full access (or restrict it later), and set an expiry. Copy the key.
    It's shown once.
-   - Optional: create a dedicated agent user in Pocket ID, sign it into Outline once, give it
+   - Optional: create a dedicated agent user in Pocket ID (add it to `outline-users`), sign it
+     into Outline once, give it
      access only to the collections the agent should touch, and create the key while signed in
      as that user.
 3. **Test the endpoint directly** from the Mac:
