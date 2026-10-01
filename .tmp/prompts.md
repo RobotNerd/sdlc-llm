@@ -652,9 +652,37 @@ The goal of this update is to make the document contain only the details that de
 
 ---
 
-Suggestions:
+I added my answers to @doc/questions.md.
+
+These are my responses to your suggestions in @doc/PRD-v2.md that aren't already answered in the questions doc:
 - Section 4. I agree with this: `Keep the tracker calls behind one client module anyway, so a second backend stays possible.`.
 - Section 6. Agreed: `The core data model (§7) uses only features that the MCP server exposes, so prose-only skills never hit a wall. Only the one-time project setup needs REST or the web UI.`
+- Section 7.1 Notify the human: Agreed. I'm not familiar with mattermost, but it sounds like a good option since it's self-hosted. The other option I was considering is signal, which might work better in cases where I'm remote and might have disconnected my phone from tailscale. I think this warrants further analysis of messaging options so I can determine which platform (or maybe multiple platforms) I want to support.
+- 8.1 commit conventions: Agreed
+- 9.1 the two STOP conditions and the ASK: only do these when the human triggers the add-task skill; when the agent invokes the add-task skill once the spec is finalized (via the plan-feature task), it should automatically create the epic and multiple tasks within that epic without human interaction; human review of all generated tasks comes after those are created
+- 9.1 3 duplicate check: Agreed
+- 9.2 2 architecture check: agreed; note that the wording should change to remove the reference to commtting the doc changes, since the agent will automatically make those changes in the outline app
+- 9.3 2 blocked-order problems: agreed
+- 9.3 5 ready check: agreed
+- 9.5: Agreed on `The code-style and architecture docs are part of the critic's input [suggestion].`.
+- 9.5: Agreed on `placed in Planned [suggestion] (not at the end of to-do; Q5)`
+- 9.6: Agreed
+- 11. repo layout: agreed, except for the `scripts/_shared` folder; see response to Q8
+- 11. versioning: agreed on semver
+- 11.1 guardrails: agreed on `A SessionStart hook that prints the Kaneo tasks that are in-progress or needs-human [suggestion]: the replacement for v1's board-context hook.`.
+- 12 Contract tests: Agreed
+- 13 3: `[suggestion] A step is ready to extract once it has passed its manual test in at least two runs with no prose change in between.` It's a good guideline, which I'll determine manually. No need for the agent to keep track of this.
+- 13 4 extraction order: looks good for now
+
+Other specific notes:
+- 7.3: A self-hosted kaneo instance is running on my local network and available over tailscale at https://rainbow-flame.taila02055.ts.net:8443/. I have not connected its mcp server to claude code yet, but we can do that and then you can run all of the tests you describe in this section. I'd say we run this outside of the official workflow, since we're moving to tasks that would require kaneo.
+- Section 9 `plan-feature`: epic stays in kaneo, spec moves to outline
+- Using kaneo and outline: When we start replacing portions of the skills with scripts, the calls to these external tools should be abstracted using an interface. The goal is to hopefully make it easier to swap out backend tools in the future if necessary. I'm not sure if it's really possible to do this within the prose content of the skill, but if so, let's word the skill to act this way as well.
+- I want to integrate an optional external messaging tool for notifying me on STOP and ASK conditions, which you mentioned in Section 7.1. Whenever one of these events occurs, the notification is always displayed in the claude code terminal. If the messaging tool is enabled (set in config.md), then a short, concise version of the notification is sent on that messaging channel. We'll choose an initial messaging tool in the beginning, but I may want the option to support multiple messaging tools/channels in the future.
+- Is it possible to use a `.env` file in this repo for storing secrets. For example, it could hold the `KANEO_API_KEY` secret you refer to in section 10.
+
+Update the PRD given this feedback. If you have any additional questions, add them at the bottom of the questions doc.
+Since you have access to outline, copy @doc/PRD-v2.md to outline once you've made the above changes locally. Likewise, move @doc/questions.md to outline but with a better name, like `PRD-v2-questions`. For the next round of changes to these docs, we'll try to use only the versions in outline.
 
 ---
 

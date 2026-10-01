@@ -125,7 +125,7 @@ macOS system Python is 3.9. Options:
   duplication, but it adds an install step and breaks the "copy the skill and it works" model.
 - C. Support the Claude Code plugin only, where skills can share files at the plugin root, and
   drop `npx skills`.
-> Answer: Agreed with your recommendation.
+> Answer: Drop the option to install skills one at a time with `npx skills` since these skills are intended to function together as a group. This should remove the need for a build step and `scripts/_shared` existing in each skill so that the installed skills can rely on the `lib/` files as the single source of truth.
 
 **Q9. How portable across agents?** `implement-task` depends on Claude Code for its critic
 subagent (`model: haiku`) and its usage valve (it reads Claude Code transcripts). Recommendation:
