@@ -639,6 +639,9 @@ outline-redis-1      redis:7
 
 Also a slight variation to your instructions: I'm using 1password. I saved the passkey there instead of the icloud keychain. -->
 
+<!-- The outline MCP commands are working very well. Outline seems to meet my needs, as you originally recommended. Update the document to deprecate the affine installation instructions and add step-by-step instructions to remove the existing affine install.
+
+When testing the MCP commands in claude code, I was prompted to allow the MCP requests. How can I allow all MCP requests to the outline server in claude code? -->
 
 ---
 

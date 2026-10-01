@@ -1,8 +1,8 @@
 # Self-hosted services on `rainbow-flame`: installation plan
 
-Temporary plan for hosting **SparkyFitness**, **Kaneo**, **AFFiNE**, and **Outline** (on trial,
-with **Pocket ID** for sign-in) on `rainbow-flame`. It also records where each service lives, so
-they can be moved to another host later (see [Migration inventory](#migration-inventory)).
+Temporary plan for hosting **SparkyFitness**, **Kaneo**, and **Outline** (with **Pocket ID** for
+sign-in) on `rainbow-flame`. AFFiNE was tried and replaced by Outline; §5 has its removal steps.
+It also records where each service lives, so they can be moved to another host later (see [Migration inventory](#migration-inventory)).
 
 | | |
 |---|---|
@@ -42,9 +42,10 @@ number is both served by Tailscale and bound by Docker on all interfaces (Sparky
 |---|---|---|
 | SparkyFitness | `127.0.0.1:3004` | `https://rainbow-flame.taila02055.ts.net:3004/` |
 | Kaneo | `127.0.0.1:5173` | `https://rainbow-flame.taila02055.ts.net:8443/` |
-| AFFiNE | `127.0.0.1:3010` | `https://rainbow-flame.taila02055.ts.net:8444/` |
 | Outline | `127.0.0.1:3000` | `https://rainbow-flame.taila02055.ts.net:8445/` |
 | Pocket ID (sign-in for Outline) | `127.0.0.1:1411` | `https://rainbow-flame.taila02055.ts.net:8446/` |
+
+Port `8444` was AFFiNE's (removed, §5) and is free again.
 
 ---
 
@@ -229,18 +230,68 @@ remove the stale containers before step 4.
 
 ---
 
-## 5. AFFiNE (docs, notes, whiteboards)
+## 5. AFFiNE — deprecated (replaced by Outline, 2026-10)
 
-AFFiNE is the self-hosted documentation tool: a Notion-style doc editor plus a Miro-style canvas,
-in the browser and in native iOS/Android apps that connect to this server. See
-[Appendix: documentation tool comparison](#appendix-documentation-tool-comparison) for why it was
-picked and what to fall back to.
+> **Deprecated.** AFFiNE was installed and then replaced by Outline (§6). On stable self-hosted
+> installs its built-in MCP server is read-only, so agent writes needed a community MCP server.
+> Outline's built-in MCP server does reads and writes out of the box. Remove AFFiNE with §5a. The
+> original install notes are kept, collapsed, in §5b for reference only. Don't follow them.
 
-The stack is four containers from AFFiNE's official self-host compose file (release `v0.27.4`):
-`affine_server` (web UI + API), a one-shot `affine_migration` job, Postgres (with pgvector), and
-Redis.
+### 5a. Remove the AFFiNE install
 
-### 5a. Tear down the Obsidian attempt
+1. **Move anything you want to keep into Outline first.** In AFFiNE, open each doc → ⋯ menu →
+   **Export → Markdown**, then import the files in Outline (Settings → **Import** → Markdown).
+   For many docs, let Claude Code do it while both MCP servers are still registered: *"For each
+   doc in my AFFiNE workspace, export it as markdown with the affine MCP server and create it in
+   the `<collection>` collection with the outline MCP server."* Spot-check the results in
+   Outline.
+2. **Optional safety backup** (skip if nothing in AFFiNE matters):
+   ```bash
+   cd /home/mib/app/affine
+   docker compose exec postgres pg_dump -U affine affine > ~/affine-final.sql
+   sudo tar czf ~/affine-final-data.tgz -C /home/mib/app/affine data config
+   ```
+3. **Remove the MCP setup on the Mac:**
+   ```bash
+   claude mcp remove affine --scope user
+   claude mcp remove affine-builtin --scope user 2>/dev/null   # only if Option A was set up
+   affine-mcp logout
+   npm uninstall -g affine-mcp-server
+   rm -rf ~/.config/affine-mcp
+   claude mcp list   # no affine entries left
+   ```
+   If you created a built-in `aff_mcp_v1…` credential, it dies with the server. There's nothing
+   to revoke separately.
+4. **Stop the containers and remove the serve rule** on rainbow-flame:
+   ```bash
+   cd /home/mib/app/affine
+   docker compose down -v
+   sudo tailscale serve --https=8444 off
+   ```
+5. **Delete the files.** The data dirs were created by root-owned containers, so `sudo` is
+   needed:
+   ```bash
+   cd ~ && sudo rm -rf /home/mib/app/affine
+   ```
+6. **Remove the images** to reclaim disk. Ignore any "image is being used" error:
+   ```bash
+   docker image rm ghcr.io/toeverything/affine:stable pgvector/pgvector:pg16 redis:latest
+   ```
+7. **Phone:** delete the AFFiNE app.
+8. **Verify:**
+   ```bash
+   docker ps -a | grep -i affine        # nothing
+   tailscale serve status | grep 8444   # nothing
+   ls /home/mib/app                     # no affine/
+   ```
+   On the Mac, `https://rainbow-flame.taila02055.ts.net:8444/` should no longer load.
+
+### 5b. Original AFFiNE notes (deprecated, reference only)
+
+<details>
+<summary>Expand the original AFFiNE install, MCP, and upgrade notes</summary>
+
+#### Tear down the Obsidian attempt
 
 Skip any command whose target doesn't exist.
 
@@ -257,7 +308,7 @@ rm -rf /home/mib/app/obsidian /home/mib/app/couchdb
 sudo apt purge obsidian && sudo apt autoremove
 ```
 
-### 5b. Install
+#### Install
 
 1. **Create the directory** and pull the official compose file, pinned to a release:
    ```bash
@@ -316,7 +367,7 @@ sudo apt purge obsidian && sudo apt autoremove
 9. **Verify:** edit a doc on the phone and confirm the change appears in the desktop browser
    within a few seconds, then test the reverse direction and a whiteboard (edgeless) page.
 
-### 5c. LLM agent access (MCP)
+#### LLM agent access (MCP)
 
 **Verdict (checked against AFFiNE `v0.27.4` source, 2026-09-30):**
 
@@ -352,7 +403,7 @@ supports writes on self-hosted).
   Members). Docs it creates will show it in **Created by**, and you can revoke it without touching
   your own login. Using your own account works too for testing.
 
-#### Option A: built-in MCP server (read-only)
+##### Option A: built-in MCP server (read-only)
 
 1. **Turn on AI features server-wide.** The MCP endpoint is behind the `copilot.enabled` switch.
    It doesn't need a provider key; BYOK keys only power AI chat and semantic search. Use either:
@@ -400,7 +451,7 @@ ID still works. The doc ID is the last path segment of the doc's URL.
 Not recommended: setting `AFFINE_ENV=dev` on the server would unlock the write tools, but that
 namespace also changes auth guards, sync, static-file serving, and more across the backend.
 
-#### Option B: `affine-mcp-server` (read + write) — recommended
+##### Option B: `affine-mcp-server` (read + write) — recommended
 
 A community, MIT-licensed server, very active (v3.8.4 released 2026-09-29), ~290 GitHub stars,
 with an end-to-end test suite that runs against a Docker AFFiNE stack. It runs on the Mac as a
@@ -453,7 +504,7 @@ local stdio process that Claude Code starts, so nothing new runs on rainbow-flam
    **Pass** = steps 2–5 all succeed. **Fail** = any write errors out or doesn't appear in the UI.
    First try `affine-mcp doctor`; if it still fails, pivot (see the pivot criterion above).
 
-#### Other AFFiNE MCP options found (2026-09-30)
+##### Other AFFiNE MCP options found (2026-09-30)
 
 - [`emmabyte-engineering/affine-mcp`](https://github.com/emmabyte-engineering/affine-mcp)
   (`@emmabyte-eng/affine-mcp` on npm): self-hosted-focused, read/write, mermaid and table helpers.
@@ -467,7 +518,7 @@ local stdio process that Claude Code starts, so nothing new runs on rainbow-flam
 - Built-in write tools (Option A with read-write): wait for upstream #15112. Re-check after each
   AFFiNE upgrade (§5d) by creating a credential and looking for a **Read & write** access mode.
 
-### 5d. Upgrading
+#### Upgrading
 
 Back up first (see [Moving to a new host](#moving-to-a-new-host), step 2), then:
 
@@ -480,12 +531,14 @@ docker compose pull && docker compose up -d   # migration job runs again automat
 Also grab the newer release's `docker-compose.yml` and diff it against yours, keeping your two
 edits from step 2.
 
+</details>
+
 ---
 
-## 6. Outline (trial alongside AFFiNE)
+## 6. Outline (docs, notes)
 
-Outline runs next to AFFiNE so the two can be compared. Unlike AFFiNE, its **built-in MCP
-server supports writes on self-hosted installs**. It's on by default and accepts a plain API key,
+Outline is the self-hosted documentation tool, chosen over AFFiNE in a side-by-side trial. Its
+**built-in MCP server supports writes on self-hosted installs**. It's on by default and accepts a plain API key,
 so no community server or workarounds are needed. Mobile is a PWA ("Add to Home Screen") rather
 than a native app, per [Outline's mobile guide](https://docs.getoutline.com/s/guide/doc/mobile-Ez4bmY6VDD).
 
@@ -780,8 +833,26 @@ and fetch tools. Each call runs with the key owner's permissions.
    7. *"Delete both smoke-test docs."* (`delete_document`; Outline keeps them in Trash, so they can
       be restored.)
 
-   **Pass** = steps 2–7 succeed with no workarounds. That's the bar AFFiNE only clears through the
-   community server (§5c).
+   **Pass** = steps 2–7 succeed with no workarounds. (Result 2026-10: passed.)
+6. **Stop the per-call approval prompts.** Claude Code asks before every MCP tool call until the
+   tool is allowed. To allow every tool on the `outline` server, add a permission rule to your
+   **user** settings, `~/.claude/settings.json`, which matches the user-scoped server and applies
+   in every project. Merge it into the existing `permissions` block if there is one:
+   ```json
+   {
+     "permissions": {
+       "allow": ["mcp__outline"],
+       "ask": ["mcp__outline__delete_document"]
+     }
+   }
+   ```
+   - `mcp__outline` (the server name, with no tool suffix) matches **all** of that server's
+     tools.
+   - The optional `ask` rule keeps a confirmation on deletes. `ask` takes precedence over
+     `allow`. Drop it if you want deletes to go through without a prompt too.
+   - The same rules can be added interactively with `/permissions` → Allow → `mcp__outline`.
+     Answering "Yes, and don't ask again" in a prompt only allows that one tool.
+   - Restart Claude Code (or start a new session), then check `/permissions` lists the rule.
 
 ### 6e. Upgrading
 
@@ -790,21 +861,17 @@ Check the [release notes](https://github.com/outline/outline/releases) first, ba
 and run `docker compose pull && docker compose up -d`. Migrations run on start. Pocket ID works
 the same way: bump the image tag in its `compose.yml`.
 
-### 6f. Removing whichever tool loses
+### 6f. Removing Outline (if ever replaced)
 
 ```bash
-# Outline loses:
 cd /home/mib/app/outline && docker compose down -v && sudo tailscale serve --https=8445 off
 # Pocket ID too, if nothing else uses it:
 cd /home/mib/app/pocket-id && docker compose down && sudo tailscale serve --https=8446 off
 docker network rm sso
-claude mcp remove outline
-# AFFiNE loses:
-cd /home/mib/app/affine && docker compose down && sudo tailscale serve --https=8444 off
-claude mcp remove affine; claude mcp remove affine-builtin 2>/dev/null
+claude mcp remove outline --scope user   # and drop the mcp__outline rules from ~/.claude/settings.json
 ```
 
-Delete the loser's directory under `/home/mib/app/` and its rows in the migration inventory.
+Then delete the directories under `/home/mib/app/` and their rows in the migration inventory.
 
 ---
 
@@ -821,8 +888,6 @@ https://rainbow-flame.taila02055.ts.net:3004 (tailnet only)
 |-- / proxy http://127.0.0.1:3004
 https://rainbow-flame.taila02055.ts.net:8443 (tailnet only)
 |-- / proxy http://127.0.0.1:5173
-https://rainbow-flame.taila02055.ts.net:8444 (tailnet only)
-|-- / proxy http://127.0.0.1:3010
 https://rainbow-flame.taila02055.ts.net:8445 (tailnet only)
 |-- / proxy http://127.0.0.1:3000
 https://rainbow-flame.taila02055.ts.net:8446 (tailnet only)
@@ -843,18 +908,15 @@ Keep this table accurate. It's the checklist for moving everything to a new host
 |---|---|---|---|---|---|
 | SparkyFitness | `/home/mib/app/sparkyfitness` | Postgres + uploads (check `docker-compose.yml` for volume/bind names) | DB password, API encryption key, `BETTER_AUTH_SECRET` | `SPARKY_FITNESS_FRONTEND_URL`, `SPARKY_FITNESS_EXTRA_TRUSTED_ORIGINS`; loopback bind in `docker-compose.yml` | `:3004 → 127.0.0.1:3004` |
 | Kaneo | `/home/mib/app/kaneo` | Docker volume `kaneo_postgres_data` | `POSTGRES_PASSWORD`, `AUTH_SECRET` | `KANEO_CLIENT_URL` | `:8443 → 127.0.0.1:5173` |
-| AFFiNE | `/home/mib/app/affine` | `./data/postgres`, `./data/storage` (uploads/blobs), `./config` | none by default (Postgres uses trust auth); LLM API key if AI is enabled | `server.externalUrl` in `config/config.json`; server URL in each mobile app; loopback bind in `compose.yml` | `:8444 → 127.0.0.1:3010` |
 | Outline | `/home/mib/app/outline` | Docker volumes `outline_database-data` (Postgres), `outline_storage-data` (attachments) | `SECRET_KEY`, `UTILS_SECRET`, `POSTGRES_PASSWORD`, `OIDC_CLIENT_SECRET` | `URL`, `OIDC_AUTH_URI`, `OIDC_LOGOUT_URI`; external `sso` network | `:8445 → 127.0.0.1:3000` |
 | Pocket ID | `/home/mib/app/pocket-id` | `./data` (SQLite DB + keys) | `ENCRYPTION_KEY` | `APP_URL`; each OIDC client's callback URL; **passkeys are bound to the host name**, so a new name means re-registering them (use `one-time-access-token`) | `:8446 → 127.0.0.1:1411` |
-| Outline MCP (on the Mac) | Claude Code user MCP config (`claude mcp list`) | none | Outline API key (in the Claude Code config) | endpoint URL: `claude mcp remove outline` and re-add | n/a |
-| AFFiNE MCP (on the Mac, not the server) | `~/.config/affine-mcp/config`; Claude Code user MCP config (`claude mcp list`) | none | agent account password (in the affine-mcp config); built-in `aff_mcp_v1…` token if Option A is used | AFFiNE URL: re-run `affine-mcp login`; built-in endpoint URL: `claude mcp remove affine-builtin` and re-add | n/a |
+| Outline MCP (on the Mac) | Claude Code user MCP config (`claude mcp list`); permission rules in `~/.claude/settings.json` | none | Outline API key (in the Claude Code config) | endpoint URL: `claude mcp remove outline` and re-add | n/a |
 
 ### Moving to a new host
 
 1. On the old host, run `docker compose down` in each `/home/mib/app/*` directory.
 2. Before the `down`, dump every Postgres database:
    - Kaneo: `docker compose exec postgres pg_dump -U kaneo kaneo > kaneo.sql`
-   - AFFiNE: `docker compose exec postgres pg_dump -U affine affine > affine.sql`
    - Outline: `docker compose exec postgres pg_dump -U outline outline > outline.sql`. Also copy
      the `outline_storage-data` volume (e.g.
      `docker run --rm -v outline_storage-data:/d -v "$PWD":/b alpine tar czf /b/outline-storage.tgz -C /d .`).
@@ -866,8 +928,8 @@ Keep this table accurate. It's the checklist for moving everything to a new host
 4. Restore the dumps into the new Postgres containers.
 5. Update the host-specific URLs in the table above, run `docker compose up -d`, and re-run the
    `tailscale serve` commands.
-6. If the host name changed, update AFFiNE's `externalUrl`, re-add the server in the AFFiNE
-   mobile app, and on the Mac re-run `affine-mcp login` (plus re-add `affine-builtin` if used).
+6. If the host name changed, re-add the Outline MCP server on the Mac
+   (`claude mcp remove outline --scope user`, then §6d step 4) and reinstall the PWA on the phone.
 7. Run `docker network create sso` on the new host before starting Pocket ID and Outline. If
    the host name changed, update Pocket ID's `APP_URL`, Outline's OIDC client callback URL, and
    Outline's `URL`/`OIDC_*` values, then re-register passkeys.
@@ -877,17 +939,20 @@ Keep this table accurate. It's the checklist for moving everything to a new host
 
 ## Appendix: documentation tool comparison
 
-**Decision (2026-09): AFFiNE.** Obsidian was tried and rejected. Its "self-hosted" mode is the
-desktop app streamed into a browser tab (plus a separate CouchDB for LiveSync), and the setup
-felt clumsy and fragile. AFFiNE won because it has a native mobile app that connects to a
-self-hosted server, plus a Miro-style canvas.
+**Decision (2026-10): Outline.**
 
-**Now trialling Outline side by side (§6)** because its built-in MCP server supports writes on
-self-hosted installs with no workarounds, and its PWA may be good enough on mobile.
+History of the decision:
+1. **Obsidian (rejected 2026-09):** its "self-hosted" mode is the desktop app streamed into a
+   browser tab, plus a separate CouchDB for LiveSync. Setup felt clumsy and fragile.
+2. **AFFiNE (picked 2026-09, deprecated 2026-10):** chosen for its native mobile app and
+   Miro-style canvas. But its built-in MCP server is read-only on stable self-hosted installs,
+   so agent writes needed a community server.
+3. **Outline (adopted 2026-10):** its built-in MCP server read and wrote docs out of the box in
+   the Claude Code smoke test (§6d). The PWA is the accepted mobile experience.
 
-**Fallback plan:** if AFFiNE doesn't work out, try **Outline**, then **Docmost**, and/or
-**BookStack**. All three are Docker Compose installs that fit the same pattern as §5 (loopback
-port, `tailscale serve` on `:8444`).
+**Fallback plan:** if Outline stops working out, try **Docmost**, then **BookStack**. Both are
+Docker Compose installs that fit the same pattern (loopback port, `tailscale serve` on a free
+HTTPS port such as `:8444`).
 
 ### Requirements
 
@@ -910,7 +975,7 @@ Legend: ✅ strong, 🟡 partial or with caveats, ❌ missing.
 | WYSIWYG in the browser | ✅ | ✅ | ✅ | ✅ (older-style editor) | ✅ | ✅ | ❌ streamed desktop app only |
 | Mobile web | 🟡 | 🟡 good for reading, OK for editing | 🟡 | 🟡 fine | 🟡 | 🟡 separate mobile layout | ❌ |
 | Native app for your own server | ✅ iOS/Android | ❌ (official PWA instead) | ❌ | ❌ | ✅ | ❌ | ✅ but syncs via LiveSync, not the server |
-| LLM / MCP access | 🟡 built-in is read-only on stable self-hosted; read/write via the community `affine-mcp-server` (§5c) | ✅ built-in `/mcp`, read + write on self-hosted, API key or OAuth, on by default (§6d) | 🟡 built-in one needs a paid licence; community servers use the free API | 🟡 community server over a solid REST API | 🟡 community | 🟡 API + community | 🟡 via a community plugin, or just read the files |
+| LLM / MCP access | 🟡 built-in is read-only on stable self-hosted; read/write via the community `affine-mcp-server` (§5b) | ✅ built-in `/mcp`, read + write on self-hosted, API key or OAuth, on by default (§6d) | 🟡 built-in one needs a paid licence; community servers use the free API | 🟡 community server over a solid REST API | 🟡 community | 🟡 API + community | 🟡 via a community plugin, or just read the files |
 | Stability | 🟡 rapid releases, rough edges | ✅ mature, several years in production | 🟡 young (2024), moving fast | ✅ very mature (2015–) | 🟡 complex server stack | ✅ | ✅ app, 🟡 self-hosted setup |
 | Community | ✅ large | ✅ large | 🟡 growing fast | ✅ steady | ✅ large | 🟡 | ✅ huge |
 | Plugins | 🟡 limited | ❌ integrations only | ❌ | 🟡 theme/hook system | ❌ | ✅ scripting | ✅ best in class |
@@ -922,12 +987,12 @@ Left out because they don't let you edit in the browser: Joplin, Anytype, Logseq
 Confluence themselves can't realistically be self-hosted (Confluence Data Center is
 enterprise-priced).
 
-### Notes on the fallbacks
+### Notes on the chosen tool and fallbacks
 
-- **Outline**
+- **Outline (chosen)**
   - The closest to Notion, in both editing and organisation (collections, nested docs).
-  - Its built-in MCP server works on self-hosted installs without a paid tier (Settings → AI),
-    and it has a good REST API.
+  - Its built-in MCP server works on self-hosted installs without a paid tier (Settings →
+    Features), and it has a good REST API.
   - Costs: you must set up a login provider (a self-hosted OIDC provider such as Pocket ID,
     Authentik, or Authelia fits the home-network plan), and there's no native mobile app.
 - **Docmost**
