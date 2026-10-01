@@ -620,6 +620,24 @@ Also perform a web search to determine if there are any other options for settin
 
 <!-- Update the document to include a section with in similar instructions for Outline: installing, configuring, enabling MCP, and testing MCP. I'd like to play with it now just in case I like it better, considering that it requires fewer workarounds than AFFiNE for my use case. I noticed from their official docs that the recommended way to use it on mobile is with [PWA](https://docs.getoutline.com/s/guide/doc/mobile-Ez4bmY6VDD). This might be acceptable for my mobile usage and I will test it. -->
 
+<!-- The outline install is failing on step 6c. 4. I see the error when checking the docker logs with `docker compose logs -f outline`:
+
+```shell
+outline-1  | {"error":"password authentication failed for user \"outline\"","level":"error","message":"Failed to connect to database","stack":"SequelizeConnectionError: password authentication failed for user \"outline\"\n    at Client._connectionCallback (/opt/outline/node_modules/sequelize/lib/dialects/postgres/connection-manager.js:145:24)\n    at Client._handleErrorWhileConnecting (/opt/outline/node_modules/pg/lib/client.js:379:19)\n    at Client._handleErrorMessage (/opt/outline/node_modules/pg/lib/client.js:399:19)\n    at Connection.emit (node:events:509:20)\n    at /opt/outline/node_modules/pg/lib/connection.js:115:12\n    at Parser.parse (/opt/outline/node_modules/pg-protocol/dist/parser.js:38:17)\n    at Socket.<anonymous> (/opt/outline/node_modules/pg-protocol/dist/index.js:11:42)\n    at Socket.emit (node:events:509:20)\n    at addChunk (node:internal/streams/readable:568:12)\n    at readableAddChunkPushByteMode (node:internal/streams/readable:519:3)"}
+```
+
+And the docker containers from `docker compose ps`:
+
+```shell
+NAME                 IMAGE                                              COMMAND                  SERVICE    CREATED         STATUS                          PORTS
+outline-outline-1    docker.getoutline.com/outlinewiki/outline:1.10.1   "docker-entrypoint.s…"   outline    6 minutes ago   Restarting (1) 34 seconds ago   
+outline-postgres-1   postgres:16                                        "docker-entrypoint.s…"   postgres   6 minutes ago   Up 6 minutes (healthy)          5432/tcp
+outline-redis-1      redis:7 
+``` -->
+
+It's failing on step 6c. 5 when I navigate to https://rainbow-flame.taila02055.ts.net:8445/ and it's redirected to the URL https://rainbow-flame.taila02055.ts.net:8446/interaction/error?error=The+requested+OAuth+2.0+Client+does+not+exist. I double-checked the OIDC client settings in pocket-id. I added only one callback url with the value `https://rainbow-flame.taila02055.ts.net:8445/auth/oidc.callback`.
+
+
 ---
 
 Suggestions:

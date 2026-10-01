@@ -588,8 +588,7 @@ prints a one-time login link.
    UTILS_SECRET=<hex 32>
    DEFAULT_LANGUAGE=en_US
 
-   POSTGRES_PASSWORD=<hex 24>
-   DATABASE_URL=postgres://outline:<same POSTGRES_PASSWORD>@postgres:5432/outline
+   POSTGRES_PASSWORD=<hex 24>   # used by both containers; DATABASE_URL is built from it in compose.yml
    PGSSLMODE=disable
    REDIS_URL=redis://redis:6379
 
@@ -619,6 +618,9 @@ prints a one-time login link.
      outline:
        image: docker.getoutline.com/outlinewiki/outline:${OUTLINE_VERSION}
        env_file: .env
+       environment:
+         # Built from the same variable Postgres uses, so the two can't drift apart.
+         DATABASE_URL: postgres://outline:${POSTGRES_PASSWORD}@postgres:5432/outline
        ports:
          - "127.0.0.1:3000:3000"
        volumes:
@@ -671,6 +673,33 @@ prints a one-time login link.
    docker compose exec outline wget -qO- http://pocket-id:1411/.well-known/openid-configuration | head -c 200   # sso network works
    sudo tailscale serve --bg --https=8445 http://127.0.0.1:3000
    ```
+   **If `outline` keeps restarting with `password authentication failed for user "outline"`:**
+   the password Outline sends doesn't match the one the Postgres data directory was **created**
+   with. `POSTGRES_PASSWORD` only takes effect the first time the `database-data` volume is
+   initialized. Changing `.env` afterwards (or a first `up` run before `.env` was filled in)
+   leaves the old password in place.
+   ```bash
+   cd /home/mib/app/outline
+   # 1. What will each container get? The two passwords must be identical.
+   docker compose config | grep -E 'DATABASE_URL|POSTGRES_PASSWORD'
+   # 2. Does Postgres accept the .env password? (127.0.0.1 forces a password check)
+   PW=$(grep '^POSTGRES_PASSWORD=' .env | cut -d= -f2 | cut -d' ' -f1)
+   docker compose exec postgres psql "postgresql://outline:$PW@127.0.0.1/outline" -c 'select 1'
+   ```
+   - If step 1 shows different values, fix `.env` or `compose.yml` and run `docker compose up -d`.
+   - If step 2 fails, the volume holds an older password. On a fresh install with no data, wipe
+     it and start over:
+     ```bash
+     docker compose down -v && docker compose up -d
+     ```
+     To keep existing data instead, set the password inside Postgres to match `.env` (the local
+     socket doesn't ask for a password):
+     ```bash
+     docker compose exec postgres psql -U outline -d outline -c "ALTER USER outline PASSWORD '$PW';"
+     docker compose restart outline
+     ```
+   - Keep secrets free of `@ : / ? #`, which would need URL-encoding inside `DATABASE_URL`.
+     `openssl rand -hex` output is safe.
 5. **First sign-in.** Open `https://rainbow-flame.taila02055.ts.net:8445/` → **Continue with
    Pocket ID** → sign in with the passkey. The first user to sign in creates the workspace and
    becomes its admin.
