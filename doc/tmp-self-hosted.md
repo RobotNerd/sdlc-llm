@@ -739,8 +739,8 @@ tools include `list_documents`, `create_document`, `update_document`, `move_docu
 `delete_document`, and `restore_document`, plus collection, comment, attachment, template, user,
 and fetch tools. Each call runs with the key owner's permissions.
 
-1. **Confirm MCP is on:** Settings → **Features** → **MCP** is enabled.
-2. **Create an API key:** Settings → **API & Apps** (API keys) → New → name it `claude-code`,
+1. **Confirm MCP is on:** Preferences → **AI** → **MCP server** is enabled.
+2. **Create an API key:** Preferences → **API & Apps** (API keys) → New → name it `claude-code`,
    leave scopes empty for full access (or restrict it later), and set an expiry. Copy the key.
    It's shown once.
    - Optional: create a dedicated agent user in Pocket ID (add it to `outline-users`), sign it
