@@ -684,7 +684,7 @@ Other specific notes:
 Update the PRD given this feedback. If you have any additional questions, add them at the bottom of the questions doc.
 Since you have access to outline, copy @doc/PRD-v2.md to outline once you've made the above changes locally. Likewise, move @doc/questions.md to outline but with a better name, like `PRD-v2-questions`. For the next round of changes to these docs, we'll try to use only the versions in outline. -->
 
-Round 2 feedback.
+<!-- Round 2 feedback.
 
 I added my answers to @doc/questions.md.
 
@@ -707,7 +707,48 @@ Responses to your suggestions in the PRD:
 
 Other notes:
 - For the guideline docs, section 9.1: Keeping these in outline is good for now. Later, I think these should be moved to their own github repo. Since I'm making the skills public, the guidelines docs they rely on should be public as well--outline is self-hosted and I won't open it to the public. The docs can be placed in a separate public git repo, and it can allow mix-and-match guidelines (e.g. separate code style docs for multiple languages) that the consuming repository can choose to use. Don't worry about planning this out now, but make a note of it in the PRD.
-- Section 10.2: Interviews should be conducted using the `questions` document pattern like we're using for the planning of this PRD. Create the questions doc in the appropriate location in outline. Once the user updates the docs with answers, they will notify the agent of that so the skill workflow can resume.
+- Section 10.2: Interviews should be conducted using the `questions` document pattern like we're using for the planning of this PRD. Create the questions doc in the appropriate location in outline. Once the user updates the docs with answers, they will notify the agent of that so the skill workflow can resume. -->
+
+<!-- I answered the round 3 questions in outline.
+
+Responses to your suggestions in the PRD:
+- 7.2 reports paths: agreed
+- 7.4 archving: agreed
+- 8. avoid duplicate notifications: agreed
+- 10.2 resuming: agreed
+- 10.5 step #10, outline epic reports path: agreed
+- 10.5 critic floor interrupt: agreed
+
+Additional Notes:
+- Go ahead and delete the local PRD-v2 doc now that we're using outline
+- I came across two official claude code guides that seem relevant here. Read both guides and then compare to the PRD. Are there any changes you would recommend making to the PRD based on these guides?
+  - [Skill authoring best practices](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices)
+  - [AI-native SDLC playbook](https://academy.claude.com/courses/ai-native-sdlc-playbook) -->
+
+<!-- I updated the questions doc with answers for Round 4.
+
+Responses to your suggestions in the PRD:
+- 10.1 question doc location: agreed
+
+Additional notes:
+- When adding questions to the question docs, insert a new line with `> Answer: TODO` after each new question to be answered.
+- As for the course I referenced, signing in is optional. Try checking it again. In case you can't get past the sign-in gate, I included direct links to each part of the course below.
+
+AI Native course - all pages in order:
+- Intro: https://academy.claude.com/courses/ai-native-sdlc-playbook/introduction
+- Intent: https://academy.claude.com/courses/ai-native-sdlc-playbook/capture-intent
+- Requirements/design: https://academy.claude.com/courses/ai-native-sdlc-playbook/requirements-and-design
+- Plan: https://academy.claude.com/courses/ai-native-sdlc-playbook/plan-mode
+- CLAUDE.md: https://academy.claude.com/courses/ai-native-sdlc-playbook/claude-md
+- Skills: https://academy.claude.com/courses/ai-native-sdlc-playbook/skills-as-institutional-knowledge
+- Sessions/subagents: https://academy.claude.com/courses/ai-native-sdlc-playbook/parallel-sessions-and-subagents
+- Feedback loop: https://academy.claude.com/courses/ai-native-sdlc-playbook/give-claude-a-feedback-loop
+- CI: https://academy.claude.com/courses/ai-native-sdlc-playbook/continuous-evals-in-ci
+- PR review: https://academy.claude.com/courses/ai-native-sdlc-playbook/ai-in-the-pr-review-loop
+- Hooks: https://academy.claude.com/courses/ai-native-sdlc-playbook/hooks-as-approval-gates
+- CICD: https://academy.claude.com/courses/ai-native-sdlc-playbook/ci-cd-integration-and-deployment
+- Metrics: https://academy.claude.com/courses/ai-native-sdlc-playbook/closing-the-loop-on-metrics
+- Closing: https://academy.claude.com/courses/ai-native-sdlc-playbook/closing-thoughts-and-resources -->
 
 ---
 
