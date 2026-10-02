@@ -652,7 +652,7 @@ The goal of this update is to make the document contain only the details that de
 
 ---
 
-I added my answers to @doc/questions.md.
+<!-- I added my answers to @doc/questions.md.
 
 These are my responses to your suggestions in @doc/PRD-v2.md that aren't already answered in the questions doc:
 - Section 4. I agree with this: `Keep the tracker calls behind one client module anyway, so a second backend stays possible.`.
@@ -682,7 +682,32 @@ Other specific notes:
 - Is it possible to use a `.env` file in this repo for storing secrets. For example, it could hold the `KANEO_API_KEY` secret you refer to in section 10.
 
 Update the PRD given this feedback. If you have any additional questions, add them at the bottom of the questions doc.
-Since you have access to outline, copy @doc/PRD-v2.md to outline once you've made the above changes locally. Likewise, move @doc/questions.md to outline but with a better name, like `PRD-v2-questions`. For the next round of changes to these docs, we'll try to use only the versions in outline.
+Since you have access to outline, copy @doc/PRD-v2.md to outline once you've made the above changes locally. Likewise, move @doc/questions.md to outline but with a better name, like `PRD-v2-questions`. For the next round of changes to these docs, we'll try to use only the versions in outline. -->
+
+Round 2 feedback.
+
+I added my answers to @doc/questions.md.
+
+Responses to your suggestions in the PRD:
+- 6.1 in prose: agreed
+- 7.2 outline: agreed
+- 7.2 <project> > docs > guidelines: agreed on this location
+- 7.2 spec titles: agreed
+- 7.3 cancelled tasks: agreed
+- 7.3 labels: agreed
+- 7.4 outline: agreed
+- 8: message shape: agreed
+- 8: how it's sent: agreed
+- 8 Later (two-way replies): agreed
+- 9.3 outline docs: agreed
+- 10.1 needs-refinement comment: agreed
+- 10.2 5 tasks in planned: agreed
+- 10.5 critic safety: agreed
+- 11 claude code .env deny settings: agreed
+
+Other notes:
+- For the guideline docs, section 9.1: Keeping these in outline is good for now. Later, I think these should be moved to their own github repo. Since I'm making the skills public, the guidelines docs they rely on should be public as well--outline is self-hosted and I won't open it to the public. The docs can be placed in a separate public git repo, and it can allow mix-and-match guidelines (e.g. separate code style docs for multiple languages) that the consuming repository can choose to use. Don't worry about planning this out now, but make a note of it in the PRD.
+- Section 10.2: Interviews should be conducted using the `questions` document pattern like we're using for the planning of this PRD. Create the questions doc in the appropriate location in outline. Once the user updates the docs with answers, they will notify the agent of that so the skill workflow can resume.
 
 ---
 
@@ -699,3 +724,5 @@ TODO: general
 - Epic to rewrite existing `tests/`; find behavioral tests to keep and throw away the rest; write new tests to cover any missing behavioral test gaps; use the testing guide doce that's part of the `implement-task` for guidance
 - move shared references to a single location in the repo and use symlinks to them within each skill (if supported)
 - TODO: PLUGIN: group all skills as a plugin for namespacing
+- create separate git repo with all guideline docs for coding projects: linter rules for every language, testing strategy, document writing style guide, etc; projects can then directly reference those docs from the git repo so they don't have to be stored in sdlc-llm and copied alongside the skills
+- use excalidraw to create diagrams; I will spin up excalidraw and host it locally; agent interacts with excalidraw using mcp; export these diagrams from exalidraw and use them where necessary; example: in [PRD v2](https://rainbow-flame.taila02055.ts.net:8445/doc/prd-v2-sdlc-llm-tRrOvSVD69) section 6, excalidraw could be used to create a much cleaner architecture diagram; agent should review it's own diagram changes at least once before finalizing to catch errors
