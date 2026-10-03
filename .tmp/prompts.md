@@ -750,6 +750,42 @@ AI Native course - all pages in order:
 - Metrics: https://academy.claude.com/courses/ai-native-sdlc-playbook/closing-the-loop-on-metrics
 - Closing: https://academy.claude.com/courses/ai-native-sdlc-playbook/closing-thoughts-and-resources -->
 
+<!-- My feedback on your suggestions in the PRD:
+- 9.1 things claude gets wrong: agreed
+- 10.3 6 deferred review: agreed
+- 10.4 3 things claude gets wrong: agreed
+- 16 deferred, kaneo as single record: agreed -->
+
+<!-- The PRD document looks good. Change its status (currently "draft"), and then write step-by-step instructions that I can follow to manually implement the verification spike. Format the instructions as you would if you were writing it as a kaneo task. For now, put the task in outline nested under `PRD v2: sdlc-llm`. We can delete the doc once done.
+
+While I'm working on that spike, go ahead and write the draft versions of the guideline docs. -->
+
+<!-- The file @doc/tmp-self-hosted.md contains a set of instructions that I used to install self-hosted apps that are needed for the current project, sdlc-llm. I want to add one additional self-hosted tool: excalidraw.
+- the agent will use excalidraw to create diagrams when it needs one for documentation
+- the agent will use the excalidraw mcp
+- the instructions should follow a similar pattern to the step-by-step instructions provided in the doc for other tools
+- the instructions should include a short set of prompts for testing that direct the agent to use the mcp; it should create a diagram from scratch, make an edit to that same diagram, then export it as an image to a file saved locally in the current directory
+- [self-hosting instructions](https://docs.excalidraw.com/docs/introduction/development#self-hosting)
+
+Ask me any clarifying questions you have before starting. -->
+
+<!-- As an aside while I work on that task, can you modify the PRD in outline. I want you to replace the architecture diagram at the beginning of section 6 with a mermaind diagram. Outline supports mermaid natively.
+
+If this is successful, I want to modify the PRD to include this a guideline for docs--use mermaid to create diagrams when needed. -->
+
+<!-- Agreed with your addition, which should make the diagrams cleaner.
+
+One bit of feedback on the diagram you created in the PRD--it was visually messy. I edited it myself to explicitly add a layout at the top of the mermaid definition, like this:
+
+```mermaid
+---
+config:
+  layout: elk
+---
+```
+
+This was me tinkering--there may be an even better layout available. Update the PRD and guideline docs to include this. Since you can't see the rendered page, make a best guess of which layout should be used depending on the diagram type. If possible, we should come up with a way for you to see the rendered page so that you won't need a human in the loop to create clean diagrams. Or find another way to generate diagrams other than mermaid in outline. -->
+
 ---
 
 TODO: general
