@@ -786,20 +786,95 @@ config:
 
 This was me tinkering--there may be an even better layout available. Update the PRD and guideline docs to include this. Since you can't see the rendered page, make a best guess of which layout should be used depending on the diagram type. If possible, we should come up with a way for you to see the rendered page so that you won't need a human in the loop to create clean diagrams. Or find another way to generate diagrams other than mermaid in outline. -->
 
+<!-- I'm working through the first manual task. Update the outline document `Verify the Kaneo and Outline behavior the v2 data model relies on` to use formatting that's easier for me to use, as described below. Also update the formatting guidelines for all documentation, not just tasks, to take these changes into account.
+
+Friction points
+- Terminal commands for me to run that are displayed inline in a paragraph are slower for me to copy/paste because I have to highlight them with the mouse. Displaying them in a dedicated code block makes it much easier, since outline automatically shows a copy button to copy the command with a single click.
+- Displaying non-command values that I have to copy/paste inline in a paragraph also makes it slower for me to read and understand. For example, in Setup > Step 4, the workflow columns are listed inline. It would be easier for me to understand them, as well as copy/paste, if they were displayed as a bulleted list.
+
+## Example 1: Command to run
+
+### Current
+2. Kaneo API key. In Kaneo: Settings → Account → API Keys → create `sdlc-spike`. Then `read -s KANEO_API_KEY && export KANEO_API_KEY` and paste it.
+
+### Preferred
+2. Kaneo API key. In Kaneo: Settings → Account → API Keys → create
+```
+sdlc-spike
+```
+
+Then
+```
+read -s KANEO_API_KEY && export KANEO_API_KEY
+```
+and paste it.
+
+## Example 2: label values
+
+### Current
+5. Kaneo labels. In the UI, create workspace labels `epic`, `deferred`, and `wont-do`.
+
+### Preferred
+5. Kaneo labels. In the UI, create workspace labels:
+- `epic`
+- `deferred`
+- `wont-do` -->
+
+<!-- I finished running the manual tests in the document `Verify the Kaneo and Outline behavior the v2 data model relies on`. Note that I cut the backend findings from the architecture guideline docs, since that did was not a good place for the testing outcome. Instead I nested it in a new document under the test procedure document and named it `backend findings`. It's an ephemeral doc and will be removed once we're done with it.
+
+There were a few deviations found. The most significant one was when trying to reorder kaneo tasks using the API. Setting `position: 0` doesn't automatically reorder other tasks in the same column. I put this as a "maybe" for breaking the PRD. I'm not sure if the PRD calls for using the API specifically to reorder tasks or if it's loose enough to support MCP as a replacement. There may also be a workaround you can discover with the API that will reorder tasks properly.
+
+Feedback on other steps included as well. -->
+
+<!-- I will clean up the docs in outline manually.
+
+Right now I'm reviewing the guideline doc drafts you wrote. While I'm doing that, I want you to read the file @.tmp/anthropic-email.eml. It's an announcment about recent updates to the claude code ecosystem, and I think some of them may be applicable to what we're building in this project. Go ahead and read the content of the linked documents for full details. Summarize any recommendations you have about how any of these features/tools might fit in the sdlc-llm project. It's ok if none of them are relevant, or if they would only provide marginal benefits. Call that out if so. -->
+
+<!-- I have finished reviewing the guideline docs in outline. My feedback:
+
+- The `Code style` doc mixed concerns: it included guidelines for writing code along with those for writing documentation. I split out the documentation portion and moved it to a new document alongside the existing one named `Documentation style`. There is some overlap with the `Task style` guide; skills that refer to the tasks style guide should also refer to `Documentation style`.
+- In the review policy doc, I changed the nit limit to 10.
+- I updated a reference in the `Skill authoring` doc to the `Documentation style` doc.
+- The `Task style` guide might violate the rule of nested references. For example, it refers to both the `Code Style` and `Testing strategy` docs. I'm not sure if just referring to them by name counts as a nested reference, so it might be fine in its current state.
+
+Make updates as necessary. -->
+
+<!-- I'm working on the messaging ticket and I noticed a change to make to the documentation and task guidelines. When the manual instructions I have to follow involve creating a file, you're currently using `pbpaste` like this example from the document `Pick the notification channel for STOP and ASK messages`:
+
+```bash
+pbpaste > notify_check.py && python3 -m py_compile notify_check.py && echo ok
+```
+
+I would prefer instead that you tell me the name of the file to create along with its contents as the first step, skipping the `pbpaste` portion of the statement. I can create the file in my editor. So this example would become something like:
+
+Create a file
+```
+notify_check.py
+```
+
+with this content:
+```python
+# Sends one test message with the standard library, the way the M1 notify script will.
+import json, os, sys, urllib.error, urllib.request
+
+channel = sys.argv[1]
+# ...
+```
+
+Next run:
+```bash
+python3 -m py_compile notify_check.py && echo ok
+``` -->
+
+<!-- I completed the messaging task and the results are in outline. Short answer: discord as primary with telegram as a failover option in case of service outage. -->
+
 ---
 
 TODO: general
-- update CLAUDE.md to make sure unnecessary line breaks aren't added to generated markdown
-- prevent claude from inserting line breaks in markdown: https://mcpservers.org/agent-skills/prisma/markdown-no-artificial-line-wraps
+- update CLAUDE.md to make sure unnecessary line breaks aren't added to generated markdown; maybe this skill https://mcpservers.org/agent-skills/prisma/markdown-no-artificial-line-wraps
 - make a rewrite pass at README
 - new skill: find shared code and move it to a shared library
-- add linter; include prevention of large code files
-- Add refactoring check for plan-feature and add-task
-- Figure out the right way to choose model as orchestrator w/ different workers; ensure plan mode is always opus; make opus write the plan and tasks instead of switching to sonnet
-- Update /add-task to include plans for comprehensive BDD test cases in each task; covers new test, changes to existing tests, and/or deprecations to existing tests; include expected inputs and outputs for each test case; clarify each test case as a either behavioral test or a throwaway unit test
-- Create a new EPIC for automating implement-task-v2.
-- Epic to rewrite existing `tests/`; find behavioral tests to keep and throw away the rest; write new tests to cover any missing behavioral test gaps; use the testing guide doce that's part of the `implement-task` for guidance
-- move shared references to a single location in the repo and use symlinks to them within each skill (if supported)
-- TODO: PLUGIN: group all skills as a plugin for namespacing
 - create separate git repo with all guideline docs for coding projects: linter rules for every language, testing strategy, document writing style guide, etc; projects can then directly reference those docs from the git repo so they don't have to be stored in sdlc-llm and copied alongside the skills
-- use excalidraw to create diagrams; I will spin up excalidraw and host it locally; agent interacts with excalidraw using mcp; export these diagrams from exalidraw and use them where necessary; example: in [PRD v2](https://rainbow-flame.taila02055.ts.net:8445/doc/prd-v2-sdlc-llm-tRrOvSVD69) section 6, excalidraw could be used to create a much cleaner architecture diagram; agent should review it's own diagram changes at least once before finalizing to catch errors
+- potentially install a self-hosted instance of excalidash; only needed if I want to manually create diagrams
+- (self-hosted project): fork [outline](https://github.com/outline/outline) and add password authentication; will be simpler for self-hosting and allows me to remove the dependency on pocket id
+- add linter and formatter; probably [ruff](https://docs.astral.sh/ruff/) for both, unless you strongly recommend something else; update related docs: code style guide
