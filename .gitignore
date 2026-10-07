@@ -1,15 +1,11 @@
-.DS_Store
 *.swp
+.DS_Store
 .env
 
-# Python (TASK-004 onward: .tasks/bin/sync + its pytest suite)
-__pycache__/
+# Python
+*.egg-info/
 *.pyc
 .pytest_cache/
-*.egg-info/
 .venv/
+__pycache__/
 venv/
-
-# implement-task batch mode: local runtime state, never committed
-.tmp/batch-state.json
-.tmp/auto-merge-marker.json

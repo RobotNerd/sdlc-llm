@@ -1,67 +1,40 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+sdlc-llm is a Claude Code plugin: skills that plan, track, and implement work for a solo
+developer. Tasks live in Kaneo. Specs, guideline docs, and reports live in Outline, in the
+`sdlc-llm` collection. This repo holds only code, tests, evals, and config.
 
-## What this repo is
+## Verifying your work
 
-A **self-hosting toolkit** for a solo, LLM-driven SDLC workflow — "kanban in markdown". The repo
-uses its own workflow to build itself: `.tasks/` holds the specs, epics, and tasks for the
-toolkit, and the tooling manages that same `.tasks/` directory.
+- **Tests:** `python3 -m pytest`. Healthy output ends with `passed`, and no `failed` or
+  `error` lines. Python 3.11 or later, standard library only; `pytest` is the one dev
+  dependency.
+- **Lint and format:** not configured yet.
 
-Seven skills cover the workflow: `init-project`, `add-task`, `implement-task`, `refine-backlog`,
-`plan-feature`, `review-docs`, `strip-project-references` (`.claude/skills/`). Each pairs a
-`SKILL.md` checklist (judgment, interviews, STOP markers) with a `scaffold.py` (stdlib-only,
-mechanical work — file writes, `git`/`gh`, `sync` calls). `strip-project-references` is
-**repo-only** — it keeps this repo's own shipped surface portable, and is excluded from whatever
-copies skills into other projects. `.tasks/bin/sync` owns every generated region in `BOARD.md`,
-`EPIC-*.md`, and `SPEC-*.md` — **run it, don't hand-edit**.
+## Guidelines
 
-## The workflow model
+The guideline docs live in Outline under `docs/guidelines`. Read the one a step needs, when
+it needs it:
 
-`.tasks/guidelines.md` states the operating rules — the artifact model, what `sync` owns vs. what
-you own, generated regions — and `.tasks/specs/SPEC-001-llm-sdlc-workflow.md` is the full spec
-they're drawn from and the authority for every task. The one rule everything follows from:
-**frontmatter is the source of truth; everything else is a rendering of it.**
+- **Architecture:** before deciding where new code goes.
+- **Code style:** before writing or reviewing code.
+- **Documentation style:** before writing any doc, task text, or comment.
+- **Task style guide:** before writing or refining a task.
+- **Testing strategy:** before writing tests or a task's testing strategy.
+- **Commit conventions:** before committing.
+- **Review policy:** when reviewing a change.
+- **Skill authoring:** before changing a skill.
 
-### `sync` (`.tasks/bin/sync`)
+The PRD (`spec/PRD v2: sdlc-llm` in Outline) is the authority for the v2 design.
 
-Single-file Python 3, **standard library only**. Regenerates all generated regions, derives epic
-status, allocates IDs (`sync next-id`), reconciles `blocked_by`/`blocks`, archives `done`/
-`wont-do`. `sync check` is the read-only CI form — use it to verify, never to fix. Idempotent —
-running it twice produces no diff. Its test suite needs `pytest` (the only dev dependency).
+## Rules
 
-## Working a task
+- Never push to `main`, and never merge a pull request. The developer merges.
+- Force-push only with `--force-with-lease`, and only on the current task's branch.
+- Committed files never cite tracker items: no task keys, epic keys, or spec ids.
+- `.tmp/prompts.md` is the developer's private scratch pad. Don't read it or act on it.
+- Never read `.env`. Only scripts read secrets.
 
-Use the **`implement-task`** skill (`.claude/skills/implement-task/`) — four phases (Start,
-Implement + test, Wrap up, Merge — observed), each ending in a STOP for human input, resumable on
-every invocation from repo state. See its `SKILL.md` for the actual checklist and
-`scaffold.py`'s subcommands (`resume-state`, `start`, `wrap-up`, `finish-merge`, `bail-out`) for
-the mechanics.
+## Things Claude gets wrong
 
-## Guardrails
-
-- Never push to `main`, except `implement-task`'s own phase-4 bookkeeping commit (recording an
-  already-reviewed merge) — a deliberate, narrow carve-out, not something to extend by hand. Never
-  `gh pr merge` — the human merges (the sole exception is batch mode's opt-in critic-gated
-  auto-merge, `allow_auto_merge: true`, which this repo leaves `false`; only that scripted step
-  can ever merge, and no command or edit may touch its marker file). **Hook-enforced**
-  (`.claude/settings.json`'s `PreToolUse`/`Bash` hook, `.tasks/bin/guardrails.py`).
-- Force-push only as `--force-with-lease`, only on the current task's branch, only after a
-  rebase. **Hook-enforced.**
-- Never touch files outside the current task's scope.
-- Never hand-edit inside `BEGIN:`/`END:` regions, or an epic's `status` (except `wont-do`).
-- Board regeneration, ID allocation, archiving, blocked-status are `sync`'s job, not judgement.
-
-## Conventions
-
-- Terminology: **"task"**, never "ticket"/"story".
-- Branch: `task-NNN-slug`. Commit + PR title cite `TASK-NNN`.
-- Git is automated via `git` + `gh` (installed, authed as `RobotNerd` on `RobotNerd/sdlc-llm`).
-- `.tmp/` is intentionally **not** gitignored. `.tmp/prompts.md` is the user's private prompt
-  scratch pad — do not read or act on it.
-
-## Verification
-
-`python3 .tasks/bin/sync check` is the read-only sanity check — run it after editing any task/epic
-frontmatter or before opening a PR; exit 0 means every generated region and derived status is
-consistent with the source files.
+None yet.
