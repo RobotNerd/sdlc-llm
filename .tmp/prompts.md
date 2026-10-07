@@ -513,34 +513,368 @@ Don't implement the steps that you outlined in `Plan: applying this strategy to 
 
 ---
 
-I've spent some time reconsidering my design of this system. My main conclusion is that managing epics and tasks as part of each project is a bad design decision. It's overly cumbersome, reinvents the wheel, and it leaves a lot of unnecessary stale data in the project in the archived files. I want to use these lessons to rethink the design.
+<!-- I've spent some time reconsidering my design of this system. My main conclusion is that managing epics and tasks as part of each project is a bad design decision. It's overly cumbersome, reinvents the wheel, and it leaves a lot of unnecessary stale data in the project as archived files. I want to use these lessons to rethink the design.
 
 Here are my current thoughts on how I want to change things up:
-- Use [kaneo](https://kaneo.app) for project management. It handles all task management, the kanban board, etc. It appears to come with an MCP server for agent connectivity, and I plan to self-host it. Leverage as many of its features as possible for task management rather than the agent doing the work.
-- Keep most skills but update them to work with kaneo: add-task, implement-task, plan-feature, refine-backlog, review-docs
-- Drop these skills: init-project (users install skills as a plugin or manually per-skill)
-- The goal is still to automate as much as possible. This means that building implement-task-v2 will still happen mostly as designed, and it will be most complex skill.
-- Skill behavior should continue to be offloaded to a deterministic script wherever possible. Keep the iterative development process where the first round is prose-only, and then behavior is offloaded in small testable chunks in separate tasks.
-- I noticed that what we've built so far feels more unstructured than I would like. I think the correct way to resolve this is a combination of multiple changes I should make: more upfront planning on my part of testing procedures and architecture direction in my prompts, defining style guide documents (architecture, testing strategy, linting rules, etc), and provide a solid style guide of how I want the tasks you generate to be formatted and worded.
+- Use [kaneo](https://kaneo.app) for project management. It handles all task management, the kanban board, etc. It appears to come with an MCP server for agent connectivity. Leverage as many of its features as possible for task management rather than the agent doing the work. I plan to self-host it on my home network. As part of this planning phase, I want you to evaluate kaneo to ensure that it will meet all of the needs for what I want to accomplish with this project.
+- I still want to keep the functionality of most skills. They need to work with kaneo instead of repo-managed tasks. I'm open to changing they way skills are organized, i.e. we don't have to keep exact same grouping of behavior by skill if something else makes more sense (new skills, splitting up skills, merging skills, etc). These tasks have behavior I want to keep: add-task, implement-task, plan-feature, refine-backlog, review-docs
+- Drop the init-project skill. Users can install skills as a plugin or manually per-skill, which seems to be industry best practice. Also consider making these installble using vercel labs npx skills, which I think is a way to share skills across multiple agent platforms.
+- The goal is still to automate the process of implementing batches of tasks. This means that building implement-task-v2 will still happen mostly as designed. It will be most complex skill.
+- Skill behavior should continue to be offloaded to deterministic scripts wherever possible. Keep the iterative development process where the first round is prose-only, and then behavior is offloaded in small testable chunks.
+- I noticed that what we've built so far feels more unstructured than I would like. I think the correct way to resolve this is a combination of multiple changes I should make: more upfront planning on my part of testing procedures and architecture direction in my prompts, defining style guide documents (architecture, testing strategy, linting rules, etc), and providing a solid style guide of how I want the tasks you generate to be formatted and worded.
 - Guideline reference docs, like @doc/testing-strategy.md, should be independent of the tasks managed by the project. For example, right now the testing strategy doc includes references to things like implement-task-v2 and EPIC-005. These types of references should be limited only to the tasks stored in kaneo and not exist in any of the generated artifiacts that are committed to the repo.
 
 Given this new direction, I want you to start by performing a full analysis of the project in its current state. Compile a new spec document/PRD that captures the features the new version should implement, and write it to @doc/PRD-v2.md. Take into account existing features, planned features (in current specs, epics, and tasks in @.tasks/), and the changes I mentioned above. Fill in any gaps you notice with your suggestions. Finally, put any questions you need me to clarify in a new file @doc/questions.md.
 
-We'll iterate on that document.
+We'll iterate on the new PRD document. -->
 
+<!-- TODO: self-hosted tmp
+- write step-by-step plan to deploy obsidian, kaneo, and sparkyfitness
+- make notes about what I've already tried and problems I ran into
+- keep doc around as a reference so it can be used to migrate data for these services later when I finalize my home network -->
+
+<!-- Write up an installation plan for me in a new file @doc/tmp-self-hosted.md that provides step-by-step instructions to install each of the following services:
+
+- [obsidian](https://obsidian.md/)
+- [kaneo](https://kaneo.app)
+- [sparkyfitness](https://github.com/CodeWithCJ/SparkyFitness)
+
+## Goals
+- I'm installing kaneo and obsidian to unblock progress on the sdlc-llm project, since I want to use both services as part of this workflow.
+- The sparkyfitness service is already running on that machine and I want to keep using it, but it's conflicting with the other services I'm trying to host (more details below).
+- I'm working on a more comprehensive plan for my self-hosted home network, and these services will likely need to be migrated to another host machine. The output document should include all the details necessary to know how and where these services are installed to make it easier to know what needs to be migrated in the future.
+- For obsidian, I want to install the LiveSync plugin to keep data synced between the hosted service and the obsidian mobile app on my phone.
+
+## Platform
+- OS: Ubuntu 24.04
+- Machine name: rainbow-flame
+- Networking: tailscale
+  - MagicDNS url: rainbow-flame.taila02055.ts.net
+  - IP: 100.105.75.3
+
+## Background
+I initially installed sparkyfitness on rainbow-flame. To make it accessible from my other devices on the tailscale network, I enabled MagicDNS and ran `sudo tailscale serve --bg 3004`. The problems started later when I tried to install kaneo on the same machine. I tried running these commands:
+
+```
+sudo tailscale serve reset
+sudo tailscale serve --bg --set-path=/kaneo http://127.0.0.1:5173
+sudo tailscale serve --bg --set-path=/sparkyfitness http://127.0.0.1:3004
+```
+
+When I try to access either of the above URLs, I get a blank screen in the browser. In the browser dev tools console, there are a bunch of disallowed MIME type errors, like this: `Loading module from “https://rainbow-flame.taila02055.ts.net/assets/useSearch-BSm_91uI.js” was blocked because of a disallowed MIME type (“text/plain”).`. My guess is that neither of these services are playing nice with the paths where I'm trying to serve them. I've installed obsidian on rainbow-flame, but I haven't tried to configure it yet until I can resolve the serving issue. -->
+
+<!-- Make adjustments to the document given this feedback:
+- Modify sparkyfitness to be served on port 3004 externally instead of defaulting to port 443.
+- The path to sparkyfitness: `$HOME/app/sparkyfitness` (full path `/home/mib/app/sparkyfitness`)
+- I installed obsidian with the `apt` package manager. Make sure the docs include instructions to install it using docker since I'll need to reinstall. -->
+
+<!-- I'm following the sparkyfitness setup. I tried accessing it from my macbook, which I hadn't done before. It's showing me the error: `Authentication Failed Invalid Origin`. I'm also getting the same error when trying to reach it from the mobile app. I see these errors in the debug console:
+
+```
+[Auth Client] Error: 
+Object { response: Response, responseText: '{"message":"Invalid origin","code":"INVALID_ORIGIN"}', request: {…}, error: {…} }
+auth-client-BStSoeHw.js:1:236
+[ERROR] Mutation Error:  
+Object { message: "Invalid origin", code: "INVALID_ORIGIN", status: 403, statusText: "" }
+api-BQ-8BZLf.js:1:1359
+[ERROR] Auth: Sign in failed: 
+Object { message: "Invalid origin", code: "INVALID_ORIGIN", status: 403, statusText: "" }
+api-BQ-8BZLf.js:1:1359
+```
+
+Give me instructions to resolve this issue and update the document to include the steps. -->
+
+<!-- I got obsidian running...and I think I hate it. It seems to be the hot new documentation tool for self-hosting that everyone is using alongside AI agents, but I do not like the UX. The setup process was not streamlined, which makes me worry about the longetivity of this product.
+
+Here are the features I'm looking for in a self-hosted documentation tool:
+- Acts as the source of truth for documentation: docs for multiple projects like sdlc, my personal notes, etc.
+- Has a WYSIWYG in-browser editor.
+- Can be used from a desktop browser or mobile.
+- Ideally has a mobile app that connects to my self-hosted server, but I'm willing to use mobile-web if the UX is solid.
+- Easy for an LLM agent to interact with it, e.g. MCP.
+- Stable
+- There's an active community.
+- Nice to have: supports plugins/extensions.
+- Similar services I've used and liked: Notion, Confluence.
+
+Perform an analysis of popular documentation tools to compare and contrast them on these features. Include Obsidian in the analysis. -->
+
+<!-- I reviewed those options and decided to give AFFiNE a try. It seems stable enough, and the mobile app makes it worth a shot. The miro-style canvas seems like it could come in handy. If it doesn't work out, I can try falling back to other options, like Outline, Docmost, or BookStack, which all look good.
+
+Update @doc/tmp-self-hosted.md:
+- Remove obsidian.
+- Add AFFiNE install instructions.
+- Add a section capturing your comparison of documentation tools. Include a note that if AFFiNE falls through, I will try Outline, Docmost, and/or BookStack. -->
+
+<!-- Make some updates to @doc/tmp-self-hosted.md.
+
+First of all, the command `curl -fsS -o /dev/null -w '%{http_code}\n' http://127.0.0.1:3010/` when setting up affine will return a 302. This is because it redirects you to create the initial user account when first accessing the site. I was able to reach the URL in the browser and configure it just fine.
+
+The bigger change: I want you to add step-by-step instructions for setting up an MCP server along with steps to test and verify it via claude code. This is a critical feature for me, because I want the LLM agent to read and write (create, update) docs in affine. I want to know if this will work now so that I can pivot to another tool if it doesn't.
+
+Create two sets of instructions for using AFFiNE MCP:
+1. Using the built-in MCP server. I tried enabling AI support in the AFFiNE settings under the `AI BYOK` section, but I'm not sure what exactly I need to configure. This section references `Settings > Integrations` but I don't see that section anywhere in the AFFiNE settings.
+2. Using this MCP server: https://github.com/DAWNCR0W/affine-mcp-server. It looks like a community plugin to me, so I'm hoping it gets around the need to sign up with a provider in the AFFiNE configuration in order to enable MCP access.
+
+Also perform a web search to determine if there are any other options for setting up AFFiNE MCP beyond the two approaches I listed above. -->
+
+<!-- Update the document to include a section with in similar instructions for Outline: installing, configuring, enabling MCP, and testing MCP. I'd like to play with it now just in case I like it better, considering that it requires fewer workarounds than AFFiNE for my use case. I noticed from their official docs that the recommended way to use it on mobile is with [PWA](https://docs.getoutline.com/s/guide/doc/mobile-Ez4bmY6VDD). This might be acceptable for my mobile usage and I will test it. -->
+
+<!-- The outline install is failing on step 6c. 4. I see the error when checking the docker logs with `docker compose logs -f outline`:
+
+```shell
+outline-1  | {"error":"password authentication failed for user \"outline\"","level":"error","message":"Failed to connect to database","stack":"SequelizeConnectionError: password authentication failed for user \"outline\"\n    at Client._connectionCallback (/opt/outline/node_modules/sequelize/lib/dialects/postgres/connection-manager.js:145:24)\n    at Client._handleErrorWhileConnecting (/opt/outline/node_modules/pg/lib/client.js:379:19)\n    at Client._handleErrorMessage (/opt/outline/node_modules/pg/lib/client.js:399:19)\n    at Connection.emit (node:events:509:20)\n    at /opt/outline/node_modules/pg/lib/connection.js:115:12\n    at Parser.parse (/opt/outline/node_modules/pg-protocol/dist/parser.js:38:17)\n    at Socket.<anonymous> (/opt/outline/node_modules/pg-protocol/dist/index.js:11:42)\n    at Socket.emit (node:events:509:20)\n    at addChunk (node:internal/streams/readable:568:12)\n    at readableAddChunkPushByteMode (node:internal/streams/readable:519:3)"}
+```
+
+And the docker containers from `docker compose ps`:
+
+```shell
+NAME                 IMAGE                                              COMMAND                  SERVICE    CREATED         STATUS                          PORTS
+outline-outline-1    docker.getoutline.com/outlinewiki/outline:1.10.1   "docker-entrypoint.s…"   outline    6 minutes ago   Restarting (1) 34 seconds ago   
+outline-postgres-1   postgres:16                                        "docker-entrypoint.s…"   postgres   6 minutes ago   Up 6 minutes (healthy)          5432/tcp
+outline-redis-1      redis:7 
+``` -->
+
+<!-- It's failing on step 6c. 5 when I navigate to https://rainbow-flame.taila02055.ts.net:8445/ and it's redirected to the URL https://rainbow-flame.taila02055.ts.net:8446/interaction/error?error=You+are+not+allowed+to+access+this+service. I ran `docker compose logs outline` and don't see any errors.
+
+Also a slight variation to your instructions: I'm using 1password. I saved the passkey there instead of the icloud keychain. -->
+
+<!-- The outline MCP commands are working very well. Outline seems to meet my needs, as you originally recommended. Update the document to deprecate the affine installation instructions and add step-by-step instructions to remove the existing affine install.
+
+When testing the MCP commands in claude code, I was prompted to allow the MCP requests. How can I allow all MCP requests to the outline server in claude code? -->
+
+<!-- I successfully uninstalled affine and committed all changes to git. Update @doc/tmp-self-hosted.md to meet these criteria:
+- Remove all references to affine.
+- Remove all references to obsidian.
+- Remove the documentation tool comparisions appendix. Outline should work just fine, and if I ever need to return to this analysis, I can find it in the git history.
+
+The goal of this update is to make the document contain only the details that describe the current state of the self-hosted services and to not include any historical decisions. -->
+
+---
+
+<!-- I added my answers to @doc/questions.md.
+
+These are my responses to your suggestions in @doc/PRD-v2.md that aren't already answered in the questions doc:
+- Section 4. I agree with this: `Keep the tracker calls behind one client module anyway, so a second backend stays possible.`.
+- Section 6. Agreed: `The core data model (§7) uses only features that the MCP server exposes, so prose-only skills never hit a wall. Only the one-time project setup needs REST or the web UI.`
+- Section 7.1 Notify the human: Agreed. I'm not familiar with mattermost, but it sounds like a good option since it's self-hosted. The other option I was considering is signal, which might work better in cases where I'm remote and might have disconnected my phone from tailscale. I think this warrants further analysis of messaging options so I can determine which platform (or maybe multiple platforms) I want to support.
+- 8.1 commit conventions: Agreed
+- 9.1 the two STOP conditions and the ASK: only do these when the human triggers the add-task skill; when the agent invokes the add-task skill once the spec is finalized (via the plan-feature task), it should automatically create the epic and multiple tasks within that epic without human interaction; human review of all generated tasks comes after those are created
+- 9.1 3 duplicate check: Agreed
+- 9.2 2 architecture check: agreed; note that the wording should change to remove the reference to commtting the doc changes, since the agent will automatically make those changes in the outline app
+- 9.3 2 blocked-order problems: agreed
+- 9.3 5 ready check: agreed
+- 9.5: Agreed on `The code-style and architecture docs are part of the critic's input [suggestion].`.
+- 9.5: Agreed on `placed in Planned [suggestion] (not at the end of to-do; Q5)`
+- 9.6: Agreed
+- 11. repo layout: agreed, except for the `scripts/_shared` folder; see response to Q8
+- 11. versioning: agreed on semver
+- 11.1 guardrails: agreed on `A SessionStart hook that prints the Kaneo tasks that are in-progress or needs-human [suggestion]: the replacement for v1's board-context hook.`.
+- 12 Contract tests: Agreed
+- 13 3: `[suggestion] A step is ready to extract once it has passed its manual test in at least two runs with no prose change in between.` It's a good guideline, which I'll determine manually. No need for the agent to keep track of this.
+- 13 4 extraction order: looks good for now
+
+Other specific notes:
+- 7.3: A self-hosted kaneo instance is running on my local network and available over tailscale at https://rainbow-flame.taila02055.ts.net:8443/. I have not connected its mcp server to claude code yet, but we can do that and then you can run all of the tests you describe in this section. I'd say we run this outside of the official workflow, since we're moving to tasks that would require kaneo.
+- Section 9 `plan-feature`: epic stays in kaneo, spec moves to outline
+- Using kaneo and outline: When we start replacing portions of the skills with scripts, the calls to these external tools should be abstracted using an interface. The goal is to hopefully make it easier to swap out backend tools in the future if necessary. I'm not sure if it's really possible to do this within the prose content of the skill, but if so, let's word the skill to act this way as well.
+- I want to integrate an optional external messaging tool for notifying me on STOP and ASK conditions, which you mentioned in Section 7.1. Whenever one of these events occurs, the notification is always displayed in the claude code terminal. If the messaging tool is enabled (set in config.md), then a short, concise version of the notification is sent on that messaging channel. We'll choose an initial messaging tool in the beginning, but I may want the option to support multiple messaging tools/channels in the future.
+- Is it possible to use a `.env` file in this repo for storing secrets. For example, it could hold the `KANEO_API_KEY` secret you refer to in section 10.
+
+Update the PRD given this feedback. If you have any additional questions, add them at the bottom of the questions doc.
+Since you have access to outline, copy @doc/PRD-v2.md to outline once you've made the above changes locally. Likewise, move @doc/questions.md to outline but with a better name, like `PRD-v2-questions`. For the next round of changes to these docs, we'll try to use only the versions in outline. -->
+
+<!-- Round 2 feedback.
+
+I added my answers to @doc/questions.md.
+
+Responses to your suggestions in the PRD:
+- 6.1 in prose: agreed
+- 7.2 outline: agreed
+- 7.2 <project> > docs > guidelines: agreed on this location
+- 7.2 spec titles: agreed
+- 7.3 cancelled tasks: agreed
+- 7.3 labels: agreed
+- 7.4 outline: agreed
+- 8: message shape: agreed
+- 8: how it's sent: agreed
+- 8 Later (two-way replies): agreed
+- 9.3 outline docs: agreed
+- 10.1 needs-refinement comment: agreed
+- 10.2 5 tasks in planned: agreed
+- 10.5 critic safety: agreed
+- 11 claude code .env deny settings: agreed
+
+Other notes:
+- For the guideline docs, section 9.1: Keeping these in outline is good for now. Later, I think these should be moved to their own github repo. Since I'm making the skills public, the guidelines docs they rely on should be public as well--outline is self-hosted and I won't open it to the public. The docs can be placed in a separate public git repo, and it can allow mix-and-match guidelines (e.g. separate code style docs for multiple languages) that the consuming repository can choose to use. Don't worry about planning this out now, but make a note of it in the PRD.
+- Section 10.2: Interviews should be conducted using the `questions` document pattern like we're using for the planning of this PRD. Create the questions doc in the appropriate location in outline. Once the user updates the docs with answers, they will notify the agent of that so the skill workflow can resume. -->
+
+<!-- I answered the round 3 questions in outline.
+
+Responses to your suggestions in the PRD:
+- 7.2 reports paths: agreed
+- 7.4 archving: agreed
+- 8. avoid duplicate notifications: agreed
+- 10.2 resuming: agreed
+- 10.5 step #10, outline epic reports path: agreed
+- 10.5 critic floor interrupt: agreed
+
+Additional Notes:
+- Go ahead and delete the local PRD-v2 doc now that we're using outline
+- I came across two official claude code guides that seem relevant here. Read both guides and then compare to the PRD. Are there any changes you would recommend making to the PRD based on these guides?
+  - [Skill authoring best practices](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices)
+  - [AI-native SDLC playbook](https://academy.claude.com/courses/ai-native-sdlc-playbook) -->
+
+<!-- I updated the questions doc with answers for Round 4.
+
+Responses to your suggestions in the PRD:
+- 10.1 question doc location: agreed
+
+Additional notes:
+- When adding questions to the question docs, insert a new line with `> Answer: TODO` after each new question to be answered.
+- As for the course I referenced, signing in is optional. Try checking it again. In case you can't get past the sign-in gate, I included direct links to each part of the course below.
+
+AI Native course - all pages in order:
+- Intro: https://academy.claude.com/courses/ai-native-sdlc-playbook/introduction
+- Intent: https://academy.claude.com/courses/ai-native-sdlc-playbook/capture-intent
+- Requirements/design: https://academy.claude.com/courses/ai-native-sdlc-playbook/requirements-and-design
+- Plan: https://academy.claude.com/courses/ai-native-sdlc-playbook/plan-mode
+- CLAUDE.md: https://academy.claude.com/courses/ai-native-sdlc-playbook/claude-md
+- Skills: https://academy.claude.com/courses/ai-native-sdlc-playbook/skills-as-institutional-knowledge
+- Sessions/subagents: https://academy.claude.com/courses/ai-native-sdlc-playbook/parallel-sessions-and-subagents
+- Feedback loop: https://academy.claude.com/courses/ai-native-sdlc-playbook/give-claude-a-feedback-loop
+- CI: https://academy.claude.com/courses/ai-native-sdlc-playbook/continuous-evals-in-ci
+- PR review: https://academy.claude.com/courses/ai-native-sdlc-playbook/ai-in-the-pr-review-loop
+- Hooks: https://academy.claude.com/courses/ai-native-sdlc-playbook/hooks-as-approval-gates
+- CICD: https://academy.claude.com/courses/ai-native-sdlc-playbook/ci-cd-integration-and-deployment
+- Metrics: https://academy.claude.com/courses/ai-native-sdlc-playbook/closing-the-loop-on-metrics
+- Closing: https://academy.claude.com/courses/ai-native-sdlc-playbook/closing-thoughts-and-resources -->
+
+<!-- My feedback on your suggestions in the PRD:
+- 9.1 things claude gets wrong: agreed
+- 10.3 6 deferred review: agreed
+- 10.4 3 things claude gets wrong: agreed
+- 16 deferred, kaneo as single record: agreed -->
+
+<!-- The PRD document looks good. Change its status (currently "draft"), and then write step-by-step instructions that I can follow to manually implement the verification spike. Format the instructions as you would if you were writing it as a kaneo task. For now, put the task in outline nested under `PRD v2: sdlc-llm`. We can delete the doc once done.
+
+While I'm working on that spike, go ahead and write the draft versions of the guideline docs. -->
+
+<!-- The file @doc/tmp-self-hosted.md contains a set of instructions that I used to install self-hosted apps that are needed for the current project, sdlc-llm. I want to add one additional self-hosted tool: excalidraw.
+- the agent will use excalidraw to create diagrams when it needs one for documentation
+- the agent will use the excalidraw mcp
+- the instructions should follow a similar pattern to the step-by-step instructions provided in the doc for other tools
+- the instructions should include a short set of prompts for testing that direct the agent to use the mcp; it should create a diagram from scratch, make an edit to that same diagram, then export it as an image to a file saved locally in the current directory
+- [self-hosting instructions](https://docs.excalidraw.com/docs/introduction/development#self-hosting)
+
+Ask me any clarifying questions you have before starting. -->
+
+<!-- As an aside while I work on that task, can you modify the PRD in outline. I want you to replace the architecture diagram at the beginning of section 6 with a mermaind diagram. Outline supports mermaid natively.
+
+If this is successful, I want to modify the PRD to include this a guideline for docs--use mermaid to create diagrams when needed. -->
+
+<!-- Agreed with your addition, which should make the diagrams cleaner.
+
+One bit of feedback on the diagram you created in the PRD--it was visually messy. I edited it myself to explicitly add a layout at the top of the mermaid definition, like this:
+
+```mermaid
+---
+config:
+  layout: elk
+---
+```
+
+This was me tinkering--there may be an even better layout available. Update the PRD and guideline docs to include this. Since you can't see the rendered page, make a best guess of which layout should be used depending on the diagram type. If possible, we should come up with a way for you to see the rendered page so that you won't need a human in the loop to create clean diagrams. Or find another way to generate diagrams other than mermaid in outline. -->
+
+<!-- I'm working through the first manual task. Update the outline document `Verify the Kaneo and Outline behavior the v2 data model relies on` to use formatting that's easier for me to use, as described below. Also update the formatting guidelines for all documentation, not just tasks, to take these changes into account.
+
+Friction points
+- Terminal commands for me to run that are displayed inline in a paragraph are slower for me to copy/paste because I have to highlight them with the mouse. Displaying them in a dedicated code block makes it much easier, since outline automatically shows a copy button to copy the command with a single click.
+- Displaying non-command values that I have to copy/paste inline in a paragraph also makes it slower for me to read and understand. For example, in Setup > Step 4, the workflow columns are listed inline. It would be easier for me to understand them, as well as copy/paste, if they were displayed as a bulleted list.
+
+## Example 1: Command to run
+
+### Current
+2. Kaneo API key. In Kaneo: Settings → Account → API Keys → create `sdlc-spike`. Then `read -s KANEO_API_KEY && export KANEO_API_KEY` and paste it.
+
+### Preferred
+2. Kaneo API key. In Kaneo: Settings → Account → API Keys → create
+```
+sdlc-spike
+```
+
+Then
+```
+read -s KANEO_API_KEY && export KANEO_API_KEY
+```
+and paste it.
+
+## Example 2: label values
+
+### Current
+5. Kaneo labels. In the UI, create workspace labels `epic`, `deferred`, and `wont-do`.
+
+### Preferred
+5. Kaneo labels. In the UI, create workspace labels:
+- `epic`
+- `deferred`
+- `wont-do` -->
+
+<!-- I finished running the manual tests in the document `Verify the Kaneo and Outline behavior the v2 data model relies on`. Note that I cut the backend findings from the architecture guideline docs, since that did was not a good place for the testing outcome. Instead I nested it in a new document under the test procedure document and named it `backend findings`. It's an ephemeral doc and will be removed once we're done with it.
+
+There were a few deviations found. The most significant one was when trying to reorder kaneo tasks using the API. Setting `position: 0` doesn't automatically reorder other tasks in the same column. I put this as a "maybe" for breaking the PRD. I'm not sure if the PRD calls for using the API specifically to reorder tasks or if it's loose enough to support MCP as a replacement. There may also be a workaround you can discover with the API that will reorder tasks properly.
+
+Feedback on other steps included as well. -->
+
+<!-- I will clean up the docs in outline manually.
+
+Right now I'm reviewing the guideline doc drafts you wrote. While I'm doing that, I want you to read the file @.tmp/anthropic-email.eml. It's an announcment about recent updates to the claude code ecosystem, and I think some of them may be applicable to what we're building in this project. Go ahead and read the content of the linked documents for full details. Summarize any recommendations you have about how any of these features/tools might fit in the sdlc-llm project. It's ok if none of them are relevant, or if they would only provide marginal benefits. Call that out if so. -->
+
+<!-- I have finished reviewing the guideline docs in outline. My feedback:
+
+- The `Code style` doc mixed concerns: it included guidelines for writing code along with those for writing documentation. I split out the documentation portion and moved it to a new document alongside the existing one named `Documentation style`. There is some overlap with the `Task style` guide; skills that refer to the tasks style guide should also refer to `Documentation style`.
+- In the review policy doc, I changed the nit limit to 10.
+- I updated a reference in the `Skill authoring` doc to the `Documentation style` doc.
+- The `Task style` guide might violate the rule of nested references. For example, it refers to both the `Code Style` and `Testing strategy` docs. I'm not sure if just referring to them by name counts as a nested reference, so it might be fine in its current state.
+
+Make updates as necessary. -->
+
+<!-- I'm working on the messaging ticket and I noticed a change to make to the documentation and task guidelines. When the manual instructions I have to follow involve creating a file, you're currently using `pbpaste` like this example from the document `Pick the notification channel for STOP and ASK messages`:
+
+```bash
+pbpaste > notify_check.py && python3 -m py_compile notify_check.py && echo ok
+```
+
+I would prefer instead that you tell me the name of the file to create along with its contents as the first step, skipping the `pbpaste` portion of the statement. I can create the file in my editor. So this example would become something like:
+
+Create a file
+```
+notify_check.py
+```
+
+with this content:
+```python
+# Sends one test message with the standard library, the way the M1 notify script will.
+import json, os, sys, urllib.error, urllib.request
+
+channel = sys.argv[1]
+# ...
+```
+
+Next run:
+```bash
+python3 -m py_compile notify_check.py && echo ok
+``` -->
+
+<!-- I completed the messaging task and the results are in outline. Short answer: discord as primary with telegram as a failover option in case of service outage. -->
 
 ---
 
 TODO: general
-- update CLAUDE.md to make sure unnecessary line breaks aren't added to generated markdown
-- prevent claude from inserting line breaks in markdown: https://mcpservers.org/agent-skills/prisma/markdown-no-artificial-line-wraps
+- update CLAUDE.md to make sure unnecessary line breaks aren't added to generated markdown; maybe this skill https://mcpservers.org/agent-skills/prisma/markdown-no-artificial-line-wraps
 - make a rewrite pass at README
 - new skill: find shared code and move it to a shared library
-- add linter; include prevention of large code files
-- Add refactoring check for plan-feature and add-task
-- Figure out the right way to choose model as orchestrator w/ different workers; ensure plan mode is always opus; make opus write the plan and tasks instead of switching to sonnet
-- Update /add-task to include plans for comprehensive BDD test cases in each task; covers new test, changes to existing tests, and/or deprecations to existing tests; include expected inputs and outputs for each test case; clarify each test case as a either behavioral test or a throwaway unit test
-- Create a new EPIC for automating implement-task-v2.
-- Epic to rewrite existing `tests/`; find behavioral tests to keep and throw away the rest; write new tests to cover any missing behavioral test gaps; use the testing guide doce that's part of the `implement-task` for guidance
-- move shared references to a single location in the repo and use symlinks to them within each skill (if supported)
-- TODO: PLUGIN: group all skills as a plugin for namespacing
+- create separate git repo with all guideline docs for coding projects: linter rules for every language, testing strategy, document writing style guide, etc; projects can then directly reference those docs from the git repo so they don't have to be stored in sdlc-llm and copied alongside the skills
+- potentially install a self-hosted instance of excalidash; only needed if I want to manually create diagrams
+- (self-hosted project): fork [outline](https://github.com/outline/outline) and add password authentication; will be simpler for self-hosting and allows me to remove the dependency on pocket id
+- add linter and formatter; probably [ruff](https://docs.astral.sh/ruff/) for both, unless you strongly recommend something else; update related docs: code style guide

@@ -1,5 +1,6 @@
 .DS_Store
 *.swp
+.env
 
 # Python (TASK-004 onward: .tasks/bin/sync + its pytest suite)
 __pycache__/
