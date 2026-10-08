@@ -41,15 +41,17 @@ def get_backend(kind, config):
 
     module_name, class_name = BUILT_IN[kind][name]
     try:
-        module = importlib.import_module(module_name)
+        backend_class = getattr(importlib.import_module(module_name), class_name, None)
     except ModuleNotFoundError as error:
         if error.name != module_name:
             raise
+        backend_class = None
+    if backend_class is None:
         raise BackendError(
             f"the {name} {kind} backend has no script implementation yet; "
             f"prose skills use lib/references/backends/{name}.md"
-        ) from None
-    return getattr(module, class_name)(config)
+        )
+    return backend_class(config)
 
 
 def known_kind(kind):
