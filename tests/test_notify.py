@@ -1,110 +1,23 @@
 """The notify script: one message to the primary channel, or to the failover when it fails."""
 
-import json
-import os
 import subprocess
 import sys
-import threading
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-import pytest
+from notify_fakes import FAKE_TOKEN, MARKER, fake_environment, make_repo
 
 ROOT = Path(__file__).resolve().parent.parent
 NOTIFY = ROOT / "lib/notify.py"
-FAKE_TOKEN = "fake-bot-token-123"
 LINK = "https://kaneo.example.com/task?id=12&view=full"
-MARKER = ".sdlc/local/notify-sent"
-SECRET_NAMES = ("DISCORD_WEBHOOK_URL", "TELEGRAM_BOT_TOKEN")
-
-
-class FakeServer:
-    """An HTTP server that records each request and answers from a list of responses."""
-
-    def __init__(self, responses):
-        self.responses = list(responses)
-        self.requests = []
-        fake = self
-
-        class Handler(BaseHTTPRequestHandler):
-            def do_POST(self):
-                body = self.rfile.read(int(self.headers["Content-Length"]))
-                fake.requests.append({"path": self.path, "headers": dict(self.headers), "json": json.loads(body)})
-                status, payload = fake.responses.pop(0) if len(fake.responses) > 1 else fake.responses[0]
-                encoded = json.dumps(payload).encode() if payload is not None else b""
-                self.send_response(status)
-                self.send_header("Content-Type", "application/json")
-                self.send_header("Content-Length", str(len(encoded)))
-                self.end_headers()
-                self.wfile.write(encoded)
-
-            def log_message(self, *args):
-                pass
-
-        self.server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
-        self.url = f"http://127.0.0.1:{self.server.server_port}"
-        threading.Thread(target=self.server.serve_forever, args=(0.05,), daemon=True).start()
-
-    def close(self):
-        self.server.shutdown()
-        self.server.server_close()
-
-
-@pytest.fixture
-def servers():
-    created = []
-
-    def make(responses):
-        server = FakeServer(responses)
-        created.append(server)
-        return server
-
-    yield make
-    for server in created:
-        server.close()
-
-
-def make_repo(tmp_path, telegram_url, enabled=True):
-    (tmp_path / ".git").mkdir()
-    (tmp_path / ".sdlc").mkdir()
-    (tmp_path / ".sdlc/config.toml").write_text(
-        f"""\
-config_version = 1
-
-[docs]
-backend = "outline"
-
-[notify]
-enabled = {"true" if enabled else "false"}
-stop_hook = false
-
-[[notify.channels]]
-role = "primary"
-type = "discord"
-
-[[notify.channels]]
-api_url = "{telegram_url}"
-chat_id = "4242"
-role = "failover"
-type = "telegram"
-
-[tracker]
-backend = "kaneo"
-"""
-    )
-    return tmp_path
 
 
 def run_notify(repo, discord, *arguments):
-    environment = {name: value for name, value in os.environ.items() if name not in SECRET_NAMES}
-    environment["DISCORD_WEBHOOK_URL"] = f"{discord.url}/api/webhooks/1/fake"
-    environment["TELEGRAM_BOT_TOKEN"] = FAKE_TOKEN
     command = [sys.executable, str(NOTIFY), "--project", "sdlc-llm", "--skill", "implement-task", "--kind", "STOP"]
     return subprocess.run(
         [*command, *arguments],
         capture_output=True,
         cwd=repo,
-        env=environment,
+        env=fake_environment(discord),
         text=True,
         timeout=30,
     )
