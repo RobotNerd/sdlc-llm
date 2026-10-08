@@ -202,6 +202,19 @@ def test_warning_and_exit_0_when_both_channels_fail(tmp_path, servers):
     assert not (repo / MARKER).exists()
 
 
+def test_warning_gives_the_services_reason_when_a_channel_refuses_the_message(tmp_path, servers):
+    discord = servers([(404, {"message": "Unknown Webhook", "code": 10015})])
+    telegram = servers([(400, {"ok": False, "error_code": 400, "description": "Bad Request: chat not found"})])
+    repo = make_repo(tmp_path, telegram.url)
+
+    result = run_notify(repo, discord, "--text", "batch finished")
+
+    assert result.returncode == 0
+    assert "Unknown Webhook" in result.stderr
+    assert "Bad Request: chat not found" in result.stderr
+    assert FAKE_TOKEN not in result.stderr
+
+
 def test_warning_and_exit_0_when_the_config_is_missing(tmp_path, servers):
     discord = servers([(204, None)])
     (tmp_path / ".git").mkdir()

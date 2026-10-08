@@ -30,8 +30,16 @@ def post_json(url, payload, user_agent):
         time.sleep(wait)
         status, headers, body = send_once(url, payload, user_agent)
     if not 200 <= status < 300:
-        raise NotifierError(f"HTTP {status}")
+        raise NotifierError(f"HTTP {status}{service_reason(body)}")
     return body
+
+
+def service_reason(body):
+    # Telegram explains an error in description, and Discord in message. Neither echoes the URL.
+    if not isinstance(body, dict):
+        return ""
+    reason = body.get("description") or body.get("message")
+    return f": {reason}" if isinstance(reason, str) else ""
 
 
 def send_once(url, payload, user_agent):
