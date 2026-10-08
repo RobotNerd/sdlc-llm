@@ -8,6 +8,14 @@ CONFIG_PATH = ".sdlc/config.toml"
 # checks its own section's keys when it's created.
 REQUIRED_KEYS = ("config_version", "docs.backend", "tracker.backend")
 SUPPORTED_CONFIG_VERSION = 1
+# Used when the project's config doesn't set the key.
+DEFAULTS = {
+    # One run, no baseline, pinned model, and a local-only report: the per-task gate.
+    # {tag} is the skill whose cases run.
+    "evals.command": (
+        "claude plugin eval . --tag {tag} --runs 1 --ablation none --model claude-sonnet-5-5 --no-publish"
+    ),
+}
 
 
 class ConfigError(Exception):
@@ -54,3 +62,9 @@ def lookup(config, dotted_key):
             return None
         value = value[part]
     return value
+
+
+def setting(config, dotted_key):
+    """Return the configured value, or the default when the config doesn't set it."""
+    value = lookup(config, dotted_key)
+    return DEFAULTS.get(dotted_key) if value is None else value
