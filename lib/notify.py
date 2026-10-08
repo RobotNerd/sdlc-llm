@@ -56,8 +56,8 @@ def parse_arguments(argv):
     return parser.parse_args(argv)
 
 
-def notify(arguments):
-    repo_root = find_repo_root()
+def notify(arguments, start=None):
+    repo_root = find_repo_root(start)
     config = load_config(repo_root)
     settings = config.get("notify", {})
     if not settings.get("enabled", False):
