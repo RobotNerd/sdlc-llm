@@ -35,7 +35,15 @@ python3 ${CLAUDE_PLUGIN_ROOT}/lib/notify.py --skill setup-project --kind STOP --
 Freedom: low.
 
 1. Run `git rev-parse --show-toplevel`. If it fails, **STOP**: setup needs a git repository.
-2. If `.sdlc/config.toml` exists, the repo is already set up. **ASK** whether to rerun setup to
+2. Check that the plugin's MCP tools exist: `mcp__plugin_sdlc-llm_kaneo__list_workspaces` and
+   `mcp__plugin_sdlc-llm_outline__list_collections`. Other servers' Kaneo or Outline tools don't
+   count, because every skill calls the plugin's. If they're missing, **STOP**, and tell the
+   developer to:
+   1. open `/plugin`, choose sdlc-llm, then **Configure options**, and set the Kaneo URL and the
+      Outline URL
+   2. sign in to both servers with `/mcp`
+   3. rerun this skill
+3. If `.sdlc/config.toml` exists, the repo is already set up. **ASK** whether to rerun setup to
    repair it. A rerun keeps the existing config file unchanged. To change a value in it, the
    developer edits the file.
 
@@ -65,8 +73,7 @@ The defaults, each with its reason, are in `TOP_LEVEL_DEFAULTS`, `CRITIC_DEFAULT
 `EVALS_DEFAULTS` in [scripts/repo_files.py](scripts/repo_files.py). Read that file only to list
 them; don't run it.
 
-If either MCP server fails to answer, **STOP**: the plugin's MCP servers aren't connected. Run
-`/mcp` to see why.
+If either MCP server fails to answer, **STOP**, and tell the developer to run `/mcp` to see why.
 
 ## 3. Secrets in .env
 
