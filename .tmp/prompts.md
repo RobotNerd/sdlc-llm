@@ -868,6 +868,62 @@ python3 -m py_compile notify_check.py && echo ok
 
 <!-- I completed the messaging task and the results are in outline. Short answer: discord as primary with telegram as a failover option in case of service outage. -->
 
+<!-- Everything passed. I manually cleaned up following your instructions, and I've merged the PR. Clean up and start SDLC-4. -->
+
+<!-- Discord properly showed a tappable link in step 3.
+
+Discord failed as expected in step 4, but telegram then failed with a 400. I added TELEGRAM_BOT_TOKEN to the .env file, and I thought I used the same one I successfully used in our manual tests from M0. Walk me through troubleshooting it. -->
+
+<!-- The telegram message is received as expected and the tappable link works. One last thing. I pasted the output of the test command below. Is the `unknown webhook` error expected here?
+
+```
+DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/0/broken python3 lib/notify.py --skill implement-task --kind ASK --task SDLC-6 --text "manual test, Discord broken" --link https://github.com/RobotNerd/sdlc-llm/pull/97
+warning: notification not sent: sent to telegram after discord: HTTP 404: Unknown Webhook
+{"sent_to": "telegram", "warning": "sent to telegram after discord: HTTP 404: Unknown Webhook"}
+``` -->
+
+<!-- Merged. Make a note in SLC-11 or SDLC-12 (wherever it fits best) to remove the "Skill evals" section via setup-project, then clean up and start SDLC-11. -->
+
+<!-- The manual test worked as expected. The extra columns for kaneo shows this:
+
+```json
+"extra_columns": [
+  "in-review"
+]
+```
+
+Update provision to remove this column for new projects. -->
+
+<!-- It's failing on step 2, saying that the MCP servers aren't connected. I verified that they are connected with the prompts `list all collections in outline` and `list all projects in kaneo`, which each returned the expected data. Here's the output with th error:
+
+```
+STOP: the plugin's MCP servers aren't connected. I stopped before asking any interview questions.
+
+- Plugin tools missing: step 2 needs mcp__plugin_sdlc-llm_kaneo__list_workspaces, and no mcp__plugin_sdlc-llm_* tool exists in this session. The only Kaneo and Outline tools here come from separate servers named kaneo and outline (mcp__kaneo__*, mcp__outline__*).
+- Why I didn't use those instead: the other skills call only the plugin's tool names. So do the permissions setup writes to .claude/settings.json, and the step 7 check. Running setup against the other servers would still leave every later skill broken.
+- URLs not filled in: the skill shows the default Kaneo and Outline URLs as ${user_config.kaneo_url} and ${user_config.outline_url}, not real addresses. The plugin's settings, which hold those URLs, look unset or not loaded.
+
+To fix:
+1. Run /mcp to see whether the plugin's kaneo and outline servers are listed and why they failed. Check that the sdlc-llm plugin is installed and enabled, and that its settings include kaneo_url and outline_url.
+2. Restart Claude Code, then run /sdlc-llm:setup-project again. It will start over from step 1.
+
+.env is already at the repo root. I didn't read it, as the skill requires.
+``` -->
+
+<!-- Everything works now as expected. I squashed and merged the PR, and you can clean up the board.
+
+Before we move on, I have a question about the current repo. Is there a step in any of the upcoming milestones to start dogfooding on the current repo, which we tried in v1? Or have we not planned that yet and/or are actively avoiding it? -->
+
+<!-- Is there a reason that the new setup-project skill is defined in `skills/` instead of `.claude/skills`? -->
+
+<!-- TODO: run it on this repo -->
+
+Yes, make the first M2 task running setup-project on this repo. I signed into the kaneo mcp, so you should have access to it now. Once you finish cleaning that up, it looks like we're ready to move to M2.
+
+Going forward, here are some changes I want you to make:
+- The milestones in Section `15. Roadmap` of the PRD v2 doc should be represented as epics in kaneo. The tasks created in each milestone are assigned to that epic.
+- The manual test instructions in kaneo should be written out step-by-step with all the details I need to run them directly on the task itself. So far, you've been writing these instructions out to the console, which makes it more difficult for me to copy/paste commands to run in the terminal. If you can't fully determine all manual test steps needed before actually implementing the ticket, another option is to include the full test instructions as a comment on the kaneo ticket. Tell me which one you chose in the output in the claude code cli.
+
 ---
 
 TODO: general
@@ -882,3 +938,8 @@ TODO: general
   - [agent-skills](https://github.com/addyosmani/agent-skills) by addyosmani
   - [superpowers](https://github.com/obra/superpowers) by obra
   - [skills](https://github.com/mattpocock/skills) by mattpocock
+  - [pstack](https://github.com/cursor/plugins/tree/main/pstack) by poteto
+  - create a new skill: review these repos (and any others added to the list); have they introduced any new ideas since the last check; if so, are those changes useful to include in this repo; user periodically triggers this skill manually
+- Consider integrating Jev into the workflow where it makes sense
+- Remove the local mermaid rendering step. It's overkill.
+- Investigate switching to excalidraw for diagrams.
