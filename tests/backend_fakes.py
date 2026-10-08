@@ -40,7 +40,7 @@ class FakeService:
                 self.end_headers()
                 self.wfile.write(encoded)
 
-            do_GET = do_POST = do_PUT = handle_any
+            do_GET = do_POST = do_PUT = do_DELETE = handle_any
 
             def log_message(self, *args):
                 pass
@@ -103,9 +103,13 @@ class FakeKaneo(FakeService):
                 column = self.make_column(match[1], body["name"], body.get("isFinal", False), len(columns))
                 columns.append(column)
                 return 200, column
-            if method == "PUT":
-                column = next(column for columns in self.columns.values() for column in columns if column["id"] == match[1])
-                column.update(body)
+            if method in ("PUT", "DELETE"):
+                columns = next(columns for columns in self.columns.values() if any(c["id"] == match[1] for c in columns))
+                column = next(column for column in columns if column["id"] == match[1])
+                if method == "DELETE":
+                    columns.remove(column)
+                else:
+                    column.update(body)
                 return 200, column
         if match := re.fullmatch(r"/api/label/workspace/(\w+)", path):
             return 200, [label for label in self.labels if label["workspaceId"] == match[1]]

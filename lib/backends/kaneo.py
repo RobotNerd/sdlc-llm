@@ -24,6 +24,9 @@ class KaneoApi:
     def mark_column_final(self, column_id, name):
         return self.client.request(f"mark column {name!r} final", "PUT", f"/column/{column_id}", {"isFinal": True})
 
+    def delete_column(self, column_id, name):
+        return self.client.request(f"delete column {name!r}", "DELETE", f"/column/{column_id}")
+
     def reorder_columns(self, project_id, column_ids):
         body = {"columns": [{"id": column_id, "position": index} for index, column_id in enumerate(column_ids)]}
         return self.client.request("reorder columns", "PUT", f"/column/reorder/{project_id}", body)

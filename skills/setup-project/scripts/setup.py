@@ -103,12 +103,13 @@ def read_values(path):
 def provision_kaneo(kaneo, settings, created):
     workspace_id, slug = settings["workspace_id"], settings["project_slug"]
     project = next((project for project in kaneo.list_projects(workspace_id) if project["slug"] == slug), None)
-    if project is None:
+    is_new = project is None
+    if is_new:
         icon = settings.get("project_icon", DEFAULT_PROJECT_ICON)
         project = kaneo.create_project(workspace_id, settings["project_name"], slug, icon)
         created.append(f"Kaneo project {slug}")
 
-    columns = ensure_columns(kaneo, project["id"], created)
+    columns = ensure_columns(kaneo, project["id"], is_new, created)
     labels = ensure_labels(kaneo, workspace_id, created)
     required_slugs = {slug for slug, _, _ in COLUMNS}
     return {
@@ -121,8 +122,16 @@ def provision_kaneo(kaneo, settings, created):
     }
 
 
-def ensure_columns(kaneo, project_id, created):
+def ensure_columns(kaneo, project_id, is_new, created):
     columns = sorted(kaneo.list_columns(project_id), key=lambda column: column["position"])
+    if is_new:
+        # Kaneo gives a new project default columns we don't use, such as "in-review". A new
+        # project has no tasks, so they're safe to delete. An existing project keeps its extras.
+        required_slugs = {slug for slug, _, _ in COLUMNS}
+        for column in [column for column in columns if column["slug"] not in required_slugs]:
+            kaneo.delete_column(column["id"], column["slug"])
+            columns.remove(column)
+            created.append(f"Kaneo default column {column['slug']} removed")
     by_slug = {column["slug"]: column for column in columns}
     for slug, name, is_final in COLUMNS:
         if slug not in by_slug:

@@ -79,9 +79,10 @@ def test_everything_is_created_and_ids_are_printed_when_backends_are_empty(tmp_p
     assert (project["slug"], project["name"]) == ("EX", "Example")
     assert ids["kaneo"]["project_id"] == project["id"]
     columns = sorted(kaneo.columns[project["id"]], key=lambda column: column["position"])
-    assert [column["slug"] for column in columns][: len(COLUMNS)] == COLUMNS
+    assert [column["slug"] for column in columns] == COLUMNS
     assert [column["slug"] for column in columns if column["isFinal"]] == ["done"]
     assert set(ids["kaneo"]["columns"]) == set(COLUMNS)
+    assert ids["kaneo"]["extra_columns"] == []
     assert {label["name"] for label in kaneo.labels} == LABELS
     assert set(ids["kaneo"]["labels"]) == LABELS
     assert ids["outline"]["collection_id"] == outline.collections[0]["id"]
@@ -122,7 +123,8 @@ def test_only_missing_parts_are_created_and_a_custom_doc_is_kept_when_some_exist
     assert len(kaneo.projects) == 1
     assert len(outline.collections) == 1
     assert not any(request["path"] == "/api/project" and request["method"] == "POST" for request in kaneo.requests)
-    assert {column["slug"] for column in kaneo.columns[project["id"]]} >= set(COLUMNS)
+    assert {column["slug"] for column in kaneo.columns[project["id"]]} == set(COLUMNS) | {"in-review"}
+    assert json.loads(result.stdout)["kaneo"]["extra_columns"] == ["in-review"]
     assert {label["name"] for label in kaneo.labels} == LABELS
     assert custom["text"] == "Our own testing rules."
     paths = documents_by_path(outline, collection["id"])
