@@ -16,7 +16,5 @@ jobs:
           python-version: "3.11"
       - name: Install dev dependencies
         run: pip install -e '.[dev]'
-      # Exit code 5 means pytest collected no tests. The suite is empty until the plugin
-      # skeleton adds its first test; drop this allowance then.
       - name: Run test suite
-        run: pytest || [ $? -eq 5 ]
+        run: pytest
