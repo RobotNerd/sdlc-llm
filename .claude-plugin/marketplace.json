@@ -1,0 +1,14 @@
+{
+  "name": "sdlc-llm",
+  "owner": {
+    "name": "Marshall Bowles"
+  },
+  "description": "The sdlc-llm plugin, installed from its own repo.",
+  "plugins": [
+    {
+      "name": "sdlc-llm",
+      "source": "./",
+      "description": "Plan, track, and implement work for a solo developer, with tasks in Kaneo and docs in Outline."
+    }
+  ]
+}

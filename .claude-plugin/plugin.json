@@ -1,0 +1,30 @@
+{
+  "name": "sdlc-llm",
+  "version": "2.0.0-dev",
+  "description": "Plan, track, and implement work for a solo developer, with tasks in Kaneo and docs in Outline.",
+  "author": {
+    "name": "Marshall Bowles"
+  },
+  "repository": "https://github.com/RobotNerd/sdlc-llm",
+  "keywords": [
+    "kaneo",
+    "outline",
+    "sdlc",
+    "tasks"
+  ],
+  "userConfig": {
+    "kaneo_url": {
+      "type": "string",
+      "title": "Kaneo URL",
+      "description": "Base URL of your Kaneo instance, with no trailing slash, for example https://kaneo.example.com",
+      "required": true
+    },
+    "outline_url": {
+      "type": "string",
+      "title": "Outline URL",
+      "description": "Base URL of your Outline instance, with no trailing slash, for example https://outline.example.com",
+      "required": true
+    }
+  },
+  "mcpServers": "./mcp.json"
+}

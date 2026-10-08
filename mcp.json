@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "kaneo": {
+      "type": "http",
+      "url": "${user_config.kaneo_url}/api/mcp"
+    },
+    "outline": {
+      "type": "http",
+      "url": "${user_config.outline_url}/mcp"
+    }
+  }
+}

@@ -9,3 +9,6 @@
 .venv/
 __pycache__/
 venv/
+
+# Eval run output
+evals/**/results/
