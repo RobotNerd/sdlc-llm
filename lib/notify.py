@@ -34,12 +34,12 @@ def main(argv=None):
     try:
         result = notify(arguments)
     except (ConfigError, EnvError, NotifyError) as error:
-        result = {"sent_to": None, "warning": str(error)}
+        result = {"sent_to": None, "warning": f"notification not sent: {error}"}
     except Exception as error:
         # Anything unexpected is still only a warning, so the skill carries on.
-        result = {"sent_to": None, "warning": f"unexpected {type(error).__name__}"}
+        result = {"sent_to": None, "warning": f"notification not sent: unexpected {type(error).__name__}"}
     if "warning" in result:
-        print(f"warning: notification not sent: {result['warning']}", file=sys.stderr)
+        print(f"warning: {result['warning']}", file=sys.stderr)
     print(json.dumps(result))
     return 0
 
@@ -75,7 +75,7 @@ def notify(arguments):
         write_marker(repo_root)
         result = {"sent_to": name}
         if failures:
-            result["warning"] = f"sent to {name} after {'; '.join(failures)}"
+            result["warning"] = f"sent to {name}, the failover, after {'; '.join(failures)}"
         return result
     raise NotifyError("; ".join(failures) or "no channels in notify.channels")
 

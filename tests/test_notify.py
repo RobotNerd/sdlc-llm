@@ -163,6 +163,8 @@ def test_telegram_gets_the_message_when_discord_fails(tmp_path, servers):
     )
     assert discord.requests[0]["headers"]["User-Agent"].startswith("sdlc-llm-notify/")
     assert (repo / MARKER).is_file()
+    assert "sent to telegram" in result.stderr
+    assert "not sent" not in result.stderr
 
 
 def test_discord_is_retried_once_when_it_answers_429(tmp_path, servers):
