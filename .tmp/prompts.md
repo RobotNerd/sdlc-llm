@@ -878,3 +878,7 @@ TODO: general
 - potentially install a self-hosted instance of excalidash; only needed if I want to manually create diagrams
 - (self-hosted project): fork [outline](https://github.com/outline/outline) and add password authentication; will be simpler for self-hosting and allows me to remove the dependency on pocket id
 - add linter and formatter; probably [ruff](https://docs.astral.sh/ruff/) for both, unless you strongly recommend something else; update related docs: code style guide
+- projects to pull ideas from:
+  - [agent-skills](https://github.com/addyosmani/agent-skills) by addyosmani
+  - [superpowers](https://github.com/obra/superpowers) by obra
+  - [skills](https://github.com/mattpocock/skills) by mattpocock
