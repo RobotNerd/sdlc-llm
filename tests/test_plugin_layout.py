@@ -77,3 +77,11 @@ def test_every_mocked_tool_has_its_real_schema():
         schemas = {tool["name"] for tool in json.loads((server_directory / "_tools.json").read_text())["tools"]}
         mocked = {path.stem for path in server_directory.glob("*.md") if not path.stem.startswith("_")}
         assert mocked <= schemas, f"{server_directory.name}: no schema for {mocked - schemas}"
+
+
+def test_skills_use_only_declared_user_config_values():
+    declared = set(load_json(".claude-plugin/plugin.json")["userConfig"])
+
+    for skill in (ROOT / "skills").glob("*/SKILL.md"):
+        referenced = set(USER_CONFIG_REF.findall(skill.read_text()))
+        assert referenced <= declared, f"{skill.parent.name} references undeclared {referenced - declared}"

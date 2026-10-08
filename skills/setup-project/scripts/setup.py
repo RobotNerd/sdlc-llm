@@ -2,6 +2,12 @@
 
 provision <values.json>: ensure the Kaneo project, its columns and labels, and the Outline
 collection with its structure and the default guideline docs. Prints the ids as JSON.
+
+write <values.json> <ids.json>: write or merge .sdlc/config.toml, .env.example, .gitignore,
+CLAUDE.md, and .claude/settings.json. ids.json is provision's output. Prints the paths changed.
+
+check: check each backend in .sdlc/config.toml, and send a test notification to each channel.
+Prints each result as JSON, and exits 1 when any fails.
 """
 
 import argparse
@@ -13,11 +19,14 @@ from pathlib import Path
 PLUGIN_ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(PLUGIN_ROOT))
 
+from lib.backends.interfaces import NotifierError
 from lib.backends.kaneo import KaneoApi
 from lib.backends.outline import OutlineApi
 from lib.backends.rest import RestError
-from lib.config import ConfigError, find_repo_root
+from lib.config import ConfigError, find_repo_root, load_config, lookup
 from lib.env import EnvError, load_env, require_secret
+from lib.notify import NotifyError, build_notifier, channels_in_order
+from repo_files import RepoFilesError, write_all
 
 # In board order. Only "done" is final.
 COLUMNS = (("to-do", "To Do", False), ("in-progress", "In Progress", False), ("needs-human", "Needs Human", False),
@@ -57,14 +66,27 @@ def main(argv=None):
     subcommands = parser.add_subparsers(dest="command", required=True)
     provision_parser = subcommands.add_parser("provision", help="ensure the Kaneo project and Outline collection")
     provision_parser.add_argument("values", type=Path, help="JSON with the kaneo and outline settings")
+    write_parser = subcommands.add_parser("write", help="write the repo's config, CLAUDE.md, and settings")
+    write_parser.add_argument("values", type=Path, help="the values JSON given to provision, plus commands and notify")
+    write_parser.add_argument("ids", type=Path, help="provision's output")
+    subcommands.add_parser("check", help="check each backend and send a test notification")
     arguments = parser.parse_args(argv)
 
     try:
-        result = provision(arguments.values)
-    except (ConfigError, EnvError, RestError, SetupError) as error:
+        if arguments.command == "provision":
+            result = provision(arguments.values)
+        elif arguments.command == "write":
+            result = write(arguments.values, arguments.ids)
+        else:
+            result = check()
+    except (ConfigError, EnvError, RepoFilesError, RestError, SetupError) as error:
         print(f"error: {error}", file=sys.stderr)
         return 1
     print(json.dumps(result, indent=2))
+    if result.get("ok") is False:
+        failing = [f"{entry['name']}: {entry['detail']}" for entry in result["checks"] if not entry["ok"]]
+        print("error: " + "; ".join(failing), file=sys.stderr)
+        return 1
     return 0
 
 
@@ -84,11 +106,89 @@ def provision(values_path):
     }
 
 
-def read_values(path):
+def write(values_path, ids_path):
+    values = read_values(values_path)
+    ids = read_json(ids_path)
+    if not {"kaneo", "outline"} <= set(ids):
+        raise SetupError(f"{ids_path} isn't provision's output: it needs kaneo and outline")
+    repo_root = find_repo_root()
+    is_plugin = (repo_root / ".claude-plugin/plugin.json").is_file()
+    changed, kept = write_all(repo_root, values, ids, is_plugin)
+    return {"changed": changed, "kept": kept}
+
+
+def check():
+    repo_root = find_repo_root()
+    config = load_config(repo_root)
+    env_path = repo_root / ".env"
+    checks = [
+        run_check("kaneo", lambda: check_kaneo(config, load_env(env_path), env_path)),
+        run_check("outline", lambda: check_outline(config, load_env(env_path), env_path)),
+    ]
+    notify = config.get("notify", {})
+    if not notify.get("enabled", False):
+        checks.append({"detail": "notifications are off", "name": "notify", "ok": True})
+    else:
+        try:
+            channels = channels_in_order(notify)
+        except NotifyError as error:
+            checks.append({"detail": str(error), "name": "notify", "ok": False})
+        else:
+            if not channels:
+                checks.append({"detail": "no channels in notify.channels", "name": "notify", "ok": False})
+            for channel in channels:
+                checks.append(run_check(channel.get("type", "unknown"), lambda channel=channel: send_test(channel, repo_root)))
+    return {"checks": checks, "ok": all(entry["ok"] for entry in checks)}
+
+
+def run_check(name, step):
     try:
-        values = json.loads(path.read_text())
+        return {"detail": step(), "name": name, "ok": True}
+    except (EnvError, NotifierError, NotifyError, RestError, SetupError) as error:
+        return {"detail": str(error), "name": name, "ok": False}
+
+
+def check_kaneo(config, secrets, env_path):
+    kaneo = KaneoApi(required(config, "kaneo.url"), require_secret(secrets, "KANEO_API_KEY", env_path))
+    project_id = required(config, "kaneo.project_id")
+    projects = kaneo.list_projects(required(config, "kaneo.workspace_id"))
+    project = next((project for project in projects if project["id"] == project_id), None)
+    if project is None:
+        raise SetupError(f"no project {project_id} in workspace {config['kaneo']['workspace_id']}")
+    return f"project {project['slug']}"
+
+
+def check_outline(config, secrets, env_path):
+    outline = OutlineApi(required(config, "outline.url"), require_secret(secrets, "OUTLINE_API_KEY", env_path))
+    collection_id = required(config, "outline.collection_id")
+    collection = next((collection for collection in outline.list_collections() if collection["id"] == collection_id), None)
+    if collection is None:
+        raise SetupError(f"no collection {collection_id}")
+    return f"collection {collection['name']}"
+
+
+def send_test(channel, repo_root):
+    text = f"{repo_root.name} · setup-project · TEST: notifications reach {channel.get('type')} ({channel.get('role')})"
+    build_notifier(channel, repo_root).send("TEST", text)
+    return "test notification sent"
+
+
+def required(config, key):
+    value = lookup(config, key)
+    if not value:
+        raise SetupError(f"{key} isn't set in .sdlc/config.toml")
+    return value
+
+
+def read_json(path):
+    try:
+        return json.loads(path.read_text())
     except (OSError, ValueError) as error:
         raise SetupError(f"can't read {path}: {error}") from None
+
+
+def read_values(path):
+    values = read_json(path)
     required = {
         "kaneo": ("project_name", "project_slug", "url", "workspace_id"),
         "outline": ("collection_name", "url"),
@@ -186,14 +286,14 @@ def provision_outline(outline, settings, is_plugin, created):
             created.append(f"Outline doc {path}")
         paths[path] = node
 
-    guidelines = {}
     guidelines_node = paths[GUIDELINES_PATH]
     for title, text in default_guidelines(is_plugin):
-        node = find_child(guidelines_node["children"], title)
-        if node is None:
-            node = outline.create_document(title, text, collection["id"], guidelines_node["id"])
+        if find_child(guidelines_node["children"], title) is None:
+            document = outline.create_document(title, text, collection["id"], guidelines_node["id"])
+            guidelines_node["children"].append({"children": [], "id": document["id"], "title": title})
             created.append(f"Outline doc {GUIDELINES_PATH}/{title}")
-        guidelines[title] = node["id"]
+    # Every guideline doc, the project's own as well as the defaults, so write can map each role.
+    guidelines = {node["title"]: node["id"] for node in sorted(guidelines_node["children"], key=lambda node: node["title"])}
 
     return {
         "collection_id": collection["id"],
