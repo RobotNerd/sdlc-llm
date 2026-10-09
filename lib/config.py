@@ -10,10 +10,10 @@ REQUIRED_KEYS = ("config_version", "docs.backend", "tracker.backend")
 SUPPORTED_CONFIG_VERSION = 1
 # Used when the project's config doesn't set the key.
 DEFAULTS = {
-    # One run, no baseline, pinned model, and a local-only report: the per-task gate.
+    # One run, no baseline, pinned model, a local-only report, and each case's scaffold: the per-task gate.
     # {tag} is the skill whose cases run.
     "evals.command": (
-        "claude plugin eval . --tag {tag} --runs 1 --ablation none --model claude-sonnet-5-5 --no-publish"
+        "claude plugin eval . --tag {tag} --runs 1 --ablation none --model claude-sonnet-5-5 --no-publish --scaffold"
     ),
 }
 

@@ -114,9 +114,10 @@ A task's `## Testing strategy` section lists automated tests first, then manual 
   * `case.yaml`: a `scaffold_script` that builds the scratch repo (the Given)
   * `graders/`: one check per file (the Then)
 * **Graders check lasting results:**
-  * `tool_used` and `tool_order` on the Kaneo and Outline MCP calls, and on `AskUserQuestion` when the behavior is a question
+  * `tool_used` and `tool_order` on the Kaneo and Outline MCP calls
+  * a question or a stop: `AskUserQuestion` isn't available in an eval run, so Claude asks in its final message instead. Grade the question with an `llm` grader on `last_message`, and add a `tool_used` grader with `min: 0` and `max: 0` on the call that mustn't happen before the answer, such as creating the task.
   * `regex` or `file_exists` on files the run leaves behind
-  * `llm` only for short output, with a rubric written as concrete PASS and FAIL conditions
+  * `llm` only for short output, with a rubric written as concrete PASS and FAIL conditions. Not on `mock_calls` when a call carries a long document: the judge sees only part of the calls. Use `input_match` on a `tool_used` grader instead.
   * There are no custom-code graders. When a check needs code, the prompt asks Claude to write the result to a file, and a `regex` grader reads that file.
 * **Backends are mocked.** Each Kaneo or Outline MCP tool a skill calls gets a file under `evals/mocks/<server>/`. Put an `expect:` guard on any mock whose arguments matter, so a wrong call fails the run.
 * **Triggering:** each case has a `tool_used: Skill` grader for its skill, and prompts vary their wording. At least one case per skill is a request that must not trigger it (`min: 0`, `max: 0`, `arm: both`).
@@ -124,13 +125,14 @@ A task's `## Testing strategy` section lists automated tests first, then manual 
   * Per-task gate: run once, with no baseline.
 
     ```bash
-    claude plugin eval . --tag <skill> --runs 1 --ablation none
+    claude plugin eval . --tag <skill> --runs 1 --ablation none --scaffold
     ```
   * At epic close: run the full suite with the default three runs and the no-plugin baseline, with a cost ceiling.
 
     ```bash
-    claude plugin eval . --max-cost-usd <ceiling>
+    claude plugin eval . --max-cost-usd <ceiling> --scaffold
     ```
+  * `--scaffold` runs each case's scaffold script. Without it, every case starts in an empty directory.
   * Pin the model in both, so a model release isn't mistaken for a regression.
 * Before trusting a low score, check the run's error for a usage-limit message. A limit hit mid-suite scores later runs 0 without marking the suite partial.
 * Each skill starts with at least three evals, written before its prose. New evals come from misbehavior seen in real use. Evals that no longer fail anything can be retired.

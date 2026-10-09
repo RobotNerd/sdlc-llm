@@ -1,6 +1,28 @@
 {
   "tools": [
     {
+      "name": "attach_label_to_task",
+      "description": "Attach an existing label to a task.",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "labelId": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "taskId": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "labelId",
+          "taskId"
+        ]
+      }
+    },
+    {
       "name": "create_task",
       "description": "Create a task in a project.",
       "inputSchema": {
@@ -55,6 +77,37 @@
       }
     },
     {
+      "name": "create_task_relation",
+      "description": "Create a relation between two tasks. relationType: 'subtask' (sourceTaskId is the parent, targetTaskId the child), 'blocks' (sourceTaskId blocks targetTaskId), or 'related' (bidirectional).",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "relationType": {
+            "enum": [
+              "subtask",
+              "blocks",
+              "related"
+            ],
+            "type": "string"
+          },
+          "sourceTaskId": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "targetTaskId": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "sourceTaskId",
+          "targetTaskId",
+          "relationType"
+        ]
+      }
+    },
+    {
       "name": "get_task",
       "description": "Get a task by ID.",
       "inputSchema": {
@@ -68,6 +121,145 @@
         },
         "required": [
           "taskId"
+        ]
+      }
+    },
+    {
+      "name": "list_tasks",
+      "description": "List a bounded page of tasks for a project (50 by default, maximum 100). Use pagination.totalPages and page to retrieve the rest; filters and sorting apply before pagination. For every task page, also follow relatedPage through pagination.relatedTotalPages for complete labels, links and column metadata.",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "assigneeId": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "dueAfter": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "dueBefore": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "limit": {
+            "maximum": 100,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "page": {
+            "maximum": 1000000,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "priority": {
+            "enum": [
+              "no-priority",
+              "low",
+              "medium",
+              "high",
+              "urgent"
+            ],
+            "type": "string"
+          },
+          "projectId": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "relatedPage": {
+            "maximum": 1000000,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "sortBy": {
+            "enum": [
+              "createdAt",
+              "priority",
+              "dueDate",
+              "position",
+              "title",
+              "number"
+            ],
+            "type": "string"
+          },
+          "sortOrder": {
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "type": "string"
+          },
+          "status": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "projectId"
+        ]
+      }
+    },
+    {
+      "name": "list_workspace_labels",
+      "description": "List labels defined in a workspace.",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "workspaceId": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "workspaceId"
+        ]
+      }
+    },
+    {
+      "name": "search",
+      "description": "Search across tasks, projects, workspaces, comments, and activities.",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "limit": {
+            "description": "Maximum results, 1 to 50. Defaults to 20.",
+            "maximum": 50,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "projectId": {
+            "description": "Limit to one project",
+            "minLength": 1,
+            "type": "string"
+          },
+          "q": {
+            "description": "Search query",
+            "minLength": 1,
+            "type": "string"
+          },
+          "type": {
+            "description": "Restrict results to one kind. Defaults to all.",
+            "enum": [
+              "all",
+              "tasks",
+              "projects",
+              "workspaces",
+              "comments",
+              "activities"
+            ],
+            "type": "string"
+          },
+          "workspaceId": {
+            "description": "Limit to one workspace",
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "q"
         ]
       }
     },

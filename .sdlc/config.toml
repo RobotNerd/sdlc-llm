@@ -54,7 +54,7 @@ backend = "outline"
 
 [evals]
 # One run, no baseline, a pinned model, and a local-only report: the per-task gate. {tag} is the skill whose cases run.
-command = "claude plugin eval . --tag {tag} --runs 1 --ablation none --model claude-sonnet-5-5 --no-publish"
+command = "claude plugin eval . --tag {tag} --runs 1 --ablation none --model claude-sonnet-5-5 --no-publish --scaffold"
 # Run the changed skills' evals after each task. "batch" runs them once at the end.
 gate = "task"
 
