@@ -1,6 +1,6 @@
 ---
 name: setup-project
-description: Sets up a repo for sdlc-llm. Interviews the developer, then creates or connects the Kaneo project and Outline collection, writes .sdlc/config.toml, .env.example, the .gitignore entries, the CLAUDE.md sections, and .claude/settings.json, and checks every backend. Use once per repo before the first add-task, or again to repair a setup. Safe to rerun.
+description: Sets up a repo to use sdlc-llm. Use when the developer asks to set up, initialize, or configure sdlc-llm in a repo, or to connect it to Kaneo and Outline, before the first add-task, or to repair a broken setup.
 allowed-tools: Bash(python3 ${CLAUDE_PLUGIN_ROOT}/skills/setup-project/scripts/setup.py *), Bash(mkdir -p .sdlc/local)
 ---
 

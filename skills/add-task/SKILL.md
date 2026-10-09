@@ -1,6 +1,6 @@
 ---
 name: add-task
-description: Turns a rough request into a well-formed Kaneo task. Interviews the developer until the task has objective acceptance criteria and a testing strategy, checks for duplicates and size, then creates the task with its description template, type label, epic and blocker relations, and its place in the to-do column. Also files deferred work. Use when the developer asks to add, create, file, or log a task, bug, chore, or feature, to put something on the backlog, or to defer an idea for later.
+description: Adds a task to the project's Kaneo backlog. Use when the developer asks to add, create, file, or log a task, bug, chore, or feature, to put something on the backlog, or to defer an idea for later.
 allowed-tools: Bash(python3 ${CLAUDE_PLUGIN_ROOT}/lib/notify.py *)
 ---
 
