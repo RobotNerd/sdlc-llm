@@ -59,6 +59,7 @@ All four top-level sections are always present. A section with nothing in it say
 * Follows the format in the Testing strategy doc: automated tests first, then manual, each as Given/When/Then plus steps, each naming the criterion it covers.
 * Every criterion has at least one test.
 * Manual tests are only for what can't be automated.
+* Manual tests are written out in full on the task: every command, agent prompt, and value to paste, and the expected result of each step, so the developer can run them from the task alone. When the steps can only be settled during implementation, the Manual section says so, and the implementer adds the full steps as a task comment before handing the task over.
 * Manual steps are formatted for copying: commands, agent prompts, and values to paste each stand in their own code block or bulleted list, never inline in a sentence. A file to create is given as its name, then its content, each in its own block. See "Formatting for the reader" in the Documentation style doc.
 
 **Notes**
