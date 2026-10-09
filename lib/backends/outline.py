@@ -25,9 +25,9 @@ class OutlineApi:
 
     def document_tree(self, collection_id):
         """Return the collection's published docs as nested {id, title, children} nodes."""
-        return self.client.request("read the collection's docs", "POST", "/collections.documents", {"id": collection_id})[
-            "data"
-        ]
+        return self.client.request(
+            "read the collection's docs", "POST", "/collections.documents", {"id": collection_id}
+        )["data"]
 
     def create_document(self, title, text, collection_id, parent_document_id=None):
         body = {"collectionId": collection_id, "publish": True, "text": text, "title": title}

@@ -2,7 +2,7 @@
 
 import pytest
 
-from lib.config import ConfigError, SUPPORTED_CONFIG_VERSION, load_config, setting
+from lib.config import SUPPORTED_CONFIG_VERSION, ConfigError, load_config, setting
 
 VALID_CONFIG = """\
 config_version = 1

@@ -47,6 +47,7 @@ def run_script(tmp_path, diagram_text, with_npx=True):
     return subprocess.run(
         [sys.executable, str(SCRIPT), str(diagram)],
         capture_output=True,
+        check=False,
         env=environment,
         text=True,
         timeout=30,

@@ -22,6 +22,7 @@ def run_hook(repo, discord, stop_hook_active=False):
     return subprocess.run(
         [sys.executable, str(HOOK)],
         capture_output=True,
+        check=False,
         cwd=ROOT,
         env=fake_environment(discord),
         input=json.dumps(stop_input),

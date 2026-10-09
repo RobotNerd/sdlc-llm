@@ -16,6 +16,7 @@ def run_notify(repo, discord, *arguments):
     return subprocess.run(
         [*command, *arguments],
         capture_output=True,
+        check=False,
         cwd=repo,
         env=fake_environment(discord),
         text=True,
@@ -48,8 +49,7 @@ def test_one_discord_message_is_sent_when_discord_is_up(tmp_path, servers):
     request = discord.requests[0]
     assert request["path"] == "/api/webhooks/1/fake"
     assert request["json"]["content"] == (
-        "sdlc-llm · implement-task · STOP · SDLC-12: critic rejected 3×, decision needed\n"
-        f"[Open SDLC-12]({LINK})"
+        f"sdlc-llm · implement-task · STOP · SDLC-12: critic rejected 3×, decision needed\n[Open SDLC-12]({LINK})"
     )
     assert request["headers"]["User-Agent"].startswith("sdlc-llm-notify/")
     assert telegram.requests == []

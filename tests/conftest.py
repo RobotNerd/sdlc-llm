@@ -2,7 +2,6 @@ import sys
 from pathlib import Path
 
 import pytest
-
 from notify_fakes import FakeServer
 
 # Scripts import shared code as the `lib` package from the plugin root, so tests do too.

@@ -7,7 +7,6 @@ import sys
 from pathlib import Path
 
 import pytest
-
 from backend_fakes import FakeKaneo, FakeOutline
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -39,15 +38,20 @@ def make_repo(tmp_path, plugin=False):
 
 def run_provision(repo, kaneo, outline):
     values = repo.parent / "values.json"
-    values.write_text(json.dumps({
-        "kaneo": {"project_name": "Example", "project_slug": "EX", "url": kaneo.url, "workspace_id": WORKSPACE},
-        "outline": {"collection_name": "example", "url": outline.url},
-    }))
+    values.write_text(
+        json.dumps(
+            {
+                "kaneo": {"project_name": "Example", "project_slug": "EX", "url": kaneo.url, "workspace_id": WORKSPACE},
+                "outline": {"collection_name": "example", "url": outline.url},
+            }
+        )
+    )
     environment = {name: value for name, value in os.environ.items() if name not in FAKE_KEYS}
     environment.update(FAKE_KEYS)
     return subprocess.run(
         [sys.executable, str(SETUP), "provision", str(values)],
         capture_output=True,
+        check=False,
         cwd=repo,
         env=environment,
         text=True,

@@ -8,7 +8,6 @@ import tomllib
 from pathlib import Path
 
 import pytest
-
 from backend_fakes import FakeKaneo, FakeOutline
 
 from lib.config import load_config
@@ -63,6 +62,7 @@ def run_setup(repo, *arguments, environment=None):
     return subprocess.run(
         [sys.executable, str(SETUP), *map(str, arguments)],
         capture_output=True,
+        check=False,
         cwd=repo,
         env=base,
         text=True,
@@ -112,7 +112,9 @@ def test_every_file_is_written_and_settings_deny_reading_env_when_the_repo_is_fr
     assert config_lines[config_lines.index("quality_gate_attempts = 5") - 1] == "# Chosen during setup-project."
     assert [channel["type"] for channel in config["notify"]["channels"]] == ["discord"]
     assert (repo / ".env.example").read_text().splitlines()[1:] == [
-        "DISCORD_WEBHOOK_URL=", "KANEO_API_KEY=", "OUTLINE_API_KEY="
+        "DISCORD_WEBHOOK_URL=",
+        "KANEO_API_KEY=",
+        "OUTLINE_API_KEY=",
     ]
     assert {".env", ".sdlc/local/"} <= set((repo / ".gitignore").read_text().splitlines())
     claude_md = (repo / "CLAUDE.md").read_text()
@@ -144,9 +146,13 @@ def test_nothing_changes_when_write_runs_again(tmp_path, backends):
 def test_existing_claude_md_and_settings_are_kept_and_extended(tmp_path, backends):
     kaneo, outline = backends
     repo = make_repo(tmp_path)
-    (repo / "CLAUDE.md").write_text("# CLAUDE.md\n\n## House rules\n\nAlways say please.\n\n## Guidelines\n\nOur own list.\n")
+    (repo / "CLAUDE.md").write_text(
+        "# CLAUDE.md\n\n## House rules\n\nAlways say please.\n\n## Guidelines\n\nOur own list.\n"
+    )
     (repo / ".claude").mkdir()
-    (repo / ".claude/settings.json").write_text(json.dumps({"model": "opus", "permissions": {"allow": ["Bash(make *)"]}}))
+    (repo / ".claude/settings.json").write_text(
+        json.dumps({"model": "opus", "permissions": {"allow": ["Bash(make *)"]}})
+    )
     (repo / ".gitignore").write_text("node_modules/\n.env")
 
     provision_and_write(repo, make_values(kaneo.url, outline.url))
@@ -163,7 +169,10 @@ def test_existing_claude_md_and_settings_are_kept_and_extended(tmp_path, backend
     assert "Bash(git *)" in settings["permissions"]["allow"]
     assert settings["permissions"]["deny"] == ["Read(.env)"]
     assert (repo / ".gitignore").read_text().splitlines() == [
-        "node_modules/", ".env", "# sdlc-llm: secrets and local state", ".sdlc/local/"
+        "node_modules/",
+        ".env",
+        "# sdlc-llm: secrets and local state",
+        ".sdlc/local/",
     ]
 
 
@@ -206,7 +215,10 @@ def test_every_check_passes_and_each_channel_gets_a_test_message_when_backends_a
     assert result.returncode == 0, result.stderr
     checks = {entry["name"]: entry for entry in json.loads(result.stdout)["checks"]}
     assert {name: entry["ok"] for name, entry in checks.items()} == {
-        "discord": True, "kaneo": True, "outline": True, "telegram": True
+        "discord": True,
+        "kaneo": True,
+        "outline": True,
+        "telegram": True,
     }
     assert checks["kaneo"]["detail"] == "project EX"
     assert "setup-project · TEST" in discord.requests[0]["json"]["content"]

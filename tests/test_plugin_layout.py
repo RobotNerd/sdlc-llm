@@ -68,7 +68,7 @@ def test_no_project_mcp_file_at_the_root():
 
 def test_eval_results_are_ignored_by_git():
     for path in ("evals/results/run/report.html", "evals/smoke/mock-wiring/results/run/report.html"):
-        result = subprocess.run(["git", "check-ignore", "--quiet", "--no-index", path], cwd=ROOT)
+        result = subprocess.run(["git", "check-ignore", "--quiet", "--no-index", path], check=False, cwd=ROOT)
         assert result.returncode == 0, f"{path} isn't gitignored"
 
 

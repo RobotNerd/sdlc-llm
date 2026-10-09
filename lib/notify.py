@@ -35,8 +35,7 @@ def main(argv=None):
         result = notify(arguments)
     except (ConfigError, EnvError, NotifyError) as error:
         result = {"sent_to": None, "warning": f"notification not sent: {error}"}
-    except Exception as error:
-        # Anything unexpected is still only a warning, so the skill carries on.
+    except Exception as error:  # noqa: BLE001 - anything unexpected is still only a warning, so the skill carries on
         result = {"sent_to": None, "warning": f"notification not sent: unexpected {type(error).__name__}"}
     if "warning" in result:
         print(f"warning: {result['warning']}", file=sys.stderr)
