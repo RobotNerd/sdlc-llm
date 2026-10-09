@@ -4,6 +4,6 @@ expect:
   resource: [document]
 ---
 
-{"document": {"id": "{{input.id}}", "title": "Mock doc title", "url": "https://outline.example.com/doc/mock-doc"}}
+{"document": {"id": "{{input.id}}", "title": "Guideline doc", "url": "https://outline.example.com/doc/{{input.id}}"}}
 
-A doc served by the eval mock.
+{{file:fixtures/{input.id}.md}}
