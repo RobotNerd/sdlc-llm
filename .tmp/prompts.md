@@ -918,11 +918,14 @@ Before we move on, I have a question about the current repo. Is there a step in 
 
 <!-- TODO: run it on this repo -->
 
-Yes, make the first M2 task running setup-project on this repo. I signed into the kaneo mcp, so you should have access to it now. Once you finish cleaning that up, it looks like we're ready to move to M2.
+<!-- Yes, make the first M2 task running setup-project on this repo. I signed into the kaneo mcp, so you should have access to it now. Once you finish cleaning that up, it looks like we're ready to move to M2.
 
 Going forward, here are some changes I want you to make:
 - The milestones in Section `15. Roadmap` of the PRD v2 doc should be represented as epics in kaneo. The tasks created in each milestone are assigned to that epic.
-- The manual test instructions in kaneo should be written out step-by-step with all the details I need to run them directly on the task itself. So far, you've been writing these instructions out to the console, which makes it more difficult for me to copy/paste commands to run in the terminal. If you can't fully determine all manual test steps needed before actually implementing the ticket, another option is to include the full test instructions as a comment on the kaneo ticket. Tell me which one you chose in the output in the claude code cli.
+- The manual test instructions in kaneo should be written out step-by-step with all the details I need to run them directly on the task itself. So far, you've been writing these instructions out to the console, which makes it more difficult for me to copy/paste commands to run in the terminal. If you can't fully determine all manual test steps needed before actually implementing the ticket, another option is to include the full test instructions as a comment on the kaneo ticket. Tell me which one you chose in the output in the claude code cli. -->
+
+A couple of small changes:
+- For SDLC-20, change the path to `~/tmp/sdlc-sandbox`.
 
 ---
 
@@ -943,3 +946,4 @@ TODO: general
 - Consider integrating Jev into the workflow where it makes sense
 - Remove the local mermaid rendering step. It's overkill.
 - Investigate switching to excalidraw for diagrams.
+- Add the telegram chat id to the .env file. It isn't a secret, but it's a good place to keep track of it.

@@ -1,0 +1,102 @@
+# The config format this file follows.
+config_version = 1
+# Past this many follow-ups, a batch recommends instead of filing, so the backlog doesn't grow unattended.
+autonomous_new_task_limit = 5
+# Task branches are <prefix><number>-<slug>. The project slug makes them easy to spot.
+branch_prefix = "sdlc-"
+# Pause with room left in the context window to write the pause report.
+context_usage_halt_pct = 85
+# Three rejections on one task means the human should decide, not the loop.
+critic_rejection_attempts = 3
+# The branch batches merge into.
+default_branch = "main"
+# Paths review-docs skips.
+docs_ignore_paths = []
+# The repo docs review-docs checks.
+docs_review_paths = ["CLAUDE.md", "README.md"]
+# The repo docs a task updates when its change affects them.
+docs_update_paths = ["README.md"]
+# Run by the quality gate. Empty means not configured.
+format_command = ".venv/bin/ruff format --check ."
+# A denial repeated twice is a rule the task can't work around, so ask the human.
+guardrail_denial_attempts = 2
+# Paths the clean-tree check ignores, such as scratch files.
+ignored_paths = []
+# Run by the quality gate. Empty means not configured.
+lint_command = ".venv/bin/ruff check ."
+# Three failed gate runs on one task means the fix needs the human.
+quality_gate_attempts = 3
+# The remote batches pull from and push to.
+remote = "origin"
+# About a month of working days with commits, after which refine-backlog asks about a task.
+stale_active_days = 20
+# Run by the quality gate. Empty means not configured.
+test_command = ".venv/bin/python -m pytest"
+# Under .sdlc/local/, which is gitignored, so throwaway tests are never committed.
+throwaway_test_dir = ".sdlc/local/throwaway-tests"
+# Stops a runaway batch before it costs too much. Tune it after a few batches.
+token_budget_per_batch = 5000000
+
+[critic]
+# Nothing goes to a third-party critic until you opt in.
+external_opt_in = false
+# A larger diff halts instead of being truncated. 200 KB covers a normal task.
+max_diff_bytes = 200000
+# Stop before the provider balance runs out mid-review.
+min_balance = 1.0
+# The read-only reviewer subagent's model.
+model = "haiku"
+# A Claude Code subagent. An external provider is opt-in.
+provider = "subagent"
+
+[docs]
+backend = "outline"
+
+[evals]
+# One run, no baseline, a pinned model, and a local-only report: the per-task gate. {tag} is the skill whose cases run.
+command = "claude plugin eval . --tag {tag} --runs 1 --ablation none --model claude-sonnet-5-5 --no-publish"
+# Run the changed skills' evals after each task. "batch" runs them once at the end.
+gate = "task"
+
+[guidelines]
+architecture = "349eddcf-6717-4618-9e51-91a1a558be5d"
+code_style = "85c78308-38b6-4711-9485-6051424f894f"
+commits = "9290f29d-a106-46af-91cc-6aacc68a4a7e"
+doc_style = "7ae3cdf0-4c8f-4ea1-9ec3-891b8f6903a7"
+review_policy = "1b95d15e-9f95-47c0-bf93-5ca56f3f21f5"
+skill_authoring = "3d27069b-b9a5-4c51-aed5-8e6b3cf00090"
+task_style = "cee10651-f8c2-4bee-b4a3-d40e41df56b9"
+testing = "20b7e311-d1ae-42ae-9bbf-90005a898048"
+
+[kaneo]
+columns = { done = "b10naj12e54evkyddorvuy5c", "in-progress" = "pv4c9cppnblarlchi41bhwhu", "needs-human" = "bjya9rknbnubq3ygenl8q4tj", "to-do" = "xngc7jxpyyojj8we0c14rroc" }
+project_id = "q2yevcyqfsf56w1nvdi47p7t"
+project_slug = "SDLC"
+url = "https://rainbow-flame.taila02055.ts.net:8443"
+workspace_id = "1yZmTxeawGIak6j0EBb6Lr8R7QkoiYNP"
+
+[notify]
+# Send STOP and ASK messages to the channels below.
+enabled = true
+# Also notify whenever a turn ends waiting for you. Off by default, because it can be noisy.
+stop_hook = false
+
+[[notify.channels]]
+role = "primary"
+type = "discord"
+
+[[notify.channels]]
+chat_id = "8880199077"
+role = "failover"
+type = "telegram"
+
+[outline]
+collection_id = "4be4e4cd-f49e-4788-ad60-c927cb2c5c83"
+url = "https://rainbow-flame.taila02055.ts.net:8445"
+
+[reference_check]
+# Placeholder keys that docs may use in examples.
+allow = ["KEY-NNN"]
+
+[tracker]
+backend = "kaneo"
