@@ -16,6 +16,7 @@ def run_notify(repo, discord, *arguments):
     return subprocess.run(
         [*command, *arguments],
         capture_output=True,
+        check=False,
         cwd=repo,
         env=fake_environment(discord),
         text=True,

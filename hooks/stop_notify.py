@@ -37,7 +37,7 @@ def main():
                 print(f"warning: {result['warning']}", file=sys.stderr)
         # A send above writes the marker too, and it mustn't suppress the next stop.
         marker.unlink(missing_ok=True)
-    except Exception as error:
+    except Exception as error:  # noqa: BLE001 - a failing hook must never block the turn from ending
         print(f"warning: stop notification not sent: {type(error).__name__}: {error}", file=sys.stderr)
     return 0
 

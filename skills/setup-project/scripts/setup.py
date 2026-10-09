@@ -19,6 +19,8 @@ from pathlib import Path
 PLUGIN_ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(PLUGIN_ROOT))
 
+from repo_files import RepoFilesError, write_all
+
 from lib.backends.interfaces import NotifierError
 from lib.backends.kaneo import KaneoApi
 from lib.backends.outline import OutlineApi
@@ -26,7 +28,6 @@ from lib.backends.rest import RestError
 from lib.config import ConfigError, find_repo_root, load_config, lookup
 from lib.env import EnvError, load_env, require_secret
 from lib.notify import NotifyError, build_notifier, channels_in_order
-from repo_files import RepoFilesError, write_all
 
 # In board order. Only "done" is final.
 COLUMNS = (

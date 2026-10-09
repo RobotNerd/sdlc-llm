@@ -80,7 +80,8 @@ EVALS_DEFAULTS = (
     (
         "command",
         DEFAULTS["evals.command"],
-        "One run, no baseline, a pinned model, and a local-only report: the per-task gate. {tag} is the skill whose cases run.",
+        "One run, no baseline, a pinned model, and a local-only report: the per-task gate. "
+        "{tag} is the skill whose cases run.",
     ),
     ("gate", "task", 'Run the changed skills\' evals after each task. "batch" runs them once at the end.'),
 )
@@ -208,7 +209,7 @@ def render_config(values, ids, is_plugin):
 
 
 def with_override(entry, dotted_key, overrides):
-    key, default, why = entry
+    key = entry[0]
     # The default's reason doesn't explain a value the developer chose.
     return (key, overrides[dotted_key], "Chosen during setup-project.") if dotted_key in overrides else entry
 

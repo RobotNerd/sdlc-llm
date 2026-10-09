@@ -7,7 +7,6 @@ import sys
 from pathlib import Path
 
 import pytest
-
 from backend_fakes import FakeKaneo, FakeOutline
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -52,6 +51,7 @@ def run_provision(repo, kaneo, outline):
     return subprocess.run(
         [sys.executable, str(SETUP), "provision", str(values)],
         capture_output=True,
+        check=False,
         cwd=repo,
         env=environment,
         text=True,

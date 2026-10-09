@@ -8,7 +8,6 @@ import tomllib
 from pathlib import Path
 
 import pytest
-
 from backend_fakes import FakeKaneo, FakeOutline
 
 from lib.config import load_config
@@ -63,6 +62,7 @@ def run_setup(repo, *arguments, environment=None):
     return subprocess.run(
         [sys.executable, str(SETUP), *map(str, arguments)],
         capture_output=True,
+        check=False,
         cwd=repo,
         env=base,
         text=True,

@@ -42,7 +42,7 @@ def main(argv=None):
     if npx is None:
         return fail("npx not found; rendering Mermaid needs Node.js, which includes npx (https://nodejs.org)")
     command = [npx, "-y", MERMAID_CLI, "-i", str(arguments.input), "-o", str(output), "-b", BACKGROUND, "-s", SCALE]
-    result = subprocess.run(command, capture_output=True, text=True)
+    result = subprocess.run(command, capture_output=True, check=False, text=True)
     if result.returncode != 0 or not output.is_file():
         return fail(f"mermaid-cli failed (exit {result.returncode}):\n{result.stderr.strip()}")
 

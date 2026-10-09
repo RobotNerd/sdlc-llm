@@ -42,8 +42,8 @@ def parse_env_file(path):
         raise EnvError(f"{path} isn't valid UTF-8") from None
 
     values = {}
-    for line_number, line in enumerate(lines, start=1):
-        line = line.strip()
+    for line_number, raw_line in enumerate(lines, start=1):
+        line = raw_line.strip()
         if not line or line.startswith("#"):
             continue
         if line.startswith("export "):
