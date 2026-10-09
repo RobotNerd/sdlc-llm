@@ -29,8 +29,12 @@ from lib.notify import NotifyError, build_notifier, channels_in_order
 from repo_files import RepoFilesError, write_all
 
 # In board order. Only "done" is final.
-COLUMNS = (("to-do", "To Do", False), ("in-progress", "In Progress", False), ("needs-human", "Needs Human", False),
-           ("done", "Done", True))
+COLUMNS = (
+    ("to-do", "To Do", False),
+    ("in-progress", "In Progress", False),
+    ("needs-human", "Needs Human", False),
+    ("done", "Done", True),
+)
 LABEL_COLORS = {
     "bug": "#DC2626",
     "chore": "#6B7280",
@@ -137,7 +141,9 @@ def check():
             if not channels:
                 checks.append({"detail": "no channels in notify.channels", "name": "notify", "ok": False})
             for channel in channels:
-                checks.append(run_check(channel.get("type", "unknown"), lambda channel=channel: send_test(channel, repo_root)))
+                checks.append(
+                    run_check(channel.get("type", "unknown"), lambda channel=channel: send_test(channel, repo_root))
+                )
     return {"checks": checks, "ok": all(entry["ok"] for entry in checks)}
 
 
@@ -161,7 +167,9 @@ def check_kaneo(config, secrets, env_path):
 def check_outline(config, secrets, env_path):
     outline = OutlineApi(required(config, "outline.url"), require_secret(secrets, "OUTLINE_API_KEY", env_path))
     collection_id = required(config, "outline.collection_id")
-    collection = next((collection for collection in outline.list_collections() if collection["id"] == collection_id), None)
+    collection = next(
+        (collection for collection in outline.list_collections() if collection["id"] == collection_id), None
+    )
     if collection is None:
         raise SetupError(f"no collection {collection_id}")
     return f"collection {collection['name']}"
@@ -193,8 +201,9 @@ def read_values(path):
         "kaneo": ("project_name", "project_slug", "url", "workspace_id"),
         "outline": ("collection_name", "url"),
     }
-    missing = [f"{section}.{key}" for section, keys in required.items() for key in keys
-               if not values.get(section, {}).get(key)]
+    missing = [
+        f"{section}.{key}" for section, keys in required.items() for key in keys if not values.get(section, {}).get(key)
+    ]
     if missing:
         raise SetupError(f"{path} is missing: {', '.join(missing)}")
     return values
@@ -258,8 +267,9 @@ def ensure_columns(kaneo, project_id, is_new, created):
 
 def ensure_labels(kaneo, workspace_id, created):
     # A label with a taskId is one task's copy, not the workspace label itself.
-    existing = {label["name"]: label["id"] for label in kaneo.list_workspace_labels(workspace_id)
-                if label.get("taskId") is None}
+    existing = {
+        label["name"]: label["id"] for label in kaneo.list_workspace_labels(workspace_id) if label.get("taskId") is None
+    }
     for name, color in LABEL_COLORS.items():
         if name not in existing:
             existing[name] = kaneo.create_label(workspace_id, name, color)["id"]
@@ -280,7 +290,9 @@ def provision_outline(outline, settings, is_plugin, created):
         parent_path, _, title = path.rpartition("/")
         node = find_child(tree if not parent_path else paths[parent_path]["children"], title)
         if node is None:
-            document = outline.create_document(title, description, collection["id"], paths.get(parent_path, {}).get("id"))
+            document = outline.create_document(
+                title, description, collection["id"], paths.get(parent_path, {}).get("id")
+            )
             node = {"children": [], "id": document["id"], "title": title}
             (tree if not parent_path else paths[parent_path]["children"]).append(node)
             created.append(f"Outline doc {path}")
@@ -293,7 +305,9 @@ def provision_outline(outline, settings, is_plugin, created):
             guidelines_node["children"].append({"children": [], "id": document["id"], "title": title})
             created.append(f"Outline doc {GUIDELINES_PATH}/{title}")
     # Every guideline doc, the project's own as well as the defaults, so write can map each role.
-    guidelines = {node["title"]: node["id"] for node in sorted(guidelines_node["children"], key=lambda node: node["title"])}
+    guidelines = {
+        node["title"]: node["id"] for node in sorted(guidelines_node["children"], key=lambda node: node["title"])
+    }
 
     return {
         "collection_id": collection["id"],

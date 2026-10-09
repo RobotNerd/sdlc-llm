@@ -9,9 +9,9 @@ description = "Claude Code plugin for a solo, LLM-driven SDLC on Kaneo and Outli
 requires-python = ">=3.11"
 dependencies = []
 
-# pytest is the one dev dependency. The plugin's scripts use only the standard library.
+# The dev dependencies are the test runner and the linter. The plugin's scripts use only the standard library.
 [project.optional-dependencies]
-dev = ["pytest"]
+dev = ["pytest", "ruff"]
 
 # The scripts are loaded by path, not installed as a package.
 [tool.setuptools]
@@ -19,3 +19,11 @@ packages = []
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+# Set here so the result is the same on every machine, whatever ruff's own defaults are.
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["B", "BLE", "C4", "E", "F", "I", "PLW", "RUF", "UP", "W"]

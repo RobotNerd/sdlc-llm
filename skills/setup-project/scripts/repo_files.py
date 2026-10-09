@@ -42,7 +42,11 @@ COMMAND_LABELS = (("test", "Tests"), ("lint", "Lint"), ("format", "Format"))
 
 # (key, default, why). Values the developer gives override the default.
 TOP_LEVEL_DEFAULTS = (
-    ("autonomous_new_task_limit", 3, "Past this many follow-ups, a batch recommends instead of filing, so the backlog doesn't grow unattended."),
+    (
+        "autonomous_new_task_limit",
+        3,
+        "Past this many follow-ups, a batch recommends instead of filing, so the backlog doesn't grow unattended.",
+    ),
     ("context_usage_halt_pct", 85, "Pause with room left in the context window to write the pause report."),
     ("critic_rejection_attempts", 3, "Three rejections on one task means the human should decide, not the loop."),
     ("default_branch", "main", "The branch batches merge into."),
@@ -53,8 +57,16 @@ TOP_LEVEL_DEFAULTS = (
     ("ignored_paths", [], "Paths the clean-tree check ignores, such as scratch files."),
     ("quality_gate_attempts", 3, "Three failed gate runs on one task means the fix needs the human."),
     ("remote", "origin", "The remote batches pull from and push to."),
-    ("stale_active_days", 20, "About a month of working days with commits, after which refine-backlog asks about a task."),
-    ("throwaway_test_dir", ".sdlc/local/throwaway-tests", "Under .sdlc/local/, which is gitignored, so throwaway tests are never committed."),
+    (
+        "stale_active_days",
+        20,
+        "About a month of working days with commits, after which refine-backlog asks about a task.",
+    ),
+    (
+        "throwaway_test_dir",
+        ".sdlc/local/throwaway-tests",
+        "Under .sdlc/local/, which is gitignored, so throwaway tests are never committed.",
+    ),
     ("token_budget_per_batch", 5000000, "Stops a runaway batch before it costs too much. Tune it after a few batches."),
 )
 CRITIC_DEFAULTS = (
@@ -65,9 +77,12 @@ CRITIC_DEFAULTS = (
     ("provider", "subagent", "A Claude Code subagent. An external provider is opt-in."),
 )
 EVALS_DEFAULTS = (
-    ("command", DEFAULTS["evals.command"],
-     "One run, no baseline, a pinned model, and a local-only report: the per-task gate. {tag} is the skill whose cases run."),
-    ("gate", "task", "Run the changed skills' evals after each task. \"batch\" runs them once at the end."),
+    (
+        "command",
+        DEFAULTS["evals.command"],
+        "One run, no baseline, a pinned model, and a local-only report: the per-task gate. {tag} is the skill whose cases run.",
+    ),
+    ("gate", "task", 'Run the changed skills\' evals after each task. "batch" runs them once at the end.'),
 )
 
 
@@ -100,7 +115,11 @@ def write_all(repo_root, values, ids, is_plugin):
 
 def render_config(values, ids, is_plugin):
     overrides = values.get("overrides", {})
-    known = {"branch_prefix"} | {key for key, _, _ in TOP_LEVEL_DEFAULTS} | {f"critic.{key}" for key, _, _ in CRITIC_DEFAULTS}
+    known = (
+        {"branch_prefix"}
+        | {key for key, _, _ in TOP_LEVEL_DEFAULTS}
+        | {f"critic.{key}" for key, _, _ in CRITIC_DEFAULTS}
+    )
     known |= {f"evals.{key}" for key, _, _ in EVALS_DEFAULTS} if is_plugin else set()
     unknown = sorted(set(overrides) - known)
     if unknown:
@@ -109,8 +128,13 @@ def render_config(values, ids, is_plugin):
     kaneo, outline = ids["kaneo"], ids["outline"]
     slug = kaneo["project_slug"]
 
-    top_level = [("branch_prefix", overrides.get("branch_prefix", f"{slug.lower()}-"),
-                      "Task branches are <prefix><number>-<slug>. The project slug makes them easy to spot.")]
+    top_level = [
+        (
+            "branch_prefix",
+            overrides.get("branch_prefix", f"{slug.lower()}-"),
+            "Task branches are <prefix><number>-<slug>. The project slug makes them easy to spot.",
+        )
+    ]
     for name, _ in COMMAND_LABELS:
         command = (commands.get(name) or {}).get("command", "")
         top_level.append((f"{name}_command", command, "Run by the quality gate. Empty means not configured."))
@@ -124,22 +148,49 @@ def render_config(values, ids, is_plugin):
     if is_plugin:
         tables.append(("evals", [with_override(entry, f"evals.{entry[0]}", overrides) for entry in EVALS_DEFAULTS]))
     found = ids["outline"]["guidelines"]
-    tables.append(("guidelines", [(role, found.get(title, ""), None if title in found else f"Set to the id of the {title} doc once it exists.")
-                                  for title, role, _ in sorted(GUIDELINE_ROLES, key=lambda entry: entry[1])
-                                  if role != "skill_authoring" or is_plugin]))
-    tables.append(("kaneo", [
-        ("columns", kaneo["columns"], None),
-        ("project_id", kaneo["project_id"], None),
-        ("project_slug", slug, None),
-        ("url", values["kaneo"]["url"], None),
-        ("workspace_id", kaneo["workspace_id"], None),
-    ]))
+    tables.append(
+        (
+            "guidelines",
+            [
+                (
+                    role,
+                    found.get(title, ""),
+                    None if title in found else f"Set to the id of the {title} doc once it exists.",
+                )
+                for title, role, _ in sorted(GUIDELINE_ROLES, key=lambda entry: entry[1])
+                if role != "skill_authoring" or is_plugin
+            ],
+        )
+    )
+    tables.append(
+        (
+            "kaneo",
+            [
+                ("columns", kaneo["columns"], None),
+                ("project_id", kaneo["project_id"], None),
+                ("project_slug", slug, None),
+                ("url", values["kaneo"]["url"], None),
+                ("workspace_id", kaneo["workspace_id"], None),
+            ],
+        )
+    )
     notify = values.get("notify", {})
-    tables.append(("notify", [
-        ("enabled", notify.get("enabled", False), "Send STOP and ASK messages to the channels below."),
-        ("stop_hook", notify.get("stop_hook", False), "Also notify whenever a turn ends waiting for you. Off by default, because it can be noisy."),
-    ]))
-    tables.append(("outline", [("collection_id", outline["collection_id"], None), ("url", values["outline"]["url"], None)]))
+    tables.append(
+        (
+            "notify",
+            [
+                ("enabled", notify.get("enabled", False), "Send STOP and ASK messages to the channels below."),
+                (
+                    "stop_hook",
+                    notify.get("stop_hook", False),
+                    "Also notify whenever a turn ends waiting for you. Off by default, because it can be noisy.",
+                ),
+            ],
+        )
+    )
+    tables.append(
+        ("outline", [("collection_id", outline["collection_id"], None), ("url", values["outline"]["url"], None)])
+    )
     tables.append(("reference_check", [("allow", ["KEY-NNN"], "Placeholder keys that docs may use in examples.")]))
     tables.append(("tracker", [("backend", "kaneo", None)]))
 
@@ -148,7 +199,11 @@ def render_config(values, ids, is_plugin):
         lines += ["", f"[{name}]", *render_entries(entries)]
         if name == "notify":
             for channel in notify.get("channels", []):
-                lines += ["", "[[notify.channels]]", *render_entries([(key, channel[key], None) for key in sorted(channel)])]
+                lines += [
+                    "",
+                    "[[notify.channels]]",
+                    *render_entries([(key, channel[key], None) for key in sorted(channel)]),
+                ]
     return "\n".join(lines) + "\n"
 
 
@@ -189,8 +244,11 @@ def toml_value(value):
 def secret_names(values):
     names = ["KANEO_API_KEY", "OUTLINE_API_KEY"]
     channel_secrets = {"discord": "DISCORD_WEBHOOK_URL", "telegram": "TELEGRAM_BOT_TOKEN"}
-    names += [channel_secrets[channel["type"]] for channel in values.get("notify", {}).get("channels", [])
-              if channel.get("type") in channel_secrets]
+    names += [
+        channel_secrets[channel["type"]]
+        for channel in values.get("notify", {}).get("channels", [])
+        if channel.get("type") in channel_secrets
+    ]
     return sorted(set(names))
 
 
@@ -198,7 +256,9 @@ def merge_env_example(current, names):
     present = set(re.findall(r"^([A-Z0-9_]+)=", current or "", flags=re.MULTILINE))
     missing = [name for name in names if name not in present]
     if current is None:
-        return "# Copy to .env and fill in. .env is gitignored, and only scripts read it.\n" + "".join(f"{name}=\n" for name in missing)
+        return "# Copy to .env and fill in. .env is gitignored, and only scripts read it.\n" + "".join(
+            f"{name}=\n" for name in missing
+        )
     return append_lines(current, [f"{name}=" for name in missing])
 
 
@@ -250,7 +310,9 @@ def guidelines_section(is_plugin):
         "`.sdlc/config.toml`. Read the one a step needs, when it needs it:",
         "",
     ]
-    lines += [f"- **{title}:** {when}" for title, role, when in GUIDELINE_ROLES if role != "skill_authoring" or is_plugin]
+    lines += [
+        f"- **{title}:** {when}" for title, role, when in GUIDELINE_ROLES if role != "skill_authoring" or is_plugin
+    ]
     return "\n".join(lines)
 
 

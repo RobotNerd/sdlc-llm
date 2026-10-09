@@ -29,7 +29,9 @@ class FakeService:
                 length = int(self.headers.get("Content-Length") or 0)
                 body = json.loads(self.rfile.read(length)) if length else None
                 url = urlparse(self.path)
-                fake.requests.append({"body": body, "headers": dict(self.headers), "method": self.command, "path": url.path})
+                fake.requests.append(
+                    {"body": body, "headers": dict(self.headers), "method": self.command, "path": url.path}
+                )
                 if fake.fail_with:
                     status, payload = fake.fail_with, "internal error"
                 else:
@@ -77,8 +79,14 @@ class FakeKaneo(FakeService):
         return project
 
     def make_column(self, project_id, name, is_final, position):
-        return {"id": self.next_id(), "isFinal": is_final, "name": name, "position": position,
-                "projectId": project_id, "slug": slugify(name)}
+        return {
+            "id": self.next_id(),
+            "isFinal": is_final,
+            "name": name,
+            "position": position,
+            "projectId": project_id,
+            "slug": slugify(name),
+        }
 
     def add_label(self, workspace_id, name, task_id=None):
         label = {"color": "#000000", "id": self.next_id(), "name": name, "taskId": task_id, "workspaceId": workspace_id}
@@ -104,7 +112,9 @@ class FakeKaneo(FakeService):
                 columns.append(column)
                 return 200, column
             if method in ("PUT", "DELETE"):
-                columns = next(columns for columns in self.columns.values() if any(c["id"] == match[1] for c in columns))
+                columns = next(
+                    columns for columns in self.columns.values() if any(c["id"] == match[1] for c in columns)
+                )
                 column = next(column for column in columns if column["id"] == match[1])
                 if method == "DELETE":
                     columns.remove(column)
@@ -133,8 +143,13 @@ class FakeOutline(FakeService):
         return collection
 
     def add_document(self, collection_id, title, text, parent_id=None):
-        document = {"collectionId": collection_id, "id": self.next_id(), "parentDocumentId": parent_id,
-                    "text": text, "title": title}
+        document = {
+            "collectionId": collection_id,
+            "id": self.next_id(),
+            "parentDocumentId": parent_id,
+            "text": text,
+            "title": title,
+        }
         self.documents.append(document)
         return document
 
@@ -154,6 +169,8 @@ class FakeOutline(FakeService):
         if path == "/api/collections.documents":
             return 200, {"data": self.tree(body["id"])}
         if path == "/api/documents.create":
-            document = self.add_document(body["collectionId"], body["title"], body["text"], body.get("parentDocumentId"))
+            document = self.add_document(
+                body["collectionId"], body["title"], body["text"], body.get("parentDocumentId")
+            )
             return 200, {"data": document}
         return 404, {"error": "not_found"}
