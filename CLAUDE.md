@@ -9,7 +9,7 @@ developer. Tasks live in Kaneo. Specs, guideline docs, and reports live in Outli
 - **Tests:** `.venv/bin/python -m pytest`. Healthy output ends with `passed`, and no `failed`
   or `error` lines. Python 3.11 or later, standard library only; `pytest` and `ruff` are the
   dev dependencies, installed in `.venv`.
--  **Lint:** `.venv/bin/ruff check .`. Healthy output is `All checks passed!`.
+- **Lint:** `.venv/bin/ruff check .`. Healthy output is `All checks passed!`.
 - **Format:** `.venv/bin/ruff format --check .`. Healthy output ends with
   `files already formatted`, and no `Would reformat` lines
 
