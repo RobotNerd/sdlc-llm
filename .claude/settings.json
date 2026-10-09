@@ -1,0 +1,39 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git *)",
+      "Bash(.venv/bin/python -m pytest)",
+      "Bash(.venv/bin/python -m pytest *)",
+      "Bash(.venv/bin/ruff check .)",
+      "Bash(.venv/bin/ruff check . *)",
+      "Bash(.venv/bin/ruff format --check .)",
+      "Bash(.venv/bin/ruff format --check . *)",
+      "Bash(claude plugin eval *)",
+      "Bash(python3 */lib/notify.py *)",
+      "Bash(python3 */lib/render_diagram.py *)",
+      "Bash(python3 */skills/*/scripts/*.py *)",
+      "mcp__plugin_sdlc-llm_kaneo__attach_label_to_task",
+      "mcp__plugin_sdlc-llm_kaneo__create_task",
+      "mcp__plugin_sdlc-llm_kaneo__create_task_comment",
+      "mcp__plugin_sdlc-llm_kaneo__create_task_relation",
+      "mcp__plugin_sdlc-llm_kaneo__delete_task_relation",
+      "mcp__plugin_sdlc-llm_kaneo__detach_label_from_task",
+      "mcp__plugin_sdlc-llm_kaneo__get_task",
+      "mcp__plugin_sdlc-llm_kaneo__get_task_relations",
+      "mcp__plugin_sdlc-llm_kaneo__list_tasks",
+      "mcp__plugin_sdlc-llm_kaneo__list_workspace_labels",
+      "mcp__plugin_sdlc-llm_kaneo__search",
+      "mcp__plugin_sdlc-llm_kaneo__update_task",
+      "mcp__plugin_sdlc-llm_kaneo__update_task_status",
+      "mcp__plugin_sdlc-llm_outline__create_document",
+      "mcp__plugin_sdlc-llm_outline__delete_document",
+      "mcp__plugin_sdlc-llm_outline__fetch",
+      "mcp__plugin_sdlc-llm_outline__list_collection_documents",
+      "mcp__plugin_sdlc-llm_outline__list_documents",
+      "mcp__plugin_sdlc-llm_outline__update_document"
+    ],
+    "deny": [
+      "Read(.env)"
+    ]
+  }
+}
