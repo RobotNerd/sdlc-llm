@@ -58,7 +58,8 @@ All four top-level sections are always present. A section with nothing in it say
 
 * Follows the format in the Testing strategy doc: automated tests first, then manual, each as Given/When/Then plus steps, each naming the criterion it covers.
 * Every criterion has at least one test.
-* Manual tests are only for what can't be automated.
+* Manual tests are a last resort, for what no automated test, eval, or agent-run check can observe. The Manual section opens with a **Why manual:** line for each test: the behavior it checks, and why it can't be automated. See Manual tests in the Testing strategy doc.
+* A manual test runs at the end of its epic, in the epic's validation task, unless the human marks it `[blocks merge]` while reviewing the task. Its steps run against the default branch.
 * Manual tests are written out in full on the task: every command, agent prompt, and value to paste, and the expected result of each step, so the developer can run them from the task alone. When the steps can only be settled during implementation, the Manual section says so, and the implementer adds the full steps as a task comment before handing the task over.
 * Manual steps are formatted for copying: commands, agent prompts, and values to paste each stand in their own code block or bulleted list, never inline in a sentence. A file to create is given as its name, then its content, each in its own block. See "Formatting for the reader" in the Documentation style doc.
 
@@ -88,6 +89,26 @@ All four top-level sections are always present. A section with nothing in it say
 <what would make it worth doing>
 ## Source
 <link to the spec or PRD that deferred it>
+```
+
+**Validation** (label `validation`): the last task of an epic that has deferred manual tests. It runs those tests after the rest of the epic has merged. It's a subtask of the epic, and every task whose tests it lists blocks it. It has nothing to implement: a batch pauses on it for the human, and on pass moves it to done. When a task with a deferred manual test joins an epic, its tests are added to the validation task, which is created if the epic doesn't have one yet.
+
+```markdown
+## Description
+Run the manual tests deferred from this epic's tasks, on the default branch. Each test's steps are on its own task.
+## Acceptance criteria
+- [ ] KEY-NNN <task title>: <manual test title> passes
+## Testing strategy
+### Automated
+None
+### Manual
+**Why manual:** each test's own task says why.
+#### Every deferred test → passes   (criteria: all) [blocks merge]
+* **Given:** every other task in the epic is merged
+* **When:** the human runs each listed test from its task
+* **Then:** each one passes, and its criterion is ticked
+## Notes
+A failing test gets a bug task in the epic, which blocks this task.
 ```
 
 **Follow-up** (label `follow-up`, created during a batch): the normal template. Notes says which task it came from and why it was split off.

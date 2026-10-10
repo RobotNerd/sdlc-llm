@@ -7,7 +7,8 @@ How work is tested. The workflow is TDD (tests are written before the implementa
 * Test types
 * Behavioral test rules
 * Testing strategy format (tasks)
-* Blocking manual tests
+* Manual tests
+* Manual tests in a batch
 * Unit tests
 * Protecting failing tests
 * Skill evals
@@ -17,6 +18,7 @@ How work is tested. The workflow is TDD (tests are written before the implementa
 | Type | What it checks | Kept? |
 |------|----------------|-------|
 | Behavioral, automated | One observable behavior, driven through a real entry point (a CLI or a script) | Committed |
+| Agent-run check | One observable behavior, checked by the agent against a real system, such as CI's result or the tracker's state | Recorded in the report |
 | Behavioral, manual | One observable behavior, run by the human from a written procedure | Lives in the task and the reports |
 | Skill eval | One skill behavior, run with `claude plugin eval` against a scratch repo and mocked backends | Committed |
 | Unit | Internals: functions, structure, wording | Throwaway by default |
@@ -69,7 +71,9 @@ A task's `## Testing strategy` section lists automated tests first, then manual 
 
 ### Manual
 
-#### <condition> → <outcome>   (criterion: <which one>) [blocks merge]
+**Why manual:** <the exact behavior, and why no automated test, eval, or agent-run check can observe it>
+
+#### <condition> → <outcome>   (criterion: <which one>)
 
 * **Given:** ...
 * **When:** ...
@@ -81,17 +85,34 @@ A task's `## Testing strategy` section lists automated tests first, then manual 
 
 * Given / When / Then are bullets, so Outline and Kaneo don't merge them into one line.
 * Manual steps follow "Formatting for the reader" in the Documentation style doc: each command, prompt, and pasted value in its own code block or list, and commands paste-ready.
+* Automated covers everything the agent runs without the human: tests, evals, and agent-run checks.
+* The Manual section opens with **Why manual:**, one line per test when there are several.
+* A blocking test ends its title with `[blocks merge]`. Only the human decides that a test blocks (see Manual tests).
 * Either subsection can be `None` when it has no tests.
 * Gates that always apply, such as `test_command`, lint, and the reference check, go in one closing line. They don't need a Given/When/Then block.
 * The per-task report's Manual testing section copies the manual tests in this same format.
 
-## Blocking manual tests
+## Manual tests
 
-* **Marking:** a manual test whose title ends in `[blocks merge]` must pass before its task merges. The label is added when the human reviews newly created tasks. Nothing adds it later.
-* **At batch start:** after the batch is validated, every task in it is scanned for `[blocks merge]` tests. If any are found, they're listed, and the human is asked whether to proceed or adjust the batch.
-* **At merge:** for a task with a blocking test, the batch pauses before squashing, with the interrupt kind `manual_test_required`. The human runs the test and reports pass or fail.
-  * Pass → merge.
+* **A last resort.** Write a manual test only for a behavior that no automated test, eval, or agent-run check can observe. If part of a behavior can be automated, automate that part, and keep the manual test to the rest.
+  * Good reasons: the behavior needs the real tracker or doc store (evals mock them), a notification arriving on a real device, or a judgment only the human can make.
+  * Not a reason: the agent can run it itself. Reading CI's result, querying the tracker, or checking a file is an agent-run check, and goes under Automated.
+* **Why manual.** The Manual section opens with a **Why manual:** line for each test: the exact behavior it checks, and why that can't be checked automatically. The human reads it while reviewing the planned tasks, and decides whether the test blocks.
+* **Deferred by default.** A manual test runs at the end of its epic, in the epic's validation task (see the Task style guide). Its own task merges without it. Write its steps against the default branch, since it runs after the merge.
+  * A task with no epic: its manual tests are listed in the batch report's Manual testing section, and run after the batch.
+* **Blocking.** A manual test whose title ends in `[blocks merge]` must pass before its task merges. Only the human decides that a test blocks, while reviewing the planned tasks or when asked by the skill that writes the task. Mark it blocking only when later work depends on the result, because it ends a batch at its task.
+
+## Manual tests in a batch
+
+A batch runs to completion without the human, unless something goes wrong.
+
+* **At batch start:** after the batch is validated, its tasks are scanned in order for `[blocks merge]` tests. The first task with one becomes the batch's last task.
+  * If that shortens the batch, the human is told before any work starts: which task now ends the batch, which requested tasks are dropped, and why. They choose to continue with the shorter batch, or cancel it.
+  * If it's already the last task, the batch starts, and says it will end with a manual test.
+* **At the end:** the batch pauses before squashing that task, with the interrupt kind `manual_test_required`. The human runs the test and reports pass or fail.
+  * Pass → merge, and the batch completes.
   * Fail → the failure is recorded in the worklog, the task isn't merged, and the batch stops. The batch report records the failure.
+* **Validation tasks** have nothing to merge. The batch pauses on one the same way, and on pass moves it to done.
 
 ## Unit tests
 

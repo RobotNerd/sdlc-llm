@@ -45,6 +45,7 @@ LABEL_COLORS = {
     "feature": "#2563EB",
     "follow-up": "#D97706",
     "refactor": "#059669",
+    "validation": "#DB2777",
     "wont-do": "#4B5563",
 }
 DEFAULT_PROJECT_ICON = "Layout"
