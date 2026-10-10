@@ -924,8 +924,73 @@ Going forward, here are some changes I want you to make:
 - The milestones in Section `15. Roadmap` of the PRD v2 doc should be represented as epics in kaneo. The tasks created in each milestone are assigned to that epic.
 - The manual test instructions in kaneo should be written out step-by-step with all the details I need to run them directly on the task itself. So far, you've been writing these instructions out to the console, which makes it more difficult for me to copy/paste commands to run in the terminal. If you can't fully determine all manual test steps needed before actually implementing the ticket, another option is to include the full test instructions as a comment on the kaneo ticket. Tell me which one you chose in the output in the claude code cli. -->
 
-A couple of small changes:
-- For SDLC-20, change the path to `~/tmp/sdlc-sandbox`.
+<!-- Feedback on SDLC-22 107:
+
+Simplify the skill description in @skills/add-task/SKILL.md. The description should be treated as a trigger, acting as a guide that lets the agent know when to invoke the skill. Remove any additional details from the description that don't help achieve this goal, like in this case, portions of the description that describe details of what it's doing internally. Add this a guideline to the PRD so that it's included when authoring upcoming skills. -->
+
+<!-- On the editing problem in auto mode: I updated my user-level claude settings in ~/.claude/setting.json. However, in this project I also have .claude/settings.json and .claude/settings.local.json, both of which contain permissions settings. Is there something I can change in either or both of these files to resolve the editing issue? -->
+
+<!-- Before I try that, I'm going to end this sessions and start a new one. I saved your instructions above, and I will try them if the fresh session fails to fix the problem.
+
+Before I start the fresh sessions, I want to make sure that the new session can pick up right where we left off. Is there anything special I need to add as a prompt, or will the session be able to pick up everything from what's available in the repo and its access to kaneo/outline? -->
+
+<!-- Here are some more details about the session where the error is happening.
+- The session is running in this path: /Users/marshallbowles/dev/sdlc-llm
+- It attempted to edit four files; three failed and one edit succeeded.
+- This is a fresh session, but it's still happening.
+- The file `.claude/settings.json` in that directory was successfully edited in auto mode.
+- Edit attempts were made to these files in that directory, but they failed: tests/test_plugin_layout.py, .claude-plugin/plugin.json, and CLAUDE.md.
+
+First, try making ten separate edits to README.md in this repository, since it could be an intermittent error. If that passes, please to a deep dive into the other repository I mentioned above to see if you can spot anything locally that could be causing the problem. -->
+
+<!-- More details. I first disabled the kaneo mcp server, and the edits still failed. That session's output:
+
+```
+All three edits were blocked again with the Kaneo MCP server disabled, with the same "no verdict" error. So Kaneo probably isn't the cause.
+
+This session also showed a pattern:
+- Went through: the Edit to .claude/settings.json, and Edits to files in the memory directory.
+- Blocked: .claude-plugin/plugin.json, tests/test_plugin_layout.py and CLAUDE.md.
+
+I've added this result to the auto-mode memory.
+
+The three blocked edits are unchanged from the earlier list. Switch to accept-edits mode for pass 2. Re-enable the Kaneo server too: after the edits I need it to move the task to needs-human and post the report comment.
+```
+
+Then I disabled the outline mcp server, tried again, and the edits still failed. The session output:
+
+```
+All three edits were blocked again, with both the Kaneo and Outline servers disabled. So neither MCP server is the cause. The result is in the auto-mode memory.
+
+One clue: the .claude/settings.json edit went through in the same parallel batch where the plugin.json edit was blocked. Whatever triggers it varies by file, not by session state. I don't know why.
+
+To finish the task:
+1. Switch to accept-edits mode for the three edits (plugin.json, tests/test_plugin_layout.py, CLAUDE.md).
+2. Re-enable both MCP servers.
+3. Tell me to continue. I'll then commit, push, test the update command against the branch, open the PR, and update Kaneo.
+```
+
+One other bit of info: I ran the session with the command `claude --plugin-dir ~/dev/sdlc-llm` since I'm installing the plugin from another repo while testing. The plugin is what includes the kaneo and outline mcp servers. The current task I'm working on is to switch to installing the plugin from the repo in github instad of the local machine. Is it possible that installing from a local directory is causing the issue? -->
+
+<!-- Figured out the root cause in another session. It's because I'm invoking this session with the `--plugin-dir ~/dev/sdlc-llm` flag; that means we're editing the exact plugin files we're referencing from the installed plugin, which is why it's getting blocked. The current ticket *should* fix that problem once it's finished, since we'll be installing the plugin files from the github repo.
+
+One question before I enable accept edit mode so you can finish the last edits. The skills you created are in `./skills`, but to use them as a plugin, I thought they were supposed to be installed in `.claude/skills`. Will installing them as a plugin create the skills files under the `.claude/` directory? How is this all supposed to work? -->
+
+<!-- > claude --plugin-dir ~/dev/sdlc-llm -->
+
+<!-- I'm running through the manual test `Plain claude in this repo` on SDLC-38. It failed on step 2. The session did not prompt me to add the sdlc-llm marketplace. I used the `/plugin` command, and the sdlc-llm plugin shows an error: `Plugin "sdlc-llm" not cached at /Users/marshallbowles/.claude/plugins/marketplaces/sdlc-llm`. -->
+
+---
+
+<!-- Before starting work on the next task in this project, I want to make sure we're aligned on the manual testing strategy. My ultimate goal is to have you compete an epic on your own, and the manual tasks will be the human-run validation phase at the end.
+
+- Manual tests are only written when you absolutely can't test the behavior automatically.
+- If manual tests aren't blocking, try to plan for them to be conducted at the end of an epic.
+- When adding a task and defining manual tests, include a short/simple explanation on the task (at the top of the manual test block) of what exact behavior is being tested that you can't conduct automatically, and why you can't automatically check that behavior. This allows me to review the test during the planning phase, at which point I can determine if it should be a blocking manual test that occurs before its task can be completed or if I am willing to defer it until later (i.e. end of the epic/batch).
+- I know that we're planning to implement batches that aren't necessarily the same as a full epic. In this case, I still want the manual tasks at the end of the epic if possible, which would be decided before the batch execution anyway (in the planning phase).
+- For the implement-task skill, I want to make sure we're accounting for blocking manual tests when choosing the batch. A batch should always run to completion without human interaction, barring an actual error. If one of the tasks in the middle of the batch includes a blocking manual test, I want you to alert me about that before beginning any of the tasks in the batch. The batch ending ticket will be automatically selected by the skill as the first task in the batch with the blocking manual test, making the batch shorter than what I requested when triggering the skill. When you prompt me about this, I can choose to continue or cancel the batch request.
+
+Make sure the docs and existing skills fully reflect these guidelines (as well as any other docs I missed), and ensure that you're following this approach if you aren't already. Also look through the upcoming tasks in kaneo for any manual test cases that are shown as manual but could be automated. -->
 
 ---
 
@@ -947,3 +1012,8 @@ TODO: general
 - Remove the local mermaid rendering step. It's overkill.
 - Investigate switching to excalidraw for diagrams.
 - Add the telegram chat id to the .env file. It isn't a secret, but it's a good place to keep track of it.
+- In addition to the critic, investigate existing hostile reviewers and recommended best practices. Find ones for architecture, code, and documentation.
+- Outline doesn't automatically sort it's tree entries at any given level. Update the review-docs skill to check the tree for unsorted entries and sort them ascending.
+- Create a new user account in kaneo for the LLM with the same permissions I have. Replace the existing API key with one from this account. Might need to set `ALLOW_REGISTRATION=true` in the compose.yml file and run `docker compose up -d --force-recreate kaneo`. Double check all of this so it doesn't kill my existing instance. If that works, try registering via the UI as the bot; credentials already in 1password.
+- Adding new tools to the workflow: Investigate [mypy](https://mypy-lang.org/) for python static code analysis. Also add categories for security analysis (e.g. [bandit](https://bandit.readthedocs.io/en/latest/) in python), dead code checks (e.g. [vulture](https://github.com/jendrikseipp/vulture)), complexity analysis (e.g. [radon](https://radon.readthedocs.io/en/latest/index.html) and/or [mccabe](https://github.com/PyCQA/mccabe)). This will require rethinking how we list the tools. For python, these features are split between multiple single-responsibility tools. In other languages, the features may split in different ways across different tools, or a single tool may exist that implements all of these features. So we need a smart way to define it in the config and its usage in skills/hooks so that it can be used to support the language being used in the repository. We should also support the case where a single repository contains code written in multiple languages.
+- Investigate how to add [graphify](https://github.com/Graphify-Labs/graphify) and similar tools to the workflow. The goal is to create a knowledge graph of the code to support the agent in understanding how the system works. At what point in the development/progress of a project's development should this tool or similar tools be added?
