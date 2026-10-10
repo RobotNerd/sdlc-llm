@@ -72,6 +72,10 @@ class DocStore(ABC):
     """Docs nested in the project's collection."""
 
     @abstractmethod
+    def append_doc(self, doc_id, text):
+        """Add text to the end of the doc, and leave the rest intact."""
+
+    @abstractmethod
     def archive_doc(self, doc_id):
         """Hide the doc from the collection. It stays restorable."""
 

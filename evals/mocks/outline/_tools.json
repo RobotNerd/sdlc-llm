@@ -66,6 +66,84 @@
           "id"
         ]
       }
+    },
+    {
+      "name": "list_collection_documents",
+      "description": "Returns the complete hierarchical tree of published documents in a collection, including nested sub-documents.",
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "collectionId": {
+            "type": "string",
+            "description": "The ID of the collection whose document tree to return."
+          }
+        },
+        "required": [
+          "collectionId"
+        ]
+      }
+    },
+    {
+      "name": "list_documents",
+      "description": "Searches documents the user has access to. Performs full-text search across document content when a query is provided.",
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "collectionId": {
+            "type": "string",
+            "description": "A collection ID to filter documents by."
+          },
+          "query": {
+            "type": "string",
+            "description": "A search query to find documents by content or title."
+          },
+          "limit": {
+            "type": "integer",
+            "description": "The maximum number of results to return."
+          }
+        }
+      }
+    },
+    {
+      "name": "update_document",
+      "description": "Updates an existing document by its ID. Only the fields provided will be updated.",
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The unique identifier of the document to update."
+          },
+          "editMode": {
+            "type": "string",
+            "enum": [
+              "replace",
+              "append",
+              "prepend",
+              "patch"
+            ],
+            "description": "How to apply the text update. \"replace\" (default) replaces the entire document content. \"append\" adds text to the end. \"prepend\" adds text to the beginning. \"patch\" finds the exact markdown specified in findText and replaces only that portion."
+          },
+          "findText": {
+            "type": "string",
+            "description": "Required when editMode is \"patch\". The exact markdown substring to find in the document."
+          },
+          "text": {
+            "type": "string",
+            "description": "The markdown content to apply."
+          },
+          "title": {
+            "type": "string",
+            "description": "The new title for the document."
+          }
+        },
+        "required": [
+          "id"
+        ]
+      }
     }
   ]
 }
