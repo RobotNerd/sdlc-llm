@@ -14,7 +14,7 @@ SETUP = ROOT / "skills/setup-project/scripts/setup.py"
 WORKSPACE = "workspace1"
 FAKE_KEYS = {"KANEO_API_KEY": "fake-kaneo-key", "OUTLINE_API_KEY": "fake-outline-key"}
 COLUMNS = ["to-do", "in-progress", "needs-human", "done"]
-LABELS = {"bug", "chore", "deferred", "docs", "epic", "feature", "follow-up", "refactor", "wont-do"}
+LABELS = {"bug", "chore", "deferred", "docs", "epic", "feature", "follow-up", "refactor", "validation", "wont-do"}
 STRUCTURE = {"docs", "docs/guidelines", "reports", "reports/batches", "reports/epics", "spec"}
 GUIDELINES = {"Documentation style", "Review policy", "Task style guide", "Testing strategy"}
 

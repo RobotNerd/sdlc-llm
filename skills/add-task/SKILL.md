@@ -61,11 +61,12 @@ Collect what the task needs, and skip anything the request or the parameters alr
   - the outcome, in a few words, for the title
   - what changes, and why
   - acceptance criteria: each one observable and objective, so two people would agree whether it's met
-  - a testing strategy: the automated tests, and a manual test only for what can't be automated
+  - a testing strategy: the automated tests, and a manual test only for what no automated test, eval, or check the agent runs itself can observe, with why it can't be automated
+  - for each manual test, whether it blocks merge. Recommend that it doesn't, so it runs at the end of the epic, unless later work depends on its result.
   - the type
 - **Deferred work:** what's deferred, why, what would bring it back, and the source (a link to the spec or PRD, or "none").
 
-Take the type from the request when it's clear, such as "fix" for `bug` or "README" for `docs`. Leave out the epic and blockers unless the developer names them. When the request leaves any of the items above open, or a criterion can't be checked, **ASK** for exactly what's missing. Don't create anything until every item is settled.
+Take the type from the request when it's clear, such as "fix" for `bug` or "README" for `docs`. Leave out the epic and blockers unless the developer names them. When the request leaves any of the items above open, or a criterion can't be checked, **ASK** for exactly what's missing. When a requested manual test could be automated, **ASK** to automate it instead, and say how. Don't create anything until every item is settled.
 
 ### 3. Check for duplicates (medium)
 
@@ -81,6 +82,7 @@ A task is one branch and one sitting. If the criteria describe separately shippa
 
 1. Turn each task key (the epic, each blocker, and an `after <key>` anchor) into its task id, by `number`. Blockers and anchors are in the to-do column you read in step 1. The epic is in Planned: Tracker: `list_column` for `planned`. If a key isn't found, **ASK** for the right one.
 2. Status: `planned` for deferred work and for the `planned` placement, otherwise `to-do`.
+3. Validation task: when there's an epic and a manual test that doesn't block merge, find the epic's validation task. It's the task in to-do or Planned with the `validation` label that the epic has a `subtask` relation to. Tracker: `list_relations` on the epic to check. There may be none yet.
 
 ### 6. Write the task (high)
 
@@ -106,7 +108,7 @@ Write the title and the description by those rules:
   ## Notes
   ```
 
-  Every criterion has at least one test. Write each manual test out in full: every command, agent prompt, and value to paste in its own code block or list, and the expected result of each step.
+  Every criterion has at least one test. When there's a manual test, the Manual section opens with a **Why manual:** line for each one: the exact behavior it checks, and why it can't be automated. Write each manual test out in full: every command, agent prompt, and value to paste in its own code block or list, and the expected result of each step. End a blocking test's title with `[blocks merge]`.
 - **Deferred work:**
 
   ```markdown
@@ -123,6 +125,14 @@ Write the title and the description by those rules:
 3. Tracker: `add_relation` `subtask` from the epic to the new task, when there's an epic.
 4. Tracker: `add_relation` `blocks` from each blocker to the new task.
 5. Tracker: `place_task` at the placement, when the status is `to-do`. The new task may not be in the column you read yet; add it to the list before you renumber.
+6. When step 5 found a validation task, Tracker: `update_description` on it, adding to its Acceptance criteria one line per manual test that doesn't block merge:
+
+   ```markdown
+   - [ ] <kaneo.project_slug>-<number> <task title>: <manual test title> passes
+   ```
+
+   When there's no validation task yet, create one the same way as steps 1 to 4: titled `Run the manual tests for <epic title>`, from the Validation template in the Task style guide, with the type `chore`, the `validation` label, the new task's status, and a `subtask` relation from the epic.
+7. Tracker: `add_relation` `blocks` from the new task to the validation task. When both are in to-do, the validation task must come later: Tracker: `place_task` it at `after <new task>` when it's above the new task, or at `end` when you just created it.
 
 ### 8. Report (low)
 
@@ -132,4 +142,4 @@ Show the task's key, `<kaneo.project_slug>-<number>`, its title, and its link:
 <kaneo.url>/dashboard/workspace/<kaneo.workspace_id>/project/<kaneo.project_id>/task/<task id>
 ```
 
-Then say where it landed: its column and position, its epic, and its blockers.
+Then say where it landed: its column and position, its epic, and its blockers. When it has manual tests, say whether each one blocks merge or was added to the epic's validation task, with that task's key.

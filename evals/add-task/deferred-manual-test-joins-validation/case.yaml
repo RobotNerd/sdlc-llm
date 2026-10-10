@@ -1,0 +1,4 @@
+schema_version: "1.1"
+name: deferred-manual-test-joins-validation
+context:
+  scaffold_script: scaffold.sh
