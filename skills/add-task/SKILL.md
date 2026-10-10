@@ -25,6 +25,7 @@ Each parameter the developer gives skips its question in step 2.
 
 - **ASK** means: ask with `AskUserQuestion`, a few questions at a time, with the recommended answer first. If `AskUserQuestion` isn't available, ask in your reply and end your turn. Never guess an answer.
 - **STOP** means: say what's needed, and end your turn.
+- **Questions doc:** an interview of more than five questions goes through a doc in Outline, not the terminal (step 2).
 - With each ASK and STOP, also run the notify script. If it fails or can't run, carry on.
 
   ```bash
@@ -67,6 +68,27 @@ Collect what the task needs, and skip anything the request or the parameters alr
 - **Deferred work:** what's deferred, why, what would bring it back, and the source (a link to the spec or PRD, or "none").
 
 Take the type from the request when it's clear, such as "fix" for `bug` or "README" for `docs`. Leave out the epic and blockers unless the developer names them. When the request leaves any of the items above open, or a criterion can't be checked, **ASK** for exactly what's missing. When a requested manual test could be automated, **ASK** to automate it instead, and say how. Don't create anything until every item is settled.
+
+**Count the open questions before you ask any.** One question per open item above, plus any other decision the request leaves to the developer. When there are more than five, or the developer asks for a questions doc, don't ask in the terminal, not even a first few. Interview through a questions doc in Outline instead, doing each DocStore operation the way the [Outline backend map](../../lib/references/backends/outline.md) says:
+
+1. **Find the parent.** When the developer named an epic: Tracker: `list_column` for `planned`, find the epic by `number`, and DocStore: `get_doc` the spec its description links to. The parent is that spec. Without an epic, or when the epic links no spec: DocStore: `find_doc` `spec`. If neither is found, **ASK** where the doc goes.
+2. **Write round 1.** DocStore: `create_doc` titled `<task title> questions` under the parent. The text quotes the developer's request, then has `## Round 1` with every open question in this shape:
+
+   ```markdown
+   ### <topic>
+
+   **Q1.** <question>
+
+   * <option> (recommended)
+   * <option>
+
+   > Answer: TODO
+   ```
+
+   Number the questions Q1, Q2, … through the whole doc, and group them by topic. Give options and a recommendation where there are any. Every question has its own `> Answer: TODO` line.
+3. **STOP**, naming the doc by its title and link: the developer answers in Outline, replacing each `TODO` with an answer or "agree", then says "continue". Pass the link to the notify script with `--link`.
+4. **On "continue",** DocStore: `get_doc`. If this session didn't create the doc, find it first with DocStore: `search_docs` on its title, or **ASK** for its link. An answer that still reads `TODO` is unanswered, and "agree" means the recommendation.
+5. **When anything is still open,** whether unanswered or raised by an answer, DocStore: `append_doc` a `## Round <N>` section, with those questions numbered on from the last one, in the same shape. Leave earlier rounds as they are. Then **STOP** again, as in item 3. When nothing is open, go on to step 3, "Check for duplicates".
 
 ### 3. Check for duplicates (medium)
 
