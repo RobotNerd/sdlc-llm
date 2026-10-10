@@ -1,6 +1,5 @@
 {
   "name": "sdlc-llm",
-  "version": "2.0.0-dev",
   "description": "Plan, track, and implement work for a solo developer, with tasks in Kaneo and docs in Outline.",
   "author": {
     "name": "Marshall Bowles"
