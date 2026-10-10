@@ -1,16 +1,4 @@
 {
-  "extraKnownMarketplaces": {
-    "sdlc-llm": {
-      "source": {
-        "source": "github",
-        "repo": "RobotNerd/sdlc-llm"
-      },
-      "autoUpdate": true
-    }
-  },
-  "enabledPlugins": {
-    "sdlc-llm@sdlc-llm": true
-  },
   "permissions": {
     "allow": [
       "Bash(git *)",
@@ -47,5 +35,17 @@
     "deny": [
       "Read(.env)"
     ]
+  },
+  "enabledPlugins": {
+    "sdlc-llm@sdlc-llm": true
+  },
+  "extraKnownMarketplaces": {
+    "sdlc-llm": {
+      "source": {
+        "source": "github",
+        "repo": "RobotNerd/sdlc-llm"
+      },
+      "autoUpdate": true
+    }
   }
 }

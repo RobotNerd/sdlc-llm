@@ -16,10 +16,16 @@ developer. Tasks live in Kaneo. Specs, guideline docs, and reports live in Outli
 ## Running the plugin
 
 This repo runs the plugin as released on `main` on GitHub. `.claude/settings.json` declares
-the `sdlc-llm` marketplace and enables `sdlc-llm@sdlc-llm` at project scope, so start
-`claude` here with no flags. The first session installs the plugin and asks for the Kaneo
-and Outline URLs. Don't load this repo with `--plugin-dir`: the session would then run the
-files it edits.
+the `sdlc-llm` marketplace and enables `sdlc-llm@sdlc-llm` at project scope, but enabling a plugin doesn't install it. Install it
+once from the repo root:
+
+```bash
+claude plugin marketplace add RobotNerd/sdlc-llm && claude plugin install sdlc-llm@sdlc-llm --scope project
+```
+
+Then start `claude` here with no flags. The first session asks for the Kaneo and Outline
+URLs. Don't load this repo with `--plugin-dir`: the session would then run the files it
+edits.
 
 The manifest has no `version`, so Claude Code versions the install by commit SHA, and every
 merge to `main` reaches it. Auto-update brings a merge in the background. To bring it in
