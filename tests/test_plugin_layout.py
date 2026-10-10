@@ -54,6 +54,25 @@ def test_marketplace_lists_the_plugin_at_the_repo_root():
     assert (ROOT / ".claude-plugin/plugin.json").exists()
 
 
+def test_project_settings_enable_the_plugin_from_this_repo_on_github():
+    settings = load_json(".claude/settings.json")
+    repository = load_json(".claude-plugin/plugin.json")["repository"]
+
+    source = settings["extraKnownMarketplaces"]["sdlc-llm"]["source"]
+    assert source["source"] == "github"
+    assert repository == f"https://github.com/{source['repo']}"
+    assert settings["enabledPlugins"]["sdlc-llm@sdlc-llm"] is True
+
+
+def test_no_version_pins_the_installed_plugin():
+    # A version in either place keeps an install on its cached copy until the string
+    # changes. Without one, Claude Code versions the install by commit SHA, so every
+    # merge to main reaches it.
+    assert "version" not in load_json(".claude-plugin/plugin.json")
+    for entry in load_json(".claude-plugin/marketplace.json")["plugins"]:
+        assert "version" not in entry
+
+
 def test_standard_directories_and_hooks_file_exist():
     for directory in ("skills", "lib/backends", "lib/references/backends", "evals", "tests"):
         assert (ROOT / directory).is_dir(), f"{directory}/ is missing"

@@ -1,4 +1,16 @@
 {
+  "extraKnownMarketplaces": {
+    "sdlc-llm": {
+      "source": {
+        "source": "github",
+        "repo": "RobotNerd/sdlc-llm"
+      },
+      "autoUpdate": true
+    }
+  },
+  "enabledPlugins": {
+    "sdlc-llm@sdlc-llm": true
+  },
   "permissions": {
     "allow": [
       "Bash(git *)",

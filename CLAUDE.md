@@ -13,6 +13,40 @@ developer. Tasks live in Kaneo. Specs, guideline docs, and reports live in Outli
 - **Format:** `.venv/bin/ruff format --check .`. Healthy output ends with
   `files already formatted`, and no `Would reformat` lines
 
+## Running the plugin
+
+This repo runs the plugin as released on `main` on GitHub. `.claude/settings.json` declares
+the `sdlc-llm` marketplace and enables `sdlc-llm@sdlc-llm` at project scope, so start
+`claude` here with no flags. The first session installs the plugin and asks for the Kaneo
+and Outline URLs. Don't load this repo with `--plugin-dir`: the session would then run the
+files it edits.
+
+The manifest has no `version`, so Claude Code versions the install by commit SHA, and every
+merge to `main` reaches it. Auto-update brings a merge in the background. To bring it in
+right away, run this from the repo root, then start a new session:
+
+```bash
+claude plugin marketplace update sdlc-llm && claude plugin update sdlc-llm@sdlc-llm
+```
+
+A branch is tested in the sandbox, `~/dev/sdlc-sandbox`, from a scratch checkout at
+`~/dev/sdlc-llm-review`. Create the checkout once:
+
+```bash
+git -C ~/dev/sdlc-llm worktree add --detach ~/dev/sdlc-llm-review
+```
+
+Before each test, set `BRANCH` to the branch under test, then move the checkout to it and
+start the sandbox session:
+
+```bash
+git -C ~/dev/sdlc-llm-review fetch && git -C ~/dev/sdlc-llm-review checkout --detach "origin/$BRANCH"
+```
+
+```bash
+cd ~/dev/sdlc-sandbox && claude --plugin-dir ~/dev/sdlc-llm-review
+```
+
 ## Guidelines
 
 The guideline docs live in Outline under `docs/guidelines`. Read the one a step needs, when
