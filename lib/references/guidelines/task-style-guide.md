@@ -138,6 +138,12 @@ Batch validation accepts a task whose blocker is in the same batch but ordered a
 1. Set up the fake tracker with A and B.
 2. Run the batch builder with the range — expected: exit 1, message names A and B.
 3. Check `git branch` — expected: no new branch.
+#### Blockers first → batch starts   (criterion: second)
+* **Given:** two to-do tasks, B blocked by A, ordered A then B
+* **When:** a batch is built from that range
+* **Then:** it exits 0, and the batch lists A, then B
+1. Set up the fake tracker with A and B.
+2. Run the batch builder with the range — expected: exit 0, and the batch lists A, then B.
 ### Manual
 None
 
