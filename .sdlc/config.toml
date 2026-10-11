@@ -79,7 +79,7 @@ workspace_id = "1yZmTxeawGIak6j0EBb6Lr8R7QkoiYNP"
 # Send STOP and ASK messages to the channels below.
 enabled = true
 # Also notify whenever a turn ends waiting for you. Off by default, because it can be noisy.
-stop_hook = false
+stop_hook = true
 
 [[notify.channels]]
 role = "primary"
