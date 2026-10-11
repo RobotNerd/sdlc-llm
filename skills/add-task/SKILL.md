@@ -1,7 +1,7 @@
 ---
 name: add-task
 description: Adds a task to the project's Kaneo backlog. Use when the developer asks to add, create, file, or log a task, bug, chore, or feature, to put something on the backlog, or to defer an idea for later.
-allowed-tools: Bash(python3 ${CLAUDE_PLUGIN_ROOT}/lib/notify.py *)
+allowed-tools: Bash(python3 ${CLAUDE_PLUGIN_ROOT}/lib/notify.py *), Bash(python3 ${CLAUDE_PLUGIN_ROOT}/lib/validate_draft.py *)
 ---
 
 # add-task
@@ -14,23 +14,53 @@ Each parameter the developer gives skips its question in step 2.
 
 | Parameter | Default | Skips |
 |---|---|---|
-| description | none | what the task changes, and why |
+| title | none | the outcome, for the title |
+| description | none | what the task changes, and why. From another skill, the full description in the template. |
 | type | none | the type label: `feature`, `bug`, `chore`, `refactor`, or `docs` |
 | epic | none | the epic, as a task key such as `KEY-12` |
 | `blocked_by` | none | the blocking tasks, as task keys |
 | placement | `end` | `top`, `end`, or `after <key>` in to-do, or `planned` |
 | `deferred` | off | files deferred work instead of a task to do |
+| `invoked_by` | none | the skill that invoked this one, such as `plan-feature` |
 
 ## Asking and stopping
 
-- **ASK** means: ask with `AskUserQuestion`, a few questions at a time, with the recommended answer first. If `AskUserQuestion` isn't available, ask in your reply and end your turn. Never guess an answer.
-- **STOP** means: say what's needed, and end your turn.
+- **ASK** means: run the notify script with `--kind ASK`, then ask with `AskUserQuestion`, a few questions at a time, with the recommended answer first. If `AskUserQuestion` isn't available, ask in your reply and end your turn. Never guess an answer.
+- **STOP** means: run the notify script with `--kind STOP`, then say what's needed, and end your turn.
 - **Questions doc:** an interview of more than five questions goes through a doc in Outline, not the terminal (step 2).
-- With each ASK and STOP, also run the notify script. If it fails or can't run, carry on.
+- **Notify script,** run with every ASK and STOP. If it fails or can't run, carry on.
 
   ```bash
-  python3 ${CLAUDE_PLUGIN_ROOT}/lib/notify.py --skill add-task --kind ASK --text "<what's needed>"
+  python3 ${CLAUDE_PLUGIN_ROOT}/lib/notify.py --skill add-task --kind <ASK or STOP> --text "<what's needed>"
   ```
+
+## Agent-invoked mode
+
+When another skill invokes add-task with `invoked_by` set and every other parameter given (`none` for one that's empty), run non-interactively. Never ASK or STOP, never use a questions doc, and send no notifications. Do every step, but where one would ASK or STOP, do this instead, and carry on:
+
+| Step | Situation | Instead |
+|---|---|---|
+| 1 | The config is missing, or Kaneo doesn't answer | End the skill, and report the error to the invoking skill. Create nothing. |
+| 2 | Something the task needs is missing or can't be checked | Record it as a gap. |
+| 3 | An open task covers the same outcome | Create the task anyway. Then Tracker: `add_comment`: `Possible duplicate of <kaneo.project_slug>-<number> <title>.` |
+| 4 | The criteria describe separately shippable pieces, or the changes span unrelated areas | Create the task anyway. Then Tracker: `add_comment` saying why it looks too big, and how it could be split. |
+| 5 | A key isn't found | Skip that relation or anchor, and record it as a gap. |
+
+In step 6, use the title and description as given, then check them with the draft validator. Pass the task as a one-task draft, as JSON on one line inside single quotes. Write each `'` in the title or description as `\u0027`, so the quoting holds. Leave `blocked_by` empty, since the blockers are existing tasks. For deferred work, put the item under `deferred` instead, without `type` or `blocked_by`.
+
+```bash
+python3 ${CLAUDE_PLUGIN_ROOT}/lib/validate_draft.py --json '{"tasks": [{"id": "new", "title": "<title>", "type": "<type>", "description": "<description>", "blocked_by": []}], "deferred": []}'
+```
+
+Run it exactly as shown, as one command: add nothing before or after it, such as `; echo`. It prints `{"ok": true}` when the draft passes. Otherwise, each line it prints is a gap. When there's any gap, the task's status is `planned`, whatever the placement, and right after creating it, Tracker: `add_comment` listing every gap:
+
+```markdown
+needs-refinement
+
+- <gap>
+```
+
+In step 8, report to the invoking skill: the key, the link, the status, and each comment added.
 
 ## Steps
 
@@ -130,7 +160,7 @@ Write the title and the description by those rules:
   ## Notes
   ```
 
-  Every criterion has at least one test. When there's a manual test, the Manual section opens with a **Why manual:** line for each one: the exact behavior it checks, and why it can't be automated. Write each manual test out in full: every command, agent prompt, and value to paste in its own code block or list, and the expected result of each step. End a blocking test's title with `[blocks merge]`.
+  Every criterion has at least one test. When there's a manual test, the Manual section opens with a **Why manual:** line for each one: the exact behavior it checks, and why it can't be automated. Write each manual test out in full: every command, agent prompt, and value to paste in its own code block or list, and the expected result of each step. A step that runs something shows the exact command, never only a description such as "clone the repo". End a blocking test's title with `[blocks merge]`.
 - **Deferred work:**
 
   ```markdown

@@ -219,3 +219,14 @@ def test_draft_error_is_printed_when_the_file_is_not_valid_json(tmp_path):
 
     assert result.returncode == 1
     assert result.stdout.startswith("draft: invalid-json: ")
+
+
+def test_ok_is_printed_when_a_valid_draft_is_passed_as_json_text():
+    draft = json.dumps({"tasks": [task("a")], "deferred": []})
+
+    result = subprocess.run(
+        [sys.executable, str(SCRIPT), "--json", draft], capture_output=True, check=False, text=True, timeout=30
+    )
+
+    assert result.returncode == 0, result.stdout
+    assert json.loads(result.stdout) == {"ok": True}

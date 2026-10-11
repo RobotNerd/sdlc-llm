@@ -1,7 +1,7 @@
 """Check a JSON draft of tasks against the Task style guide's mechanical rules.
 
 Prints {"ok": true} and exits 0 when the draft passes. Otherwise prints every error, one per
-line, as `<id>: <rule>: <detail>`, and exits 1.
+line, as `<id>: <rule>: <detail>`, and exits 1. Pass the draft as a file path, or as JSON text with --json.
 
 The draft is one JSON object:
 
@@ -51,10 +51,12 @@ ORDINALS = (
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("draft", type=Path, help="the draft's JSON file")
+    source = parser.add_mutually_exclusive_group(required=True)
+    source.add_argument("draft", nargs="?", type=Path, help="the draft's JSON file")
+    source.add_argument("--json", help="the draft itself, as JSON text")
     arguments = parser.parse_args(argv)
 
-    errors = validate_file(arguments.draft)
+    errors = validate_text(arguments.json) if arguments.json is not None else validate_file(arguments.draft)
     if errors:
         print("\n".join(errors))
         return 1
@@ -64,9 +66,15 @@ def main(argv=None):
 
 def validate_file(path):
     try:
-        draft = json.loads(path.read_text())
+        text = path.read_text()
     except OSError as error:
         return [f"draft: unreadable: {error.strerror}"]
+    return validate_text(text)
+
+
+def validate_text(text):
+    try:
+        draft = json.loads(text)
     except json.JSONDecodeError as error:
         return [f"draft: invalid-json: {error}"]
     if not isinstance(draft, dict):

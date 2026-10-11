@@ -53,8 +53,8 @@ provider = "subagent"
 backend = "outline"
 
 [evals]
-# One run, no baseline, a pinned model, and a local-only report: the per-task gate. {tag} is the skill whose cases run.
-command = "claude plugin eval . --tag {tag} --runs 1 --ablation none --model claude-sonnet-5-5 --no-publish --scaffold"
+# One run, no baseline, a pinned model, and a local-only report: the per-task gate. {tag} is the skill whose cases run. The python3 grant lets a skill run its scripts.
+command = "claude plugin eval . --tag {tag} --runs 1 --ablation none --model claude-sonnet-5-5 --no-publish --scaffold --allow-tools 'Bash(python3:*)'"
 # Run the changed skills' evals after each task. "batch" runs them once at the end.
 gate = "task"
 
