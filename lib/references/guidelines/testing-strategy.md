@@ -141,6 +141,13 @@ A batch runs to completion without the human, unless something goes wrong.
   * `llm` only for short output, with a rubric written as concrete PASS and FAIL conditions. Not on `mock_calls` when a call carries a long document: the judge sees only part of the calls. Use `input_match` on a `tool_used` grader instead.
   * There are no custom-code graders. When a check needs code, the prompt asks Claude to write the result to a file, and a `regex` grader reads that file.
 * **Backends are mocked.** Each Kaneo or Outline MCP tool a skill calls gets a file under `evals/mocks/<server>/`. Put an `expect:` guard on any mock whose arguments matter, so a wrong call fails the run.
+* **Scripts need a grant.** A case's `allowed_tools` can't grant Bash, so a skill that runs a script needs `--allow-tools` on the eval command line, such as:
+
+  ```bash
+  --allow-tools 'Bash(python3:*)'
+  ```
+
+  The grant only matches one plain command. A skill runs its scripts as one command, with nothing chained before or after it.
 * **Triggering:** each case has a `tool_used: Skill` grader for its skill, and prompts vary their wording. At least one case per skill is a request that must not trigger it (`min: 0`, `max: 0`, `arm: both`).
 * **Running the suite:**
   * Per-task gate: run once, with no baseline.
