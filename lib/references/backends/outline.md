@@ -13,6 +13,7 @@ How a prose skill performs each DocStore operation through the Outline MCP serve
 
 | Operation | Tools | Arguments and steps |
 |-----------|-------|---------------------|
+| `append_doc` | `mcp__plugin_sdlc-llm_outline__update_document`, `mcp__plugin_sdlc-llm_outline__fetch` | `id`, `editMode` `append`, and `text`, starting with a blank line. Fetch the doc afterwards and check the text is at the end. |
 | `archive_doc` | `mcp__plugin_sdlc-llm_outline__delete_document` | `id`, and `archive` `true`. Without `archive`, the doc goes to the trash instead. |
 | `create_doc` | `mcp__plugin_sdlc-llm_outline__create_document` | `title`, `text`, and `parentDocumentId`. For a doc at the top of the collection, pass `collectionId` `<outline.collection_id>` instead. |
 | `find_doc` | `mcp__plugin_sdlc-llm_outline__list_collection_documents` | `collectionId` `<outline.collection_id>`. Walk the tree one title per path segment, such as `docs`, then `guidelines`, then `Code style`. Titles must match exactly. |
