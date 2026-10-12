@@ -230,3 +230,19 @@ def test_ok_is_printed_when_a_valid_draft_is_passed_as_json_text():
 
     assert result.returncode == 0, result.stdout
     assert json.loads(result.stdout) == {"ok": True}
+
+
+def test_the_draft_is_saved_when_save_is_given_with_json_text(tmp_path):
+    draft = json.dumps({"tasks": [task("a", title="Ends in a period.")], "deferred": []})
+    saved = tmp_path / ".sdlc/local/export-draft.json"
+
+    result = subprocess.run(
+        [sys.executable, str(SCRIPT), "--save", str(saved), "--json", draft],
+        capture_output=True,
+        check=False,
+        text=True,
+        timeout=30,
+    )
+
+    assert result.returncode == 1
+    assert saved.read_text() == draft

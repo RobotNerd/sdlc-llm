@@ -1,24 +1,25 @@
 ---
 name: plan-feature
-description: Plans a feature through a spec in Outline. Use when the developer asks to plan, spec, design, or scope a feature, or something too big for one task, or to continue, resume, or approve a feature plan.
-allowed-tools: Bash(python3 ${CLAUDE_PLUGIN_ROOT}/lib/notify.py *)
+description: Plans a feature through a spec in Outline. Use when the developer asks to plan, spec, design, or scope a feature, or something too big for one task, or to continue, resume, or approve a feature plan, or to break an approved spec into tasks and release them.
+allowed-tools: Bash(python3 ${CLAUDE_PLUGIN_ROOT}/lib/notify.py *), Bash(python3 ${CLAUDE_PLUGIN_ROOT}/lib/validate_draft.py *)
 ---
 
 # plan-feature
 
-Turns a feature idea into an approved spec in Outline, through an interview in a questions doc.
+Turns a feature idea into an approved spec in Outline, through an interview in a questions doc, then into an epic and tasks in Kaneo.
 
 ## Parameters
 
 | Parameter | Default | Skips |
 |---|---|---|
 | feature | none | the request. With none, the skill resumes a spec in progress (step 2). |
+| epic | none | creating an epic in step 9. An existing epic the tasks join, as a task key such as `KEY-12`. |
 
 ## Asking and stopping
 
 - **ASK** means: run the notify script with `--kind ASK`, then ask with `AskUserQuestion`, with the recommended answer first. If `AskUserQuestion` isn't available, ask in your reply and end your turn. Never guess an answer.
 - **STOP** means: run the notify script with `--kind STOP`, then say what's needed, and end your turn.
-- **Notify script,** run with every ASK and STOP. Pass the doc the developer needs with `--link`. If it fails or can't run, carry on.
+- **Notify script,** run with every ASK and STOP, even when notifications look off in the config: the script checks that itself. Pass the doc or task the developer needs with `--link`. If it fails or can't run, carry on.
 
   ```bash
   python3 ${CLAUDE_PLUGIN_ROOT}/lib/notify.py --skill plan-feature --kind <ASK or STOP> --text "<what's needed>" --link "<doc url>"
@@ -38,11 +39,17 @@ Status: interviewing
 |---|---|---|
 | `interviewing` | The questions doc has a round open. | step 3, item 3 |
 | `drafting` | The spec is drafted and waiting for approval. | step 5, item 4 |
-| `approved` | The spec is approved. | step 6, item 5 |
-| `tasks created` | The tasks are created, waiting for review. | step 6, item 5 |
+| `approved` | The spec is approved. | step 7 |
+| `tasks created` | The tasks are created, waiting for review. | step 11 |
 | `released` | Done. Never resumed. | — |
 
 Change the status with DocStore: `update_doc`, `findText` the whole old status line, and `text` the new one.
+
+Once the tasks are created, the line after the status line links the epic:
+
+```markdown
+Epic: [<key> <epic title>](<epic url>)
+```
 
 ## Steps
 
@@ -55,6 +62,7 @@ Read guideline docs from Outline with `mcp__plugin_sdlc-llm_outline__fetch` (`re
 | Testing strategy | `guidelines.testing` | [testing-strategy.md](../../lib/references/guidelines/testing-strategy.md) |
 | Documentation style | `guidelines.doc_style` | [documentation-style.md](../../lib/references/guidelines/documentation-style.md) |
 | Architecture | `guidelines.architecture` | none |
+| Task style guide | `guidelines.task_style` | [task-style-guide.md](../../lib/references/guidelines/task-style-guide.md) |
 
 Copy this checklist into your reply, and tick each step off as you finish it:
 
@@ -65,6 +73,11 @@ Copy this checklist into your reply, and tick each step off as you finish it:
 - [ ] 4. Check the architecture
 - [ ] 5. Draft the spec
 - [ ] 6. Approve
+- [ ] 7. Decompose
+- [ ] 8. Validate the draft
+- [ ] 9. Create the tasks
+- [ ] 10. Review
+- [ ] 11. Release
 ```
 
 ### 1. Check the repo (low)
@@ -166,4 +179,73 @@ Read the Documentation style doc now.
 2. If Open questions has any entry, the spec isn't approved. Leave the status as it is. **STOP**, naming each open question: the developer resolves it in the spec, then approves again.
 3. When the Architecture change isn't `None`, apply it to the Architecture doc: DocStore: `update_doc` the heading it names, or `append_doc` when the change is a new section.
 4. Set the status to `approved`.
-5. **STOP**: say the spec is approved, with its title and link, and that breaking it into tasks comes next.
+5. **STOP**: say the spec is approved, with its title and link, and that on "continue" the skill breaks it into tasks.
+
+### 7. Decompose (high)
+
+Read the Task style guide and the Testing strategy doc now. Approval already applied the architecture change, so leave the Architecture doc alone from here on.
+
+1. DocStore: `get_doc` the spec.
+2. Split the Design into vertical slices, by the Task style guide's Sizing rules. Order them so every slice comes after the slices it needs.
+3. Write each slice as a task, by the Task style guide: the title, the type, and the description, with every section of the template. Each manual test has its **Why manual:** line and full, copyable steps, and none is marked `[blocks merge]`: the developer decides that in step 10.
+4. When any slice has a manual test, add the validation task last: titled `Run the manual tests for <feature>`, with the type `chore`, written from the Validation template in the Task style guide. Its criteria have one line per manual test, `- [ ] <slice title>: <manual test title> passes`. It's blocked by each slice that has a manual test, and by no other.
+5. Write each item in the spec's Deferred section as a deferred entry, with the four Deferred sections. Its Source is the spec's title and link.
+6. Put them in one JSON draft, in the order of item 2, with the validation task last. Each `id` is a short slug, and `blocked_by` lists the ids of the slices it needs:
+
+   ```json
+   {"tasks": [{"id": "<slug>", "title": "<title>", "type": "<type>", "description": "<description>", "blocked_by": ["<slug>"]}], "deferred": [{"id": "<slug>", "title": "<title>", "description": "<description>"}]}
+   ```
+
+### 8. Validate the draft (low)
+
+Run the draft validator, with the draft as JSON on one line inside single quotes. Write each `'` in the draft as `'`, so the quoting holds. `<feature slug>` is the feature name in lowercase, with hyphens for spaces.
+
+```bash
+python3 ${CLAUDE_PLUGIN_ROOT}/lib/validate_draft.py --save .sdlc/local/<feature slug>-draft.json --json '<draft>'
+```
+
+Run it exactly as shown, as one command: add nothing before or after it, not even `mkdir`, since `--save` creates the folder. It prints `{"ok": true}` when the draft passes. Otherwise each line is an error, as `<id>: <rule>: <detail>`. Fix every error in the draft and run it again, until it passes. Don't STOP.
+
+### 9. Create the tasks (medium)
+
+Read the [Kaneo backend map](../../lib/references/backends/kaneo.md) before the first tracker call. Every tracker operation below is done the way it says. A task's link is:
+
+```
+<kaneo.url>/dashboard/workspace/<kaneo.workspace_id>/project/<kaneo.project_id>/task/<task id>
+```
+
+1. **The epic.**
+   - With the `epic` parameter: Tracker: `list_column` for `planned`, and find the epic by `number`. If it isn't found, **ASK** for the right key. When its description doesn't link the spec, Tracker: `update_description`, adding `## Spec` and the spec's title and link at the end.
+   - Without it: Tracker: `create_task` titled with the feature name, with the status `planned`, and the description from the Epic template in the Task style guide, written from the spec, ending with `## Spec` and the spec's title and link. Then Tracker: `add_label` `epic`.
+2. **Link the spec to the epic.** DocStore: `update_doc` the spec, `findText` its status line, and `text` the status line, a blank line, and the `Epic:` line, unless the spec already has one.
+3. **Skip what exists.** Tracker: `list_relations` on the epic, and Tracker: `list_column` for `planned`. A draft entry whose title matches one of the epic's subtasks, or a planned `deferred` task, was created by an earlier run: skip it, and take its key and id.
+4. **Each task, in draft order,** one at a time. Each task goes through add-task in full, from its step 1, with its own validator run, duplicate check, and labels. When add-task's instructions are already loaded, follow them again for the next task. This skill never calls `create_task` for a task itself. For the validation task, first write each slice's key before its title in the criteria: `- [ ] <key> <slice title>: <manual test title> passes`. Invoke the add-task skill non-interactively with:
+
+   - `invoked_by`: `plan-feature`
+   - `title`, `type`, and `description`: from the draft
+   - `epic`: `none`, and `blocked_by`: `none`. This skill links them in item 5, since add-task looks for blockers in to-do only.
+   - `placement`: `planned`
+   - `deferred`: `off`
+
+   add-task reports the task's key, link, and status, and any comment it added. Keep them for step 10.
+5. **Link each task** right after add-task creates it:
+   - Tracker: `add_relation` `subtask` from the epic.
+   - Tracker: `add_relation` `blocks` from each task in its `blocked_by`.
+   - For the validation task, Tracker: `add_label` `validation`.
+6. **Each deferred entry.** Invoke add-task the same way, with `type` `none`, and `deferred` `on`. Don't link it to the epic. Then DocStore: `update_doc` the spec: `findText` the item's line in Deferred, and `text` the same line ending with the task's key, title, and link, as `[<key> <title>](<link>)`.
+7. If add-task reports an error, **STOP**, naming the tasks created so far and the error.
+
+### 10. Review (low)
+
+1. Set the status to `tasks created`.
+2. Run the notify script with `--kind STOP` and the epic's link for `--link`. Then **STOP**, listing the epic and each task in draft order, then the deferred tasks, each with its key, title, and full link, and each comment add-task added. The developer reviews and edits the tasks in Kaneo, and marks a manual test `[blocks merge]` only when later work depends on its result. Then they say "approved".
+
+### 11. Release (medium)
+
+1. **On a reply other than approval,** make the changes it asks for, then **STOP** again as in step 10, item 2.
+2. **Read the tasks.** DocStore: `get_doc` the spec, and take the epic from its `Epic:` line. Tracker: `list_relations` on the epic, and Tracker: `list_column` for `planned`. The tasks to release are the epic's subtasks still in Planned. Skip any with the `deferred` label.
+3. **Tests that block merge.** For each task with a manual test title ending in `[blocks merge]`: Tracker: `update_description` on the validation task, removing that test's line, and Tracker: `remove_relation` `blocks` from the task to the validation task. When the validation task has no criteria left, Tracker: `archive_task` it, with a comment saying every manual test blocks merge, and skip it.
+4. **Order.** Sort the tasks so each comes after every task that blocks it, by the `blocks` relations. Break ties by `number`. The validation task goes last.
+5. **Move them.** Tracker: `list_column` for to-do, once. Then, in the order of item 4: Tracker: `set_status` `to-do`, then Tracker: `place_task` at `end`. Place each one against the column you read plus the tasks already moved, without reading the column again: a moved task may not be listed in to-do yet.
+6. Set the status to `released`.
+7. Report each released task in order, with its key, title, and full link, written out for each task.

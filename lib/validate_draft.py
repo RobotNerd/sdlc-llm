@@ -2,6 +2,7 @@
 
 Prints {"ok": true} and exits 0 when the draft passes. Otherwise prints every error, one per
 line, as `<id>: <rule>: <detail>`, and exits 1. Pass the draft as a file path, or as JSON text with --json.
+With --json, --save also writes the draft to a file, whether or not it passes.
 
 The draft is one JSON object:
 
@@ -54,7 +55,13 @@ def main(argv=None):
     source = parser.add_mutually_exclusive_group(required=True)
     source.add_argument("draft", nargs="?", type=Path, help="the draft's JSON file")
     source.add_argument("--json", help="the draft itself, as JSON text")
+    parser.add_argument("--save", type=Path, help="with --json, also write the draft to this file")
     arguments = parser.parse_args(argv)
+    if arguments.save and arguments.json is None:
+        parser.error("--save needs --json")
+    if arguments.save:
+        arguments.save.parent.mkdir(parents=True, exist_ok=True)
+        arguments.save.write_text(arguments.json)
 
     errors = validate_text(arguments.json) if arguments.json is not None else validate_file(arguments.draft)
     if errors:
