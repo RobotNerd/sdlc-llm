@@ -15,3 +15,6 @@ evals/**/results/
 
 # Local runtime state
 .sdlc/local/
+
+# Developer scratch files
+.tmp/
