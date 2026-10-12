@@ -1,0 +1,7 @@
+---
+type: tool_used
+tool: mcp__plugin_sdlc-llm_kaneo__create_task
+input_match: '^(?=.*"title"\s*:\s*"Export tasks to CSV")(?=.*outline\.example\.com/doc/)'
+min: 1
+max: 1
+---
