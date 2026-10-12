@@ -5,6 +5,8 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+# Built from parts, so this repo's own reference check doesn't flag this file.
+LEGACY_IDS = ["-".join(parts) for parts in (("TASK", "7"), ("EPIC", "001"), ("SPEC", "3"))]
 SCRIPT = ROOT / "lib/reference_check.py"
 CONFIG = """\
 config_version = 1
@@ -51,12 +53,13 @@ def test_a_committed_task_key_is_reported_with_its_path_and_line(tmp_path):
 
 
 def test_a_legacy_id_is_reported(tmp_path):
-    repo = make_repo(tmp_path, {"a.py": "# From TASK-7.\n", "b.md": "EPIC-001 and SPEC-3\n"})
+    task, epic, spec = LEGACY_IDS
+    repo = make_repo(tmp_path, {"a.py": f"# From {task}.\n", "b.md": f"{epic} and {spec}\n"})
 
     result = run_check(repo)
 
     assert result.returncode == 1
-    assert result.stdout.splitlines() == ["a.py:1: TASK-7", "b.md:1: EPIC-001", "b.md:1: SPEC-3"]
+    assert result.stdout.splitlines() == [f"a.py:1: {task}", f"b.md:1: {epic}", f"b.md:1: {spec}"]
 
 
 def test_an_allowed_placeholder_passes(tmp_path):
