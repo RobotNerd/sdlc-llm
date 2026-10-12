@@ -16,5 +16,7 @@ jobs:
           python-version: "3.11"
       - name: Install dev dependencies
         run: pip install -e '.[dev]'
+      - name: Check committed files for tracker references
+        run: python lib/reference_check.py
       - name: Run test suite
         run: pytest

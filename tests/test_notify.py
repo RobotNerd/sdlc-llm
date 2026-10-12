@@ -41,7 +41,7 @@ def test_one_discord_message_is_sent_when_discord_is_up(tmp_path, servers):
     repo = make_repo(tmp_path, telegram.url)
 
     result = run_notify(
-        repo, discord, "--task", "SDLC-12", "--text", "critic rejected 3×, decision needed", "--link", LINK
+        repo, discord, "--task", "EX-12", "--text", "critic rejected 3×, decision needed", "--link", LINK
     )
 
     assert result.returncode == 0, result.stderr
@@ -49,7 +49,7 @@ def test_one_discord_message_is_sent_when_discord_is_up(tmp_path, servers):
     request = discord.requests[0]
     assert request["path"] == "/api/webhooks/1/fake"
     assert request["json"]["content"] == (
-        f"sdlc-llm · implement-task · STOP · SDLC-12: critic rejected 3×, decision needed\n[Open SDLC-12]({LINK})"
+        f"sdlc-llm · implement-task · STOP · EX-12: critic rejected 3×, decision needed\n[Open EX-12]({LINK})"
     )
     assert request["headers"]["User-Agent"].startswith("sdlc-llm-notify/")
     assert telegram.requests == []
@@ -60,7 +60,7 @@ def test_telegram_gets_the_message_when_discord_fails(tmp_path, servers):
     discord, telegram = servers([(503, None)]), servers([(200, {"ok": True})])
     repo = make_repo(tmp_path, telegram.url)
 
-    result = run_notify(repo, discord, "--task", "SDLC-12", "--text", "tests <failed> & stopped", "--link", LINK)
+    result = run_notify(repo, discord, "--task", "EX-12", "--text", "tests <failed> & stopped", "--link", LINK)
 
     assert result.returncode == 0, result.stderr
     assert len(telegram.requests) == 1
@@ -71,8 +71,8 @@ def test_telegram_gets_the_message_when_discord_fails(tmp_path, servers):
     assert request["json"]["parse_mode"] == "HTML"
     assert request["json"]["link_preview_options"] == {"is_disabled": True}
     assert request["json"]["text"] == (
-        "sdlc-llm · implement-task · STOP · SDLC-12: tests &lt;failed&gt; &amp; stopped\n"
-        '<a href="https://kaneo.example.com/task?id=12&amp;view=full">Open SDLC-12</a>'
+        "sdlc-llm · implement-task · STOP · EX-12: tests &lt;failed&gt; &amp; stopped\n"
+        '<a href="https://kaneo.example.com/task?id=12&amp;view=full">Open EX-12</a>'
     )
     assert discord.requests[0]["headers"]["User-Agent"].startswith("sdlc-llm-notify/")
     assert (repo / MARKER).is_file()
