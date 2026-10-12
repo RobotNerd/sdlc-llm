@@ -408,6 +408,23 @@
           "status"
         ]
       }
+    },
+    {
+      "name": "list_task_comments",
+      "description": "List comments on a task.",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "taskId"
+        ]
+      }
     }
   ]
 }

@@ -40,6 +40,10 @@ class Tracker(ABC):
         """Return every task in the column, in priority order."""
 
     @abstractmethod
+    def list_comments(self, task_id):
+        """Return the task's comments, oldest first."""
+
+    @abstractmethod
     def list_relations(self, task_id):
         """Return every relation the task is the source or the target of."""
 

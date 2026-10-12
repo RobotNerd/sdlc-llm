@@ -33,6 +33,7 @@ allowed-confusables = ["×"]
 [tool.ruff.lint.per-file-ignores]
 # Scripts run by path put the plugin root on sys.path before importing from lib.
 "hooks/stop_notify.py" = ["E402"]
+"lib/active_days.py" = ["E402"]
 "lib/notify.py" = ["E402"]
 "lib/reference_check.py" = ["E402"]
 "skills/setup-project/scripts/setup.py" = ["E402"]
