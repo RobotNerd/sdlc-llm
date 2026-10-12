@@ -4,3 +4,5 @@ expect:
 ---
 
 {"document": {"id": "{{input.id}}", "title": "Updated doc", "url": "https://outline.example.com/doc/{{input.id}}"}}
+
+{{input.text}}

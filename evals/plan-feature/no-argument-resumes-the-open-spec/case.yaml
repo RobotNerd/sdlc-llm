@@ -1,0 +1,4 @@
+schema_version: "1.1"
+name: no-argument-resumes-the-open-spec
+context:
+  scaffold_script: scaffold.sh
