@@ -4,8 +4,7 @@ import tomllib
 from pathlib import Path
 
 CONFIG_PATH = ".sdlc/config.toml"
-# The planning skills read the backend names to pick their tool maps in lib/references/backends/.
-REQUIRED_KEYS = ("config_version", "docs.backend", "tracker.backend")
+REQUIRED_KEYS = ("config_version",)
 SUPPORTED_CONFIG_VERSION = 1
 
 

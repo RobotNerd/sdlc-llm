@@ -4,6 +4,8 @@ import json
 import re
 from pathlib import Path
 
+import pytest
+
 ROOT = Path(__file__).resolve().parent.parent
 USER_CONFIG_REF = re.compile(r"\$\{user_config\.([A-Za-z_][A-Za-z0-9_]*)\}")
 
@@ -73,7 +75,7 @@ def test_no_version_pins_the_installed_plugin():
 
 
 def test_standard_directories_and_hooks_file_exist():
-    for directory in ("skills", "lib/backends", "lib/references/backends", "tests"):
+    for directory in ("skills", "lib/backends", "tests"):
         assert (ROOT / directory).is_dir(), f"{directory}/ is missing"
     assert "hooks" in load_json("hooks/hooks.json")
 
@@ -92,12 +94,17 @@ def test_skills_use_only_declared_user_config_values():
         assert referenced <= declared, f"{skill.parent.name} references undeclared {referenced - declared}"
 
 
-def test_work_skill_is_short_with_valid_frontmatter():
-    text = (ROOT / "skills/work/SKILL.md").read_text()
+@pytest.mark.parametrize("name", ("groom", "plan", "work"))
+def test_skill_is_short_with_valid_frontmatter(name):
+    text = (ROOT / f"skills/{name}/SKILL.md").read_text()
     match = re.match(r"---\n(.*?)\n---\n", text, re.DOTALL)
     assert match, "SKILL.md has no frontmatter"
     fields = dict(line.split(": ", 1) for line in match.group(1).splitlines())
 
-    assert fields["name"] == "work"
+    assert fields["name"] == name
     assert 0 < len(fields["description"]) <= 1024
     assert len(text.splitlines()) < 60
+
+
+def test_only_the_v3_skills_exist():
+    assert sorted(path.name for path in (ROOT / "skills").iterdir()) == ["groom", "plan", "work"]

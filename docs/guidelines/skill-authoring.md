@@ -16,7 +16,7 @@ How this plugin's skills are written. `implement-task` and the critic apply thes
 
 ## Frontmatter
 
-* `name`: verb–object, lowercase with hyphens: `add-task`, `plan-feature`. Never `verify` or `simplify`: Claude Code runs a skill with either name before every commit.
+* `name`: verb–object, lowercase with hyphens: `plan`, `groom`. Never `verify` or `simplify`: Claude Code runs a skill with either name before every commit.
 * `description`: a trigger. It tells the agent when to invoke the skill, and nothing else. Third person. One short sentence on what the skill does, then when to use it, with the words a user would say to trigger it. Under 1,024 characters.
 * The `description` never says how the skill works inside: no steps, checks, templates, labels, or relations. Those belong in the body. Good: "Adds a task to the project's Kaneo backlog. Use when the developer asks to add, create, file, or log a task…". Bad: "Interviews the developer until the task has objective acceptance criteria, checks for duplicates and size, then creates the task with…".
 
@@ -28,7 +28,6 @@ How this plugin's skills are written. `implement-task` and the critic apply thes
 ## References
 
 * Every reference is linked directly from `SKILL.md`, at the step that needs it. One level deep: a reference never sends the reader on to another reference.
-* This includes shared references in `lib/references/`. Link them from `SKILL.md` directly.
 * A reference longer than 100 lines starts with a table of contents.
 * File names say what's inside: `batch-validation.md`, not `notes.md`.
 

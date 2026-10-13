@@ -1,4 +1,4 @@
-"""Kaneo through its REST API. The prose skills use lib/references/backends/kaneo.md instead."""
+"""Kaneo through its REST API. The skills use the Kaneo MCP tools instead."""
 
 from lib.backends.rest import RestClient
 

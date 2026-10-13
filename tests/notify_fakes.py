@@ -49,9 +49,6 @@ def make_repo(tmp_path, telegram_url, enabled=True, stop_hook=False):
         f"""\
 config_version = 1
 
-[docs]
-backend = "outline"
-
 [notify]
 enabled = {"true" if enabled else "false"}
 stop_hook = {"true" if stop_hook else "false"}
@@ -65,9 +62,6 @@ api_url = "{telegram_url}"
 chat_id = "4242"
 role = "failover"
 type = "telegram"
-
-[tracker]
-backend = "kaneo"
 """
     )
     return tmp_path

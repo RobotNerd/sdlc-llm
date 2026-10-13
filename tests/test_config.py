@@ -7,11 +7,8 @@ from lib.config import SUPPORTED_CONFIG_VERSION, ConfigError, load_config
 VALID_CONFIG = """\
 config_version = 1
 
-[docs]
-backend = "outline"
-
-[tracker]
-backend = "kaneo"
+[kaneo]
+project_slug = "EX"
 """
 
 
@@ -28,8 +25,7 @@ def test_config_loads_when_every_required_key_is_present(tmp_path):
 
     config = load_config(repo)
 
-    assert config["tracker"]["backend"] == "kaneo"
-    assert config["docs"]["backend"] == "outline"
+    assert config["kaneo"]["project_slug"] == "EX"
 
 
 def test_config_loads_when_started_from_a_subdirectory(tmp_path):
@@ -37,7 +33,7 @@ def test_config_loads_when_started_from_a_subdirectory(tmp_path):
     subdirectory = repo / "skills/some-skill"
     subdirectory.mkdir(parents=True)
 
-    assert load_config(subdirectory)["tracker"]["backend"] == "kaneo"
+    assert load_config(subdirectory)["kaneo"]["project_slug"] == "EX"
 
 
 def test_error_names_the_expected_path_when_config_is_missing(tmp_path):
@@ -50,12 +46,12 @@ def test_error_names_the_expected_path_when_config_is_missing(tmp_path):
 
 
 def test_error_names_the_key_when_a_required_key_is_missing(tmp_path):
-    repo = make_repo(tmp_path, VALID_CONFIG.replace('[tracker]\nbackend = "kaneo"\n', ""))
+    repo = make_repo(tmp_path, VALID_CONFIG.replace("config_version = 1\n", ""))
 
     with pytest.raises(ConfigError) as error:
         load_config(repo)
 
-    assert "tracker.backend" in str(error.value)
+    assert "config_version" in str(error.value)
 
 
 def test_error_names_the_supported_version_when_config_version_is_unknown(tmp_path):

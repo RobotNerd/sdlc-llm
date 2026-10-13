@@ -33,9 +33,6 @@ throwaway_test_dir = ".sdlc/local/throwaway-tests"
 # Stops a runaway batch before it costs too much. Tune it after a few batches.
 token_budget_per_batch = 5000000
 
-[docs]
-backend = "outline"
-
 [kaneo]
 columns = { done = "b10naj12e54evkyddorvuy5c", "in-progress" = "pv4c9cppnblarlchi41bhwhu", "needs-human" = "bjya9rknbnubq3ygenl8q4tj", "to-do" = "xngc7jxpyyojj8we0c14rroc" }
 project_id = "q2yevcyqfsf56w1nvdi47p7t"
@@ -65,6 +62,3 @@ url = "https://rainbow-flame.taila02055.ts.net:8445"
 [reference_check]
 # Placeholder keys that docs may use in examples.
 allow = ["KEY-NNN"]
-
-[tracker]
-backend = "kaneo"
