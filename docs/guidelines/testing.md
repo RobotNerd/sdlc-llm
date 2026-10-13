@@ -27,23 +27,22 @@ A manual test is the spec for the automated test or eval that later replaces it.
 
 ## Behavioral test rules
 
+1. **Test one behavior, observed from outside.** The observable result is what the person invoking the code sees:
+   * files, git state, tracker and doc-store state, reports
+   * what the agent asks, and when and why it stops
 
- 1. **Test one behavior, observed from outside.** The observable result is what the person invoking the code sees:
-    * files, git state, tracker and doc-store state, reports
-    * what the agent asks, and when and why it stops
-
-    Never test internal structure, such as step headings, prose wording or function calls.
- 2. **Trace every test to an acceptance criterion.** Each criterion gets at least one test, and each test names the criterion it covers.
- 3. **Write it as Given / When / Then.**
-    * **Given** is the preconditions: a concrete, reproducible setup.
-    * **When** is exactly one action.
-    * **Then** is the observable outcomes.
- 4. **Make pass or fail objective.** A Then states exact facts, for example "the default branch has one new commit whose message cites the task". Never write "works correctly".
- 5. **Check lasting results, not wording.** Agent output varies from run to run, so check the files, commits and backend state it leaves behind. When the behavior is a question or a stop, check that it happens and what it's about, not its exact phrasing.
- 6. **Check that the test survives a rewrite.** Ask: if the implementation were rewritten without changing what the user sees, would this test still pass? If not, it's a unit test.
- 7. **Cover failure paths too.** Test the happy path, plus every refusal, stop or error that the acceptance criteria describe.
- 8. **Keep tests independent.** Each test sets up its own state, and tests can run in any order. For manual tests, reset the scratch repo and sandbox between tests.
- 9. **Keep tests short.** Under about 10 steps. Split anything longer.
+   Never test internal structure, such as step headings, prose wording or function calls.
+2. **Trace every test to an acceptance criterion.** Each criterion gets at least one test, and each test names the criterion it covers.
+3. **Write it as Given / When / Then.**
+   * **Given** is the preconditions: a concrete, reproducible setup.
+   * **When** is exactly one action.
+   * **Then** is the observable outcomes.
+4. **Make pass or fail objective.** A Then states exact facts, for example "the default branch has one new commit whose message cites the task". Never write "works correctly".
+5. **Check lasting results, not wording.** Agent output varies from run to run, so check the files, commits and backend state it leaves behind. When the behavior is a question or a stop, check that it happens and what it's about, not its exact phrasing.
+6. **Check that the test survives a rewrite.** Ask: if the implementation were rewritten without changing what the user sees, would this test still pass? If not, it's a unit test.
+7. **Cover failure paths too.** Test the happy path, plus every refusal, stop or error that the acceptance criteria describe.
+8. **Keep tests independent.** Each test sets up its own state, and tests can run in any order. For manual tests, reset the scratch repo and sandbox between tests.
+9. **Keep tests short.** Under about 10 steps. Split anything longer.
 10. **Name the behavior in the title.** Manual tests use "<condition> → <outcome>". Automated tests use `test_<outcome>_when_<condition>`.
 11. **Manual and automated tests follow the same rules.**
 12. **Automated tests drive the real entry point in a temporary repo.** External systems (Kaneo, Outline, notifiers, model calls) are replaced by fakes. Contract tests run the same code against the real tools, on demand.
@@ -84,7 +83,7 @@ A task's `## Testing strategy` section lists automated tests first, then manual 
 ```
 
 * Given / When / Then are bullets, so Outline and Kaneo don't merge them into one line.
-* Manual steps follow "Formatting for the reader" in the Documentation style doc: each command, prompt, and pasted value in its own code block or list, and commands paste-ready.
+* Manual steps follow "Formatting for the reader" in `documentation-style.md`: each command, prompt, and pasted value in its own code block or list, and commands paste-ready.
 * Automated covers everything the agent runs without the human: tests, evals, and agent-run checks.
 * The Manual section opens with **Why manual:**, one line per test when there are several.
 * A blocking test ends its title with `[blocks merge]`. Only the human decides that a test blocks (see Manual tests).
@@ -98,7 +97,7 @@ A task's `## Testing strategy` section lists automated tests first, then manual 
   * Good reasons: the behavior needs the real tracker or doc store (evals mock them), a notification arriving on a real device, or a judgment only the human can make.
   * Not a reason: the agent can run it itself. Reading CI's result, querying the tracker, or checking a file is an agent-run check, and goes under Automated.
 * **Why manual.** The Manual section opens with a **Why manual:** line for each test: the exact behavior it checks, and why that can't be checked automatically. The human reads it while reviewing the planned tasks, and decides whether the test blocks.
-* **Deferred by default.** A manual test runs at the end of its epic, in the epic's validation task (see the Task style guide). Its own task merges without it. Write its steps against the default branch, since it runs after the merge.
+* **Deferred by default.** A manual test runs at the end of its epic, in the epic's validation task (see `task-style.md`). Its own task merges without it. Write its steps against the default branch, since it runs after the merge.
   * A task with no epic: its manual tests are listed in the batch report's Manual testing section, and run after the batch.
 * **Blocking.** A manual test whose title ends in `[blocks merge]` must pass before its task merges. Only the human decides that a test blocks, while reviewing the planned tasks or when asked by the skill that writes the task. Mark it blocking only when later work depends on the result, because it ends a batch at its task.
 
@@ -155,11 +154,13 @@ A batch runs to completion without the human, unless something goes wrong.
     ```bash
     claude plugin eval . --tag <skill> --runs 1 --ablation none --scaffold
     ```
+
   * At epic close: run the full suite with the default three runs and the no-plugin baseline, with a cost ceiling.
 
     ```bash
     claude plugin eval . --max-cost-usd <ceiling> --scaffold
     ```
+
   * `--scaffold` runs each case's scaffold script. Without it, every case starts in an empty directory.
   * Pin the model in both, so a model release isn't mistaken for a regression.
 * Before trusting a low score, check the run's error for a usage-limit message. A limit hit mid-suite scores later runs 0 without marking the suite partial.

@@ -1,6 +1,6 @@
 # Review policy
 
-What the critic checks before a task merges, and what fails a review. The critic reads this doc, the task, its plan comments, the diff, the gate results, and the Architecture, Code style, and Documentation style docs. It never edits anything.
+What the critic checks before a task merges, and what fails a review. The critic reads this doc, the task, its plan comments, the diff, the gate results, and `architecture.md`, `code-style.md`, and `documentation-style.md`. It never edits anything.
 
 ## Checklist
 
@@ -9,22 +9,22 @@ Each item is answered `true` or `false`. If an item can't be verified, it's `fal
 | Item | True when |
 |------|-----------|
 | `criteria_met` | The diff satisfies every acceptance criterion. |
-| `docs_clean` | Docs changed wherever behavior changed. The doc text is concise and accurate, follows the Documentation style doc, and nothing stale is left behind. |
+| `docs_clean` | Docs changed wherever behavior changed. The doc text is concise and accurate, follows `documentation-style.md`, and nothing stale is left behind. |
 | `gates_passed` | Every quality gate reported passing. |
 | `nothing_alarming` | No secrets, destructive or unrelated changes, or disabled tests or guardrails. |
 | `plan_followed` | The diff matches the plan comment and any "Plan change" comments. |
 | `scope_ok` | Every changed file is within the task's scope. Follow-up task creation is always allowed. |
-| `sorted_order` | Lists and structures whose order doesn't matter are sorted, per the Code style doc (code) and the Documentation style doc (docs). |
+| `sorted_order` | Lists and structures whose order doesn't matter are sorted, per `code-style.md` (code) and `documentation-style.md` (docs). |
 | `tests_behavioral` | Committed tests exercise behavior through the public surface. Unit tests are committed only with a reason in the worklog. Tests from the test-writing step weren't edited during implementation without a loop-back. |
 
-When the task changes a skill, the critic also checks the Skill authoring doc's rules. A broken rule is a finding.
+When the task changes a skill, the critic also checks the rules in `skill-authoring.md`. A broken rule is a finding.
 
 ## Severity
 
 Every finding has a severity:
 
-* `**important**`**:** breaks behavior, leaks data or secrets, fails an acceptance criterion, strays from the plan without a "Plan change" comment, or leaves a checklist item `false`.
-* `**nit**`**:** anything else worth fixing: naming, wording, small style points.
+* **`important`:** breaks behavior, leaks data or secrets, fails an acceptance criterion, strays from the plan without a "Plan change" comment, or leaves a checklist item `false`.
+* **`nit`:** anything else worth fixing: naming, wording, small style points.
 
 Only an `important` finding rejects the task. Nits never reject.
 

@@ -36,16 +36,6 @@ token_budget_per_batch = 5000000
 [docs]
 backend = "outline"
 
-[guidelines]
-architecture = "349eddcf-6717-4618-9e51-91a1a558be5d"
-code_style = "85c78308-38b6-4711-9485-6051424f894f"
-commits = "9290f29d-a106-46af-91cc-6aacc68a4a7e"
-doc_style = "7ae3cdf0-4c8f-4ea1-9ec3-891b8f6903a7"
-review_policy = "1b95d15e-9f95-47c0-bf93-5ca56f3f21f5"
-skill_authoring = "3d27069b-b9a5-4c51-aed5-8e6b3cf00090"
-task_style = "cee10651-f8c2-4bee-b4a3-d40e41df56b9"
-testing = "20b7e311-d1ae-42ae-9bbf-90005a898048"
-
 [kaneo]
 columns = { done = "b10naj12e54evkyddorvuy5c", "in-progress" = "pv4c9cppnblarlchi41bhwhu", "needs-human" = "bjya9rknbnubq3ygenl8q4tj", "to-do" = "xngc7jxpyyojj8we0c14rroc" }
 project_id = "q2yevcyqfsf56w1nvdi47p7t"

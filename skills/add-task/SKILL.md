@@ -138,13 +138,13 @@ A task is one branch and one sitting. If the criteria describe separately shippa
 
 ### 6. Write the task (high)
 
-Read these guideline docs now, from Outline with `mcp__plugin_sdlc-llm_outline__fetch` (`resource` `document`, `id` from the config). When an id is empty, read the plugin's default copy instead.
+Read these guideline docs now, from the repo:
 
-| Doc | Config key | Default copy |
-|---|---|---|
-| Task style guide | `guidelines.task_style` | [task-style-guide.md](../../lib/references/guidelines/task-style-guide.md) |
-| Testing strategy | `guidelines.testing` | [testing-strategy.md](../../lib/references/guidelines/testing-strategy.md) |
-| Documentation style | `guidelines.doc_style` | [documentation-style.md](../../lib/references/guidelines/documentation-style.md) |
+| Doc | File |
+|---|---|
+| Task style guide | `docs/guidelines/task-style.md` |
+| Testing strategy | `docs/guidelines/testing.md` |
+| Documentation style | `docs/guidelines/documentation-style.md` |
 
 Write the title and the description by those rules:
 
