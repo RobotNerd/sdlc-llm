@@ -58,7 +58,7 @@ All four top-level sections are always present. A section with nothing in it say
 
 * Follows the format in `testing.md`: automated tests first, then manual, each as Given/When/Then plus steps, each naming the criterion it covers.
 * Every criterion has at least one test.
-* Manual tests are a last resort, for what no automated test, eval, or agent-run check can observe. The Manual section opens with a **Why manual:** line for each test: the behavior it checks, and why it can't be automated. See Manual tests in `testing.md`.
+* Manual tests are a last resort, for what no automated test or agent-run check can observe. The Manual section opens with a **Why manual:** line for each test: the behavior it checks, and why it can't be automated. See Manual tests in `testing.md`.
 * A manual test runs at the end of its epic, in the epic's validation task, unless the human marks it `[blocks merge]` while reviewing the task. Its steps run against the default branch.
 * Manual tests are written out in full on the task: every command, agent prompt, and value to paste, and the expected result of each step, so the developer can run them from the task alone. When the steps can only be settled during implementation, the Manual section says so, and the implementer adds the full steps as a task comment before handing the task over.
 * Manual steps are formatted for copying: commands, agent prompts, and values to paste each stand in their own code block or bulleted list, never inline in a sentence. A file to create is given as its name, then its content, each in its own block. See "Formatting for the reader" in `documentation-style.md`.
@@ -70,7 +70,7 @@ All four top-level sections are always present. A section with nothing in it say
 
 ## Sizing
 
-* One task is one branch, one squash commit, and one sitting.
+* One task is one commit in a batch, done by one subagent in one sitting.
 * Split it if the criteria describe separately shippable pieces, the changes span unrelated areas, or the testing needs several unrelated setups.
 * Split by behavior (vertical slices), not by layer. "Add the endpoint and show it in the UI" is a slice; "do the backend" is not.
 
@@ -91,7 +91,7 @@ All four top-level sections are always present. A section with nothing in it say
 <link to the spec or PRD that deferred it>
 ```
 
-**Validation** (label `validation`): the last task of an epic that has deferred manual tests. It runs those tests after the rest of the epic has merged. It's a subtask of the epic, and every task whose tests it lists blocks it. It has nothing to implement: a batch pauses on it for the human, and on pass moves it to done. When a task with a deferred manual test joins an epic, its tests are added to the validation task, which is created if the epic doesn't have one yet.
+**Validation** (label `validation`): the last task of an epic that has deferred manual tests. It runs those tests after the rest of the epic has merged. It's a subtask of the epic, and every task whose tests it lists blocks it. It has nothing to implement: `work` stops on it for the developer, who runs the tests and moves it to done when they pass. When a task with a deferred manual test joins an epic, its tests are added to the validation task, which is created if the epic doesn't have one yet.
 
 ```markdown
 ## Description

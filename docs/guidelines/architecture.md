@@ -2,86 +2,77 @@
 
 How sdlc-llm is built, where new code goes, and the decisions behind it.
 
-## Contents
-
-* What it is
-* Components
-* Where state lives
-* Backend interfaces
-* Repo layout
-* Scripts
-* Key decisions
-
 ## What it is
 
-A Claude Code plugin: a set of skills that plan, track, and implement work for a solo developer. Work items live in Kaneo. Planning and guideline docs live in Outline. The project's repo holds only code, tests, config, and agent instructions.
+A Claude Code plugin for one developer: three skills that plan, groom, and implement work. Tasks live in Kaneo. Specs and questions docs live in Outline. Each project's repo holds its code, tests, config, and guideline docs.
 
 ## Components
 
 | Component | Role |
 |-----------|------|
-| Skills (`skills/<name>/SKILL.md`) | Judgment: interviews, decomposition, implementation, review. Numbered steps with STOP and ASK markers. |
-| Scripts (`skills/<name>/scripts/`, `lib/`) | Mechanical steps: backend calls, git, validation, reports. Stdlib Python. |
-| Backends (`lib/backends/`) | One module per external tool, behind an interface. |
-| Hooks (`hooks/hooks.json`) | The notification Stop hook. Guardrails later. |
-| Evals (`evals/<skill>/<case>/`, `evals/mocks/`) | Regression tests for skill behavior, run with `claude plugin eval` against mocked Kaneo and Outline MCP servers. |
-| MCP config (`mcp.json`) | Declares the `kaneo` and `outline` MCP servers, with URLs from the plugin's `userConfig`. Eval mocks only work for servers declared here. The manifest names it, because a root `.mcp.json` would also load as the repo's own project MCP config. |
+| Skills (`skills/<name>/SKILL.md`) | Judgment. `plan` turns an idea into tasks, `groom` reviews the backlog, and `work` implements a batch of tasks. Each states its goal, its hard rules, and when to stop. |
+| Scripts (`lib/`) | Work that must be exact, or would load a large payload into context. Stdlib Python. |
+| Notifiers (`lib/backends/`) | Discord and Telegram senders for `lib/notify.py`, behind the `Notifier` interface. |
+| Kaneo client (`lib/backends/kaneo.py`, `lib/backends/rest.py`) | Kaneo's REST API, for scripts. Skills use the Kaneo MCP tools instead. |
+| Hooks (`hooks/hooks.json`) | `hooks/stop_notify.py` runs on Stop and StopFailure, and notifies with the session's state. |
+| MCP config (`mcp.json`) | Declares the `kaneo` and `outline` MCP servers, with URLs from the plugin's `userConfig`. The manifest names it, because a root `.mcp.json` would also load as the repo's own project MCP config. |
+
+### Scripts
+
+| Script | What it does |
+|--------|--------------|
+| `lib/notify.py` | Sends an ASK or STOP notification to Discord, with Telegram as the fallback |
+| `lib/reference_check.py` | Fails, in CI, when a committed file cites a tracker item |
+| `lib/validate_draft.py` | Checks task drafts against the task format |
+
+## Per-repo files
+
+A project using the plugin keeps everything unique to it in its own repo. The skills read only these:
+
+* `.env`: notification tokens. Read only by scripts.
+* `.sdlc/config.toml`: the Kaneo project, the Outline collection, and repo settings such as the check commands.
+* `CLAUDE.md`: the project's rules and checks.
+* `docs/guidelines/`: the project's guideline docs, with fixed file names.
 
 ## Where state lives
 
 | State | Owner |
 |-------|-------|
-| Tasks, epics, deferred work, status, order, dependencies, worklog | Kaneo |
-| Specs, questions docs, guideline docs, epic and batch reports | Outline |
-| Code, tests, evals, config | The repo |
-| Batch state, drafts | `.sdlc/local/` (gitignored) |
+| Tasks, epics, deferred work, status, order, dependencies, task comments | Kaneo |
+| Specs and questions docs | Outline |
+| Code, tests, config, guideline docs | The repo |
+| Drafts and other scratch state | `.sdlc/local/` (gitignored) |
 | Secrets | `.env` (gitignored), read only by scripts |
 
-The only links between Kaneo and the repo are task keys in commit messages, and merge SHAs in Kaneo comments. Committed files never cite tracker items.
-
-## Backend interfaces
-
-Skills never call a tool directly. They call operations on an interface:
-
-* **Tracker:** tasks, columns, order, labels, relations, comments, search, archive.
-* **DocStore:** docs, nesting, patch updates, search, archive.
-* **Notifier:** send a one-line message to each enabled channel.
-* **Critic:** review a task's diff against the review policy, and return a verdict.
-
-Each interface has one module per backend, chosen in `.sdlc/config.toml`. Only the backend module knows an endpoint or a field name. Swapping a tool means adding a module and a backend map, not editing skills.
-
-While a skill is prose-only, it uses MCP tools through the backend map. When a step moves into a script, the script uses the backend module, which calls the tool's REST API.
+Kaneo carries a batch's state between sessions: a new session resumes from the tasks' statuses. The only links between Kaneo and the repo are task keys in commit messages. Committed files never cite tracker items.
 
 ## Repo layout
 
 ```
 .claude-plugin/        plugin and marketplace manifests
-skills/<name>/         SKILL.md, references/, scripts/
-lib/                   shared code: config, .env loader, git helpers
-lib/backends/          interface implementations
 docs/guidelines/       guideline docs
 hooks/                 plugin hooks
+lib/                   scripts and shared code: config, .env loader
+lib/backends/          notifiers and the Kaneo REST client
 mcp.json               Kaneo and Outline MCP servers
-evals/<skill>/<case>/  skill eval cases
-evals/mocks/<server>/  MCP mocks for the evals
-tests/                 script tests, backend fakes, contract tests
+skills/<name>/         SKILL.md
+tests/                 script tests and fakes
 ```
 
 Shared code lives only in `lib/`. A script finds `lib/` by a path relative to its own file.
 
-## Scripts
+## Script rules
 
 * Python ≥ 3.11, standard library only.
-* One subcommand per deterministic step.
-* JSON in (a file path argument), JSON out on stdout. Exit 0 on success. On failure, exit non-zero with a specific message on stderr.
-* Each script checks its own preconditions. Hooks are a backstop, not the enforcement.
-* Idempotent where it can be: running a step twice leaves the same state.
+* JSON in (a file path or a `--json` argument), JSON out on stdout. Exit 0 on success. On failure, exit non-zero with a specific message on stderr.
+* Each script checks its own preconditions.
+* Idempotent where it can be: running it twice leaves the same state.
 
 ## Key decisions
 
-* **A real tracker, not files in the repo.** v1's markdown tracker needed a generator, region markers, and hooks just to stay consistent, and its archives went stale in the repo.
-* **Prose first, scripts later.** A step moves into a script only after it settles. Scripting an unsettled step means rewriting it.
-* **Local squash merge, no PRs.** A critic gates each merge instead of a human PR review. A PR mode is deferred.
-* **The core data model uses only what the MCP servers expose**, so prose-only skills never need REST.
-* **Plan, validate, then execute** before any bulk write to a backend.
-* **Claude Code's eval runner, not our own.** `claude plugin eval` already isolates runs, mocks MCP servers, compares against a no-plugin baseline, and gates CI. Contract tests cover the real backends.
+* **Built for one developer.** No backend abstraction and no install path for other people. Kaneo and Outline are the only backends, and skills call their MCP tools by name.
+* **A real tracker, not files in the repo.** A markdown tracker needed a generator and hooks just to stay consistent, and its archives went stale.
+* **Short skills, scripts for exact work.** A skill states the goal, the hard rules, and when to stop, and leaves the tool calls to Claude. A step becomes a script only when it must be exact or cheap.
+* **A pull request per batch, merged by the developer.** `work` commits each task on one branch and opens one pull request. Skills never push to the default branch or merge.
+* **A subagent per task,** so the main session holds only short summaries and stays cheap.
+* **Guidelines in each repo,** so each project can differ, and reading one is a cheap local read.
