@@ -1,6 +1,6 @@
 # Task style guide
 
-How tasks are structured and worded. `add-task`, `plan-feature`, and `refine-backlog` read this, along with `documentation-style.md` and `testing.md`, which it builds on. A task that breaks these rules gets flagged as under-specified.
+How tasks are structured and worded. `plan` and `groom` read this, along with `documentation-style.md` and `testing.md`, which it builds on. A task that breaks these rules gets flagged as under-specified.
 
 ## Contents
 

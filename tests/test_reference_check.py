@@ -11,17 +11,11 @@ SCRIPT = ROOT / "lib/reference_check.py"
 CONFIG = """\
 config_version = 1
 
-[docs]
-backend = "outline"
-
 [kaneo]
 project_slug = "EX"
 
 [reference_check]
 allow = ["KEY-NNN", "EX-0"]
-
-[tracker]
-backend = "kaneo"
 """
 
 

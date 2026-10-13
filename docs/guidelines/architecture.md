@@ -23,7 +23,6 @@ A Claude Code plugin: a set of skills that plan, track, and implement work for a
 | Skills (`skills/<name>/SKILL.md`) | Judgment: interviews, decomposition, implementation, review. Numbered steps with STOP and ASK markers. |
 | Scripts (`skills/<name>/scripts/`, `lib/`) | Mechanical steps: backend calls, git, validation, reports. Stdlib Python. |
 | Backends (`lib/backends/`) | One module per external tool, behind an interface. |
-| Backend maps (`lib/references/backends/`) | For prose skills: each interface operation → the MCP tool that performs it. |
 | Hooks (`hooks/hooks.json`) | The notification Stop hook. Guardrails later. |
 | Evals (`evals/<skill>/<case>/`, `evals/mocks/`) | Regression tests for skill behavior, run with `claude plugin eval` against mocked Kaneo and Outline MCP servers. |
 | MCP config (`mcp.json`) | Declares the `kaneo` and `outline` MCP servers, with URLs from the plugin's `userConfig`. Eval mocks only work for servers declared here. The manifest names it, because a root `.mcp.json` would also load as the repo's own project MCP config. |
@@ -60,7 +59,7 @@ While a skill is prose-only, it uses MCP tools through the backend map. When a s
 skills/<name>/         SKILL.md, references/, scripts/
 lib/                   shared code: config, .env loader, git helpers
 lib/backends/          interface implementations
-lib/references/        backend maps, default guideline docs
+docs/guidelines/       guideline docs
 hooks/                 plugin hooks
 mcp.json               Kaneo and Outline MCP servers
 evals/<skill>/<case>/  skill eval cases
