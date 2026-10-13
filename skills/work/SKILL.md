@@ -1,7 +1,8 @@
 ---
 name: work
 description: Implements a batch of Kaneo To Do tasks on one branch and opens one pull request for it. Use when the developer asks to work, implement, build, or do one or more tasks by key, to start or resume a batch, or says "merged" after merging a batch's pull request.
-allowed-tools: Bash(python3 ${CLAUDE_PLUGIN_ROOT}/lib/notify.py *)
+allowed-tools: Bash(python3 ${CLAUDE_PLUGIN_ROOT}/lib/board.py*), Bash(python3 ${CLAUDE_PLUGIN_ROOT}/lib/notify.py *)
+model: sonnet
 ---
 
 # work
@@ -13,7 +14,7 @@ Implements the given tasks in order, one subagent per task, and stops only on a 
 - Never push to the default branch, and never merge a pull request. The developer merges.
 - Each task is implemented in a fresh subagent with `model: sonnet`. Keep only its summary; don't read its diff into this session.
 - Kaneo is the batch's state. Read it before acting, so a new session resumes where the last one stopped.
-- Find tasks by key in the configured Kaneo project. Don't call `list_tasks`.
+- Read the board only with `python3 ${CLAUDE_PLUGIN_ROOT}/lib/board.py`. It prints one line per open task: key, status, title, labels, open blockers, and id.
 
 ## Stop
 
@@ -33,7 +34,7 @@ Use `ASK` for a question and `STOP` for anything else. Stop when:
 
 ## Batch
 
-1. Before any work, read every task and its blocks relations. Skip tasks already in needs-human or done. Stop, listing each problem, if any other task isn't in To Do or In Progress, or is blocked by a task that isn't done and is either outside the batch or later in it.
+1. Before any work, read the board, and find each task in the batch by its key. Skip tasks already in needs-human or done. Stop, listing each problem, if any other task isn't in To Do or In Progress, or is blocked by a task that's outside the batch or later in it. A task missing from the board is done or archived; read it by number to tell which.
 2. Branch: `<branch_prefix><number of the first task>-<short slug>`. If it exists locally or on the remote, check it out. Otherwise fetch, then branch from the up-to-date default branch.
 3. For each remaining task, in the order given, start one subagent. Tell it the task key, and to:
    - set the task to in-progress, and implement it to its acceptance criteria and testing strategy
