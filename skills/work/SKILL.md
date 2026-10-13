@@ -25,6 +25,7 @@ python3 ${CLAUDE_PLUGIN_ROOT}/lib/notify.py --skill work --kind <ASK or STOP> --
 
 Use `ASK` for a question and `STOP` for anything else. Stop when:
 
+- a task is blocked by an open task outside the batch, or later in it: stop before any work, so the developer can revise the batch
 - a task's checks still fail after `quality_gate_attempts` honest fixes
 - a decision is the developer's: an unclear criterion, a design choice, or a task that can't be done as written
 - a task has a manual test marked `[blocks merge]`: commit it, push, open the pull request, then stop with where its steps are
@@ -32,7 +33,7 @@ Use `ASK` for a question and `STOP` for anything else. Stop when:
 
 ## Batch
 
-1. Read every task. Skip tasks already in needs-human or done; stop if any other task isn't in To Do or In Progress.
+1. Before any work, read every task and its blocks relations. Skip tasks already in needs-human or done. Stop, listing each problem, if any other task isn't in To Do or In Progress, or is blocked by a task that isn't done and is either outside the batch or later in it.
 2. Branch: `<branch_prefix><number of the first task>-<short slug>`. If it exists locally or on the remote, check it out. Otherwise fetch, then branch from the up-to-date default branch.
 3. For each remaining task, in the order given, start one subagent. Tell it the task key, and to:
    - set the task to in-progress, and implement it to its acceptance criteria and testing strategy
