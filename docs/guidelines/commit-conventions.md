@@ -1,6 +1,6 @@
 # Commit conventions
 
-How commits are named and written. `implement-task` reads this.
+How commits and pull requests are named and written. `work` follows this for each task it commits.
 
 ## Format
 
@@ -11,11 +11,11 @@ Conventional commits, with the task key as the scope:
 ```
 
 * The summary is lowercase after the colon, imperative, under about 70 characters, with no trailing period.
-* Commit messages are the only committed place a task key appears.
+* Commit messages and pull request titles are the only committed places a task key appears.
 
 ## Type
 
-The squash commit's type comes from the task's type label:
+The commit's type comes from the task's type label:
 
 | Task type | Commit type |
 |-----------|-------------|
@@ -25,20 +25,22 @@ The squash commit's type comes from the task's type label:
 | `feature` | `feat`      |
 | `refactor` | `refactor`  |
 
-## Commits on a task branch
+## One commit per task
 
-The branch is squash-merged, so these are working checkpoints. Each step that changes files ends with one:
-
-```
-wip(<task key>): <step name>
-```
-
-The step name is the skill step, for example `write tests` or `implement task`.
-
-## The squash commit
+A batch branch has one commit per task, in the batch's order:
 
 * **Subject:** `<type>(<task key>): <task title, lowercased>`
-* **Body:** the acceptance criteria met, as a list, and any follow-up tasks created, by key.
+* **Body:** what changed, as a list, and any follow-up tasks created, by key.
+
+A fix after review is a new commit with the same scope, on the same branch.
+
+## The pull request
+
+`work` opens one pull request per batch, and the developer squash-merges it on GitHub.
+
+* **Title:** for one task, the task's commit subject. For several, `<type>: <what the batch does>`, with the type of most of its tasks.
+* **Body:** each task's key and title, with a line on what changed.
+* **On merge:** the squash commit on the default branch takes the pull request's title as its subject, and GitHub lists each branch commit's message in its body. That's how every task key in a batch reaches the default branch. Keep that list when merging.
 
 ## Examples
 
@@ -54,10 +56,6 @@ Follow-ups: KEY-47
 ```
 
 ```
-wip(KEY-42): write tests
-```
-
-```
 fix(KEY-51): keep to-do order when a task is archived
 ```
 
@@ -65,4 +63,4 @@ fix(KEY-51): keep to-do order when a task is archived
 
 * Don't put more than one task in a commit.
 * Don't write "update", "changes", or "misc" as the summary.
-* Don't put a task key in code, docs, or test names. The branch name carries only the task number.
+* Don't put a task key in code, docs, or test names. The branch name carries only the first task's number.

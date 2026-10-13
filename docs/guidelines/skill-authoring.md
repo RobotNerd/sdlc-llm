@@ -1,103 +1,83 @@
 # Skill authoring
 
-How this plugin's skills are written. `implement-task` and the critic apply these rules when a task changes a skill. Based on Anthropic's [skill authoring best practices](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices).
+How this plugin's skills are written. Based on Anthropic's [skill authoring best practices](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices).
 
-## Contents
+## When to write a skill
 
-* Frontmatter
-* Size and structure
-* References
-* Steps
-* Backends and MCP tools
-* Scripts
-* Wording
-* Evals
-* Template
+Only for repeated work with rules. When a plain request works as well, there's no skill: the repo's guidelines and `CLAUDE.md` carry the rules.
 
 ## Frontmatter
 
-* `name`: verb–object, lowercase with hyphens: `plan`, `groom`. Never `verify` or `simplify`: Claude Code runs a skill with either name before every commit.
+* `name`: a short verb or verb–object, lowercase with hyphens: `plan`, `groom`, `work`. Never `verify` or `simplify`: Claude Code runs a skill with either name before every commit.
 * `description`: a trigger. It tells the agent when to invoke the skill, and nothing else. Third person. One short sentence on what the skill does, then when to use it, with the words a user would say to trigger it. Under 1,024 characters.
-* The `description` never says how the skill works inside: no steps, checks, templates, labels, or relations. Those belong in the body. Good: "Adds a task to the project's Kaneo backlog. Use when the developer asks to add, create, file, or log a task…". Bad: "Interviews the developer until the task has objective acceptance criteria, checks for duplicates and size, then creates the task with…".
+* The `description` never says how the skill works inside: no steps, checks, or templates. Those belong in the body.
+* `allowed-tools`: the exact script commands the skill runs, such as `Bash(python3 ${CLAUDE_PLUGIN_ROOT}/lib/notify.py *)`.
 
-## Size and structure
+## Size and shape
 
-* The `SKILL.md` body stays under 500 lines. Detail goes into references.
-* `SKILL.md` holds the steps and nothing else: no background, no rationale. Claude already knows the general concepts; only add what it doesn't know.
+A skill is about 30 to 50 lines, and under 60. It states:
 
-## References
+1. **The goal:** one or two sentences on what the skill produces, and where its settings come from.
+2. **Hard rules:** what must always or never happen, and the facts about Kaneo or Outline that Claude would otherwise get wrong.
+3. **When to stop:** each condition that needs the developer, and the notify command to run first.
+4. **Steps:** a short numbered list of outcomes, in order. Each says what must be true when it's done, not which tool to call.
 
-* Every reference is linked directly from `SKILL.md`, at the step that needs it. One level deep: a reference never sends the reader on to another reference.
-* A reference longer than 100 lines starts with a table of contents.
-* File names say what's inside: `batch-validation.md`, not `notes.md`.
+No background or rationale: Claude already knows the general concepts. Only add what it doesn't know.
 
-## Steps
+## Tools and scripts
 
-* Numbered steps. Each step's name is short and stable; batch state and evals refer to it.
-* Each step is marked with its degree of freedom:
-  * **low:** exact commands, one safe way. These are the candidates for scripts.
-  * **medium:** a template or a script with parameters.
-  * **high:** judgment decisions made by Claude.
-* **STOP** means wait for the human. **ASK** means don't guess; ask. Every STOP and ASK also runs the notify script.
-* A long workflow tells the agent to copy its step checklist into the reply and tick each step off.
-* A skill that can be called by another skill with every parameter supplied runs without STOPs or ASKs, and records what it would have asked as a comment.
+* Leave tool calls to Claude. Name an MCP tool only when Claude would otherwise pick the wrong one.
+* Show the exact command for a script, in its own code block, and what a passing run prints.
+* A script runs as one command, with nothing chained before or after it, so `allowed-tools` matches it.
 * Feedback loops are explicit: run the check, fix, re-run, and only continue when it passes.
 
-## Backends and MCP tools
+## Stopping
 
-* Steps name interface operations ("Tracker: set status `in-progress`"), not a specific tool.
-* The backend map says which MCP tool performs each operation, using the full name (server plus tool).
-
-## Scripts
-
-* Say whether to run a script or read it: "Run `scripts/validate.py <draft>`", or "See `scripts/validate.py` for the rules."
-* Show the exact command and what its output looks like.
-* Scripts follow the script rules in `architecture.md`.
+* **ASK** is a question for the developer. **STOP** is anything else they must do: review, approve, merge, or fix.
+* Every ASK and STOP runs the notify script first, then says what's needed and ends the turn.
+* Never guess an answer the developer owns.
 
 ## Wording
 
 * Short and plain, per `documentation-style.md`.
 * One term per concept, used the same way in every skill.
 * No time-sensitive wording.
-* One default approach per step. Mention an alternative only when it's needed, with when to use it.
 * Forward slashes in every path.
 
-## Evals
+## Checking a skill
 
-* At least three eval cases per skill, written before its prose, in the `claude plugin eval` format that `testing.md` describes.
-* Vary the prompt wording, to check that the skill triggers when it should. Include one prompt that must not trigger it.
-* A misbehavior seen in real use becomes a new eval.
-* After changing a skill's `description`, re-run its cases. A Δ near zero with the skill-fired grader failing means the description doesn't trigger.
+* `tests/test_plugin_layout.py` checks each skill's frontmatter and length.
+* A skill's behavior is checked by manual tests in the sandbox, per `testing.md`, and by use. A misbehavior seen in use becomes a fix and, where it can be, a manual test.
 
 ## Template
 
 ```markdown
 ---
 name: verb-object
-description: Does X for Y. Use when the user asks to ..., or when ...
+description: Does X for Y. Use when the developer asks to ..., or when ...
+allowed-tools: Bash(python3 ${CLAUDE_PLUGIN_ROOT}/lib/notify.py *)
 ---
 
 # verb-object
 
-<One sentence: what this skill produces.>
+<The goal: what this skill produces. Where its settings come from.>
 
-## Parameters
+## Hard rules
 
-| Parameter | Default | Skips |
-|---|---|---|
+- <What must always or never happen.>
+
+## Stop
+
+To stop, run the notify script, then say what you need, and end your turn:
+
+    python3 ${CLAUDE_PLUGIN_ROOT}/lib/notify.py --skill verb-object --kind <ASK or STOP> --text "<what's needed>"
+
+Stop when:
+
+- <condition>
 
 ## Steps
 
-Copy this checklist and tick each step off:
-
-- [ ] 1. <step name>
-- [ ] 2. <step name>
-
-### 1. <step name> (low)
-
-<Instructions. Link a reference here if this step needs one.>
-
-### 2. <step name> (high)
-
-<Instructions.> → **STOP**: <what the human decides>.
+1. **<Outcome>.** <What must be true when it's done.>
+2. **<Outcome>.** <...>
 ```
