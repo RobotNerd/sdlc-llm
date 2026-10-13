@@ -90,3 +90,14 @@ def test_skills_use_only_declared_user_config_values():
     for skill in (ROOT / "skills").glob("*/SKILL.md"):
         referenced = set(USER_CONFIG_REF.findall(skill.read_text()))
         assert referenced <= declared, f"{skill.parent.name} references undeclared {referenced - declared}"
+
+
+def test_work_skill_is_short_with_valid_frontmatter():
+    text = (ROOT / "skills/work/SKILL.md").read_text()
+    match = re.match(r"---\n(.*?)\n---\n", text, re.DOTALL)
+    assert match, "SKILL.md has no frontmatter"
+    fields = dict(line.split(": ", 1) for line in match.group(1).splitlines())
+
+    assert fields["name"] == "work"
+    assert 0 < len(fields["description"]) <= 1024
+    assert len(text.splitlines()) < 60
