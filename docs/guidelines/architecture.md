@@ -14,13 +14,14 @@ A Claude Code plugin for one developer: three skills that plan, groom, and imple
 | Scripts (`lib/`) | Work that must be exact, or would load a large payload into context. Stdlib Python. |
 | Notifiers (`lib/backends/`) | Discord and Telegram senders for `lib/notify.py`, behind the `Notifier` interface. |
 | Kaneo client (`lib/backends/kaneo.py`, `lib/backends/rest.py`) | Kaneo's REST API, for scripts. Skills use the Kaneo MCP tools instead. |
-| Hooks (`hooks/hooks.json`) | `hooks/stop_notify.py` runs on Stop and StopFailure, and notifies with the session's state. |
+| Hooks (`hooks/hooks.json`) | `hooks/session_start.py` runs on SessionStart, and puts the in-progress and needs-human tasks in the session's context. `hooks/stop_notify.py` runs on Stop and StopFailure, and notifies with the session's state. |
 | MCP config (`mcp.json`) | Declares the `kaneo` and `outline` MCP servers, with URLs from the plugin's `userConfig`. The manifest names it, because a root `.mcp.json` would also load as the repo's own project MCP config. |
 
 ### Scripts
 
 | Script | What it does |
 |--------|--------------|
+| `lib/board.py` | Prints one line per open Kaneo task, so a skill reads the board without loading every description |
 | `lib/notify.py` | Sends an ASK or STOP notification to Discord, with Telegram as the fallback |
 | `lib/reference_check.py` | Fails, in CI, when a committed file cites a tracker item |
 | `lib/validate_draft.py` | Checks task drafts against the task format |
@@ -29,7 +30,7 @@ A Claude Code plugin for one developer: three skills that plan, groom, and imple
 
 A project using the plugin keeps everything unique to it in its own repo. The skills read only these:
 
-* `.env`: notification tokens. Read only by scripts.
+* `.env`: the Kaneo API key and notification tokens. Read only by scripts.
 * `.sdlc/config.toml`: the Kaneo project, the Outline collection, and repo settings such as the check commands.
 * `CLAUDE.md`: the project's rules and checks.
 * `docs/guidelines/`: the project's guideline docs, with fixed file names.

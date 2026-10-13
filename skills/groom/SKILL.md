@@ -1,7 +1,8 @@
 ---
 name: groom
 description: Reviews the project's Kaneo backlog and proposes fixes. Use when the developer asks to groom, refine, tidy, triage, or review the backlog, to find blocked, stale, or under-specified tasks, or to check what's ready to work on.
-allowed-tools: Bash(python3 ${CLAUDE_PLUGIN_ROOT}/lib/notify.py *), Bash(python3 ${CLAUDE_PLUGIN_ROOT}/lib/validate_draft.py *)
+allowed-tools: Bash(python3 ${CLAUDE_PLUGIN_ROOT}/lib/board.py*), Bash(python3 ${CLAUDE_PLUGIN_ROOT}/lib/notify.py *), Bash(python3 ${CLAUDE_PLUGIN_ROOT}/lib/validate_draft.py *)
+model: opus
 ---
 
 # groom
@@ -24,7 +25,13 @@ python3 ${CLAUDE_PLUGIN_ROOT}/lib/notify.py --skill groom --kind <ASK or STOP> -
 
 ## Review
 
-Read the to-do, in-progress, needs-human, and Planned tasks, and each to-do and Planned task's `blocks` relations and comments. A blocker is open until it's done or archived. Then find:
+Read the board with the board script, never with the Kaneo board tool. It prints one line per open task, in board order: key, status, title, labels, open blockers, and id.
+
+```bash
+python3 ${CLAUDE_PLUGIN_ROOT}/lib/board.py
+```
+
+Then read each to-do and Planned task, and its comments, by id. Then find:
 
 1. **Blocked chains:** each to-do task with an open blocker, as a chain written blocker first, such as `KEY-10 → KEY-11`. For information only.
 2. **Blocked order:** a to-do task ranked above its own blocker. Propose an order with each blocker moved up to just above the first task that needs it.

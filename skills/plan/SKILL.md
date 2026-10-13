@@ -2,6 +2,7 @@
 name: plan
 description: Turns an idea into Kaneo tasks, with an Outline spec when the work needs one. Use when the developer asks to plan, spec, design, scope, or break down a feature or a change, to add a task, or to continue or approve a plan.
 allowed-tools: Bash(python3 ${CLAUDE_PLUGIN_ROOT}/lib/notify.py *), Bash(python3 ${CLAUDE_PLUGIN_ROOT}/lib/validate_draft.py *)
+model: opus
 ---
 
 # plan

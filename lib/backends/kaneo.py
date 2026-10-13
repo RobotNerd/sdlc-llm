@@ -2,6 +2,9 @@
 
 from lib.backends.rest import RestClient
 
+# The most the API returns in one page.
+TASK_PAGE_SIZE = 100
+
 
 class KaneoApi:
     def __init__(self, url, api_key):
@@ -37,3 +40,10 @@ class KaneoApi:
     def create_label(self, workspace_id, name, color):
         body = {"color": color, "name": name, "workspaceId": workspace_id}
         return self.client.request(f"create label {name!r}", "POST", "/label", body)
+
+    def list_tasks(self, project_id, page, related_page):
+        query = {"limit": TASK_PAGE_SIZE, "page": page, "relatedPage": related_page}
+        return self.client.request("list tasks", "GET", f"/task/tasks/{project_id}", query=query)
+
+    def task_relations(self, task_id):
+        return self.client.request("get task relations", "GET", f"/task-relation/{task_id}")

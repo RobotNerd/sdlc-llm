@@ -12,6 +12,7 @@ Only for repeated work with rules. When a plain request works as well, there's n
 * `description`: a trigger. It tells the agent when to invoke the skill, and nothing else. Third person. One short sentence on what the skill does, then when to use it, with the words a user would say to trigger it. Under 1,024 characters.
 * The `description` never says how the skill works inside: no steps, checks, or templates. Those belong in the body.
 * `allowed-tools`: the exact script commands the skill runs, such as `Bash(python3 ${CLAUDE_PLUGIN_ROOT}/lib/notify.py *)`.
+* `model`: the model the skill runs on. `opus` for judgment, such as planning and grooming; `sonnet` for following a fixed process, such as `work`.
 
 ## Size and shape
 
@@ -56,6 +57,7 @@ No background or rationale: Claude already knows the general concepts. Only add 
 name: verb-object
 description: Does X for Y. Use when the developer asks to ..., or when ...
 allowed-tools: Bash(python3 ${CLAUDE_PLUGIN_ROOT}/lib/notify.py *)
+model: opus
 ---
 
 # verb-object
