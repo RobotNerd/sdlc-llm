@@ -6,8 +6,6 @@ autonomous_new_task_limit = 5
 branch_prefix = "sdlc-"
 # Pause with room left in the context window to write the pause report.
 context_usage_halt_pct = 85
-# Three rejections on one task means the human should decide, not the loop.
-critic_rejection_attempts = 3
 # The branch batches merge into.
 default_branch = "main"
 # Paths review-docs skips.
@@ -28,8 +26,6 @@ lint_command = ".venv/bin/ruff check ."
 quality_gate_attempts = 3
 # The remote batches pull from and push to.
 remote = "origin"
-# About a month of working days with commits, after which refine-backlog asks about a task.
-stale_active_days = 20
 # Run by the quality gate. Empty means not configured.
 test_command = ".venv/bin/python -m pytest"
 # Under .sdlc/local/, which is gitignored, so throwaway tests are never committed.
@@ -37,26 +33,8 @@ throwaway_test_dir = ".sdlc/local/throwaway-tests"
 # Stops a runaway batch before it costs too much. Tune it after a few batches.
 token_budget_per_batch = 5000000
 
-[critic]
-# Nothing goes to a third-party critic until you opt in.
-external_opt_in = false
-# A larger diff halts instead of being truncated. 200 KB covers a normal task.
-max_diff_bytes = 200000
-# Stop before the provider balance runs out mid-review.
-min_balance = 1.0
-# The read-only reviewer subagent's model.
-model = "haiku"
-# A Claude Code subagent. An external provider is opt-in.
-provider = "subagent"
-
 [docs]
 backend = "outline"
-
-[evals]
-# One run, no baseline, a pinned model, and a local-only report: the per-task gate. {tag} is the skill whose cases run. The python3 grant lets a skill run its scripts.
-command = "claude plugin eval . --tag {tag} --runs 1 --ablation none --model claude-sonnet-5-5 --no-publish --scaffold --allow-tools 'Bash(python3:*)'"
-# Run the changed skills' evals after each task. "batch" runs them once at the end.
-gate = "task"
 
 [guidelines]
 architecture = "349eddcf-6717-4618-9e51-91a1a558be5d"

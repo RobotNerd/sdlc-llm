@@ -7,7 +7,7 @@ merge.
 Work items live in [Kaneo](https://kaneo.app), a self-hosted tracker. Specs, guideline docs,
 and reports live in [Outline](https://www.getoutline.com), a self-hosted wiki. Notifications
 for anything that needs the developer go to Discord, with Telegram as a fallback. The repo
-holds only code, tests, evals, and config.
+holds only code, tests, and config.
 
 ## Status
 

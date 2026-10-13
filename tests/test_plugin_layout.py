@@ -2,7 +2,6 @@
 
 import json
 import re
-import subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -74,7 +73,7 @@ def test_no_version_pins_the_installed_plugin():
 
 
 def test_standard_directories_and_hooks_file_exist():
-    for directory in ("skills", "lib/backends", "lib/references/backends", "evals", "tests"):
+    for directory in ("skills", "lib/backends", "lib/references/backends", "tests"):
         assert (ROOT / directory).is_dir(), f"{directory}/ is missing"
     assert "hooks" in load_json("hooks/hooks.json")
 
@@ -83,19 +82,6 @@ def test_no_project_mcp_file_at_the_root():
     # A root .mcp.json would also load as this repo's own project MCP config, where
     # ${user_config.*} never resolves. The plugin's servers live in mcp.json instead.
     assert not (ROOT / ".mcp.json").exists()
-
-
-def test_eval_results_are_ignored_by_git():
-    for path in ("evals/results/run/report.html", "evals/smoke/mock-wiring/results/run/report.html"):
-        result = subprocess.run(["git", "check-ignore", "--quiet", "--no-index", path], check=False, cwd=ROOT)
-        assert result.returncode == 0, f"{path} isn't gitignored"
-
-
-def test_every_mocked_tool_has_its_real_schema():
-    for server_directory in (ROOT / "evals/mocks").iterdir():
-        schemas = {tool["name"] for tool in json.loads((server_directory / "_tools.json").read_text())["tools"]}
-        mocked = {path.stem for path in server_directory.glob("*.md") if not path.stem.startswith("_")}
-        assert mocked <= schemas, f"{server_directory.name}: no schema for {mocked - schemas}"
 
 
 def test_skills_use_only_declared_user_config_values():

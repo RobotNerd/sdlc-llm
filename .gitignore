@@ -10,9 +10,6 @@
 __pycache__/
 venv/
 
-# Eval run output
-evals/**/results/
-
 # Local runtime state
 .sdlc/local/
 

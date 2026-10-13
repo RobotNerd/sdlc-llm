@@ -1,4 +1,0 @@
-schema_version: "1.1"
-name: existing-epic-reused
-context:
-  scaffold_script: scaffold.sh

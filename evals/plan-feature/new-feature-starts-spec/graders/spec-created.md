@@ -1,7 +1,0 @@
----
-type: tool_used
-tool: mcp__plugin_sdlc-llm_outline__create_document
-input_match: '^(?=.*"parentDocumentId"\s*:\s*"00000000-0000-4000-8000-000000005bec")(?=.*Status: interviewing)(?=.*[Ss]preadsheet)'
-min: 1
-max: 1
----

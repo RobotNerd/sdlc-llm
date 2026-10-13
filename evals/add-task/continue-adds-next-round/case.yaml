@@ -1,4 +1,0 @@
-schema_version: "1.1"
-name: continue-adds-next-round
-context:
-  scaffold_script: scaffold.sh
