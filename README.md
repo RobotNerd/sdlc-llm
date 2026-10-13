@@ -1,32 +1,224 @@
 # sdlc-llm
 
-Agent skills for a solo developer who builds software with an LLM. The skills plan features,
-write tasks, groom the backlog, review docs, and implement batches of tasks, from branch to
-merge.
+A Claude Code plugin for a solo developer who builds software with an LLM. Its skills plan
+work, groom the backlog, and implement batches of tasks, from branch to pull request.
 
-Work items live in [Kaneo](https://kaneo.app), a self-hosted tracker. Specs, guideline docs,
-and reports live in [Outline](https://www.getoutline.com), a self-hosted wiki. Notifications
-for anything that needs the developer go to Discord, with Telegram as a fallback. The repo
-holds only code, tests, and config.
+Tasks live in [Kaneo](https://kaneo.app), a self-hosted tracker. Specs and questions docs
+live in [Outline](https://www.getoutline.com), a self-hosted wiki. Notifications for anything
+that needs the developer go to Discord, with Telegram as the fallback. The developer reviews
+and merges every pull request; the skills never push to `main` or merge.
 
-## Status
+## Install
 
-Version 2 is in development: it's being rebuilt as a single Claude Code plugin on top of
-Kaneo and Outline. Version 1 kept the tracker inside each repo as markdown files. It's
-preserved at the `v1-final` tag:
+Install the plugin once per machine, at user scope, from the marketplace on GitHub:
 
 ```bash
-git checkout v1-final
+claude plugin marketplace add RobotNerd/sdlc-llm
+```
+
+```bash
+claude plugin install sdlc-llm@sdlc-llm --scope user
+```
+
+The first session asks for the Kaneo and Outline URLs. Plugin auto-update brings each merge
+to `main` to every machine.
+
+## Per-repo files
+
+Everything unique to a project lives in its own repo. The skills read only these:
+
+* `.env`: the Kaneo API key and the notification tokens. Gitignored, and read only by
+  scripts. `.env.example` lists the keys.
+* `.sdlc/config.toml`: the Kaneo project, the Outline collection, and repo settings such as
+  the branch prefix and the test, lint, and format commands.
+* `CLAUDE.md`: the project's rules and checks.
+* `docs/guidelines/`: the project's guideline docs. A skill reads only the one a step needs.
+
+The guideline docs have fixed file names, so the skills can find them. A repo may leave any of
+them out:
+
+* `architecture.md`
+* `code-style.md`
+* `commit-conventions.md`
+* `documentation-style.md`
+* `review-policy.md`
+* `skill-authoring.md`
+* `task-style.md`
+* `testing.md`
+
+## Skills
+
+| Skill | What it does |
+|-------|--------------|
+| `groom` | Reviews the backlog: blocked chains, tasks ranked above their blocker, stale and under-specified tasks, Planned tasks ready for To Do, deferred tasks, and finished epics. It proposes every fix in one numbered list, and makes only the ones you confirm. |
+| `plan` | Turns an idea into tasks. It interviews you in an Outline questions doc, writes a spec when the work is bigger than one task, and creates the epic and its tasks in Kaneo. |
+| `work` | Implements a batch of To Do tasks on one branch, one subagent per task, and opens one pull request. It stops only on a real blocker. |
+
+`work` runs on Sonnet; `plan` and `groom` run on Opus.
+
+## Scripts and hooks
+
+| Name | Kind | What it does |
+|------|------|--------------|
+| `hooks/session_start.py` | SessionStart hook | Prints the in-progress and needs-human tasks, so a new session knows where things stand |
+| `hooks/stop_notify.py` | Stop and StopFailure hook | Notifies with the session's state, including a usage limit and when it resets |
+| `lib/board.py` | script | Prints one line per open task: key, status, title, labels, open blockers, and id |
+| `lib/notify.py` | script | Sends a notification to Discord, with Telegram as the fallback |
+| `lib/reference_check.py` | script, CI | Fails when a committed file cites a tracker item |
+| `lib/validate_draft.py` | script | Checks task drafts against the task format |
+
+The hooks do nothing in a repo without `.sdlc/config.toml`.
+
+## Workflows
+
+### Plan and build a feature
+
+1. Start planning:
+
+   ```text
+   /sdlc-llm:plan Let a batch skip tasks that are already merged
+   ```
+
+2. Answer each question in the Outline questions doc the skill links to, replacing its
+   `> Answer: TODO` line. Then type:
+
+   ```text
+   continue
+   ```
+
+3. Read the spec. Edit it if you like, then type:
+
+   ```text
+   approved
+   ```
+
+4. Review the tasks it created in Planned, then type `approved` again to release them to To
+   Do.
+5. Implement them, using the keys it listed:
+
+   ```text
+   /sdlc-llm:work KEY-12 KEY-13 KEY-14
+   ```
+
+6. Review and merge the pull request on GitHub, then type:
+
+   ```text
+   merged
+   ```
+
+   The skill updates `main`, deletes the branch, and moves the tasks to done.
+
+### Groom the backlog
+
+1. Start a review:
+
+   ```text
+   /sdlc-llm:groom
+   ```
+
+2. Answer with the numbers of the proposals to apply, and a choice where one is offered:
+
+   ```text
+   1, 3, 4 keep, 6 archive
+   ```
+
+3. Start a batch with the tasks now at the top of To Do:
+
+   ```text
+   /sdlc-llm:work KEY-15 KEY-16
+   ```
+
+### Pick up after a break or a usage limit
+
+1. Start a new session in the repo:
+
+   ```bash
+   claude
+   ```
+
+2. Read the in-progress and needs-human tasks the SessionStart hook prints at the top.
+3. If the pull request is still open, or the batch stopped partway, run the same `work`
+   command again. It resumes from the tasks' Kaneo status:
+
+   ```text
+   /sdlc-llm:work KEY-12 KEY-13 KEY-14
+   ```
+
+4. If you merged the pull request while away, type:
+
+   ```text
+   merged
+   ```
+
+## Without a skill
+
+Some work is a plain request. The repo's guidelines and `CLAUDE.md` carry the rules. Earlier
+versions had skills for some of these; they were dropped as not worth a skill.
+
+Add a single task (was `add-task`):
+
+```text
+Add a task to Kaneo: <what and why>. Follow docs/guidelines/task-style.md, and check it with validate_draft.py.
+```
+
+Defer an idea:
+
+```text
+File a deferred task for <idea>: why it's deferred, and what would bring it back.
+```
+
+Review docs (was `review-docs`):
+
+```text
+Review README.md and CLAUDE.md for paths that don't exist, stale skill names, and tracker references. List the problems; fix only what I confirm.
+```
+
+Set up a new repo (was `setup-project`):
+
+```text
+Set up this repo for sdlc-llm: create .sdlc/config.toml for Kaneo project <slug> and Outline collection <name>, a .env from .env.example, and docs/guidelines/ with the guideline files from <repo>.
+```
+
+Ask what blocks a task:
+
+```text
+What blocks KEY-14, and what's left on each blocker?
+```
+
+Refine one task:
+
+```text
+Rewrite the acceptance criteria of KEY-14 by docs/guidelines/task-style.md, and show me the change before you save it.
+```
+
+Archive a task:
+
+```text
+Archive KEY-14 as wont-do: <reason>.
 ```
 
 ## Development
 
-Python 3.11 or later, standard library only. `pytest` is the one dev dependency:
+Python 3.11 or later, standard library only. `pytest` and `ruff` are the dev dependencies:
 
 ```bash
-pip install -e '.[dev]'
+python3 -m venv .venv
 ```
 
 ```bash
-python3 -m pytest
+.venv/bin/pip install -e '.[dev]'
 ```
+
+```bash
+.venv/bin/python -m pytest
+```
+
+```bash
+.venv/bin/ruff check .
+```
+
+```bash
+.venv/bin/ruff format --check .
+```
+
+`CLAUDE.md` says how to test a branch in the sandbox before merging it.
