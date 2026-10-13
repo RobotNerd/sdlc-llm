@@ -10,7 +10,7 @@ import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
 SCRIPT = ROOT / "lib/validate_draft.py"
-STYLE_GUIDE = ROOT / "lib/references/guidelines/task-style-guide.md"
+STYLE_GUIDE = ROOT / "docs/guidelines/task-style.md"
 
 GOOD_DESCRIPTION = """\
 ## Description

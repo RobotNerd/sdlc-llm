@@ -1,7 +1,7 @@
 # CLAUDE.md
 
 sdlc-llm is a Claude Code plugin: skills that plan, track, and implement work for a solo
-developer. Tasks live in Kaneo. Specs, guideline docs, and reports live in Outline, in the
+developer. Tasks live in Kaneo. Specs and reports live in Outline, in the
 `sdlc-llm` collection. This repo holds only code, tests, and config.
 
 ## Verifying your work
@@ -55,17 +55,16 @@ cd ~/dev/sdlc-sandbox && claude --plugin-dir ~/dev/sdlc-llm-review
 
 ## Guidelines
 
-The guideline docs live in Outline under `docs/guidelines`. Read the one a step needs, when
-it needs it:
+The guideline docs live in `docs/guidelines/`. Read the one a step needs, when it needs it:
 
-- **Architecture:** before deciding where new code goes.
-- **Code style:** before writing or reviewing code.
-- **Documentation style:** before writing any doc, task text, or comment.
-- **Task style guide:** before writing or refining a task.
-- **Testing strategy:** before writing tests or a task's testing strategy.
-- **Commit conventions:** before committing.
-- **Review policy:** when reviewing a change.
-- **Skill authoring:** before changing a skill.
+- `docs/guidelines/architecture.md`: before deciding where new code goes.
+- `docs/guidelines/code-style.md`: before writing or reviewing code.
+- `docs/guidelines/commit-conventions.md`: before committing.
+- `docs/guidelines/documentation-style.md`: before writing any doc, task text, or comment.
+- `docs/guidelines/review-policy.md`: when reviewing a change.
+- `docs/guidelines/skill-authoring.md`: before changing a skill.
+- `docs/guidelines/task-style.md`: before writing or refining a task.
+- `docs/guidelines/testing.md`: before writing tests or a task's testing strategy.
 
 The PRD (`spec/PRD v2: sdlc-llm` in Outline) is the authority for the v2 design.
 

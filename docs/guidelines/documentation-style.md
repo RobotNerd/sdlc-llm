@@ -67,13 +67,13 @@ flowchart LR
 
 Never publish a diagram without looking at it.
 
-
 1. Write the diagram to a `.mmd` file in a scratch directory.
 2. Render it with the same Mermaid major version Outline uses:
 
    ```bash
    npx -y @mermaid-js/mermaid-cli@11 -i diagram.mmd -o diagram.png -b white -s 2
    ```
+
 3. View the PNG. Fix crossings, long edges, and cramped labels, then render again.
 4. Publish the block only when the PNG reads cleanly.
 

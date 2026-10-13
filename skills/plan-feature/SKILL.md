@@ -55,14 +55,14 @@ Epic: [<key> <epic title>](<epic url>)
 
 Read the [Outline backend map](../../lib/references/backends/outline.md) before the first DocStore call. Every DocStore operation below is done the way it says. Values in angle brackets come from `.sdlc/config.toml`.
 
-Read guideline docs from Outline with `mcp__plugin_sdlc-llm_outline__fetch` (`resource` `document`, `id` from the config), at the step that needs them. When an id is empty, read the plugin's default copy instead:
+Read guideline docs from the repo, at the step that needs them:
 
-| Doc | Config key | Default copy |
-|---|---|---|
-| Testing strategy | `guidelines.testing` | [testing-strategy.md](../../lib/references/guidelines/testing-strategy.md) |
-| Documentation style | `guidelines.doc_style` | [documentation-style.md](../../lib/references/guidelines/documentation-style.md) |
-| Architecture | `guidelines.architecture` | none |
-| Task style guide | `guidelines.task_style` | [task-style-guide.md](../../lib/references/guidelines/task-style-guide.md) |
+| Doc | File |
+|---|---|
+| Testing strategy | `docs/guidelines/testing.md` |
+| Documentation style | `docs/guidelines/documentation-style.md` |
+| Architecture | `docs/guidelines/architecture.md` |
+| Task style guide | `docs/guidelines/task-style.md` |
 
 Copy this checklist into your reply, and tick each step off as you finish it:
 
@@ -144,7 +144,7 @@ Read the Testing strategy doc now, for the testing questions.
 
 ### 4. Check the architecture (high)
 
-1. Read the Architecture doc. When `guidelines.architecture` is empty, DocStore: `find_doc` `docs/guidelines/Architecture`. When there's none, the spec's Architecture change says `None: the project has no Architecture doc.`, and you skip item 2.
+1. Read the Architecture doc. When the file doesn't exist, the spec's Architecture change says `None: the project has no Architecture doc.`, and you skip item 2.
 2. Compare the answers with it. Write the change the feature needs: what to add, change, or remove, under which heading of the Architecture doc. A feature that fits the current architecture has `None`.
 
 ### 5. Draft the spec (high)
@@ -177,7 +177,7 @@ Read the Documentation style doc now.
 
 1. DocStore: `get_doc` the spec.
 2. If Open questions has any entry, the spec isn't approved. Leave the status as it is. **STOP**, naming each open question: the developer resolves it in the spec, then approves again.
-3. When the Architecture change isn't `None`, apply it to the Architecture doc: DocStore: `update_doc` the heading it names, or `append_doc` when the change is a new section.
+3. When the Architecture change isn't `None`, apply it to `docs/guidelines/architecture.md`: edit the heading it names, or add a section when the change is a new one.
 4. Set the status to `approved`.
 5. **STOP**: say the spec is approved, with its title and link, and that on "continue" the skill breaks it into tasks.
 

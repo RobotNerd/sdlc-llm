@@ -1,6 +1,6 @@
 # Task style guide
 
-How tasks are structured and worded. `add-task`, `plan-feature`, and `refine-backlog` read this, along with the Documentation style and Testing strategy docs it builds on. A task that breaks these rules gets flagged as under-specified.
+How tasks are structured and worded. `add-task`, `plan-feature`, and `refine-backlog` read this, along with `documentation-style.md` and `testing.md`, which it builds on. A task that breaks these rules gets flagged as under-specified.
 
 ## Contents
 
@@ -56,12 +56,12 @@ All four top-level sections are always present. A section with nothing in it say
 
 **Testing strategy**
 
-* Follows the format in the Testing strategy doc: automated tests first, then manual, each as Given/When/Then plus steps, each naming the criterion it covers.
+* Follows the format in `testing.md`: automated tests first, then manual, each as Given/When/Then plus steps, each naming the criterion it covers.
 * Every criterion has at least one test.
-* Manual tests are a last resort, for what no automated test, eval, or agent-run check can observe. The Manual section opens with a **Why manual:** line for each test: the behavior it checks, and why it can't be automated. See Manual tests in the Testing strategy doc.
+* Manual tests are a last resort, for what no automated test, eval, or agent-run check can observe. The Manual section opens with a **Why manual:** line for each test: the behavior it checks, and why it can't be automated. See Manual tests in `testing.md`.
 * A manual test runs at the end of its epic, in the epic's validation task, unless the human marks it `[blocks merge]` while reviewing the task. Its steps run against the default branch.
 * Manual tests are written out in full on the task: every command, agent prompt, and value to paste, and the expected result of each step, so the developer can run them from the task alone. When the steps can only be settled during implementation, the Manual section says so, and the implementer adds the full steps as a task comment before handing the task over.
-* Manual steps are formatted for copying: commands, agent prompts, and values to paste each stand in their own code block or bulleted list, never inline in a sentence. A file to create is given as its name, then its content, each in its own block. See "Formatting for the reader" in the Documentation style doc.
+* Manual steps are formatted for copying: commands, agent prompts, and values to paste each stand in their own code block or bulleted list, never inline in a sentence. A file to create is given as its name, then its content, each in its own block. See "Formatting for the reader" in `documentation-style.md`.
 
 **Notes**
 
