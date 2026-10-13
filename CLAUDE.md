@@ -2,7 +2,7 @@
 
 sdlc-llm is a Claude Code plugin: skills that plan, track, and implement work for a solo
 developer. Tasks live in Kaneo. Specs, guideline docs, and reports live in Outline, in the
-`sdlc-llm` collection. This repo holds only code, tests, evals, and config.
+`sdlc-llm` collection. This repo holds only code, tests, and config.
 
 ## Verifying your work
 

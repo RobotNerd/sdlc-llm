@@ -2,7 +2,7 @@
 
 import pytest
 
-from lib.config import SUPPORTED_CONFIG_VERSION, ConfigError, load_config, setting
+from lib.config import SUPPORTED_CONFIG_VERSION, ConfigError, load_config
 
 VALID_CONFIG = """\
 config_version = 1
@@ -85,17 +85,8 @@ def test_error_says_so_when_not_inside_a_git_repo(tmp_path):
     assert "git repository" in str(error.value)
 
 
-def test_default_eval_command_is_used_when_config_does_not_set_one(tmp_path):
-    config = load_config(make_repo(tmp_path, VALID_CONFIG))
+def test_repo_config_has_no_evals_or_critic_table():
+    config = load_config()
 
-    command = setting(config, "evals.command")
-
-    assert command.startswith("claude plugin eval . --tag {tag}")
-    assert "--runs 1" in command
-    assert "--ablation none" in command
-
-
-def test_configured_eval_command_wins_when_config_sets_one(tmp_path):
-    config = load_config(make_repo(tmp_path, VALID_CONFIG + '\n[evals]\ncommand = "custom"\n'))
-
-    assert setting(config, "evals.command") == "custom"
+    assert "evals" not in config
+    assert "critic" not in config

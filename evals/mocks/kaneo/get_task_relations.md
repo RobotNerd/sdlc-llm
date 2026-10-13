@@ -1,6 +1,0 @@
----
-expect:
-  taskId: string
----
-
-[]

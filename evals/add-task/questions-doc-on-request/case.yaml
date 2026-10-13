@@ -1,4 +1,0 @@
-schema_version: "1.1"
-name: questions-doc-on-request
-context:
-  scaffold_script: scaffold.sh

@@ -1,4 +1,0 @@
-schema_version: "1.1"
-name: many-questions-go-to-a-doc
-context:
-  scaffold_script: scaffold.sh
