@@ -32,23 +32,23 @@ python3 ${CLAUDE_PLUGIN_ROOT}/lib/board.py
 ```
 
 Then read each to-do and Planned task, and its comments, by id. Then find:
-
 1. **Blocked chains:** each to-do task with an open blocker, as a chain written blocker first, such as `KEY-10 → KEY-11`. For information only.
-2. **Blocked order:** a to-do task ranked above its own blocker. Propose an order with each blocker moved up to just above the first task that needs it.
-3. **Stale tasks:** a to-do or Planned task, not `deferred`, created more than 30 days ago with no `kept` comment since. Choices: archive as `wont-do`, keep, or re-rank.
-4. **Under-specified tasks:** run the draft validator once on every to-do and Planned task, then read each against `task-style.md`'s judgment rules. A `needs-refinement` comment is open unless a later comment starts with `refined`. Choices: refine it now, or leave it flagged. Pass the draft as JSON on one line in single quotes, each `'` in it written as `\u0027`:
+2. **Manual tasks:** each open task with the `manual` label, with the count and keys of the open tasks it blocks, directly or through a chain, each counted once. Highest count first. For information only; none if no open task has the label.
+3. **Blocked order:** a to-do task ranked above its own blocker. Propose an order with each blocker moved up to just above the first task that needs it.
+4. **Stale tasks:** a to-do or Planned task, not `deferred`, created more than 30 days ago with no `kept` comment since. Choices: archive as `wont-do`, keep, or re-rank.
+5. **Under-specified tasks:** run the draft validator once on every to-do and Planned task, then read each against `task-style.md`'s judgment rules. A `needs-refinement` comment is open unless a later comment starts with `refined`. Choices: refine it now, or leave it flagged. Pass the draft as JSON on one line in single quotes, each `'` in it written as `\u0027`:
 
    ```bash
    python3 ${CLAUDE_PLUGIN_ROOT}/lib/validate_draft.py --json '<draft>'
    ```
 
-5. **Ready tasks:** a Planned task that isn't under-specified, deferred, or an epic. Propose moving it to the end of To Do.
-6. **Deferred tasks:** each `deferred` task. Choices: promote it to a full task in Planned, keep it, or archive it as `wont-do`.
-7. **Finished epics:** an epic whose subtasks are all done or archived. Propose moving it to done.
+6. **Ready tasks:** a Planned task that isn't under-specified, deferred, or an epic. Propose moving it to the end of To Do.
+7. **Deferred tasks:** each `deferred` task. Choices: promote it to a full task in Planned, keep it, or archive it as `wont-do`.
+8. **Finished epics:** an epic whose subtasks are all done or archived. Propose moving it to done.
 
 ## Propose and apply
 
-Write one reply: the blocked chains, then every proposal in one numbered list with its choices, recommended first. Stop; the developer answers by number.
+Write one reply: the blocked chains, the manual tasks list, then every proposal in one numbered list with its choices, recommended first. Stop; the developer answers by number.
 
 Then apply only the confirmed answers, and report each change:
 
