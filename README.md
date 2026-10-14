@@ -20,8 +20,131 @@ claude plugin marketplace add RobotNerd/sdlc-llm
 claude plugin install sdlc-llm@sdlc-llm --scope user
 ```
 
-The first session asks for the Kaneo and Outline URLs. Plugin auto-update brings each merge
-to `main` to every machine.
+The first session asks for the Kaneo and Outline URLs.
+
+### Upgrade
+
+Auto-update brings each merge to `main` to the install in the background. Without running
+anything, the install catches up on its own.
+
+To bring the install to the latest `main` right away, run these two commands:
+
+```bash
+claude plugin marketplace update sdlc-llm
+```
+
+```bash
+claude plugin update sdlc-llm@sdlc-llm --scope user
+```
+
+Then start a new session. A running session keeps the version it started with.
+
+## Setup
+
+Make a repo ready for `plan`, `groom`, and `work`. Do these steps once per repo, in order.
+The steps are manual.
+
+1. Create a project in Kaneo. Note its slug, and find its id and your workspace's id in the
+   project's URL.
+2. Give the project these columns, in this order. Mark `done` as the final column. `planned`
+   and `archived` are built-in Kaneo statuses and need no column.
+
+   * `to-do`
+   * `in-progress`
+   * `needs-human`
+   * `done`
+
+3. Create these labels in the workspace:
+
+   * `bug`
+   * `chore`
+   * `deferred`
+   * `docs`
+   * `epic`
+   * `feature`
+   * `follow-up`
+   * `needs-refinement`
+   * `refactor`
+   * `validation`
+   * `wont-do`
+
+4. Create an Outline collection for the repo's specs and questions docs. Note its id.
+5. Create a Kaneo API key and an Outline API key. In the repo, copy `.env.example` to
+   `.env`, then fill in the keys:
+
+   ```bash
+   cp .env.example .env
+   ```
+
+   Copy `.env.example` from this plugin's repo if the repo has none. It holds these keys:
+
+   * `DISCORD_WEBHOOK_URL`
+   * `KANEO_API_KEY`
+   * `OUTLINE_API_KEY`
+   * `TELEGRAM_BOT_TOKEN`
+
+   Leave the notification keys empty if notifications are off.
+
+6. Add these lines to `.gitignore`:
+
+   * `.env`
+   * `.sdlc/local/`
+
+7. Create `.sdlc/config.toml` in an editor, with this content. Replace the ids, the slug,
+   and the URLs. Set the three commands to the repo's own test, lint, and format checks, or
+   to `""` if it has none:
+
+   ```toml
+   config_version = 1
+   branch_prefix = "app-"
+   remote = "origin"
+   test_command = "pytest"
+   lint_command = "ruff check ."
+   format_command = "ruff format --check ."
+   throwaway_test_dir = ".sdlc/local/throwaway-tests"
+
+   [kaneo]
+   project_id = "<project id>"
+   project_slug = "APP"
+   url = "https://kaneo.example.com"
+
+   [outline]
+   collection_id = "<collection id>"
+   url = "https://outline.example.com"
+   ```
+
+   To turn on notifications, add this to the file. A second channel with `type = "telegram"`,
+   `role = "failover"`, and a `chat_id` is the fallback:
+
+   ```toml
+   [notify]
+   enabled = true
+   stop_hook = true
+
+   [[notify.channels]]
+   role = "primary"
+   type = "discord"
+   ```
+
+8. Create `CLAUDE.md` in the repo root, with the project's rules and its test, lint, and
+   format commands.
+9. Create `docs/guidelines/` and add the guideline files the repo needs, named as in
+   `Per-repo files`.
+10. Check the setup. Start a session in the repo:
+
+    ```bash
+    claude
+    ```
+
+    A good result: the SessionStart hook prints either the in-progress and needs-human
+    tasks, or `No Kaneo tasks are in progress or needing review.`, and no error. Then send:
+
+    ```text
+    /sdlc-llm:groom
+    ```
+
+    A good result: the skill reads the board and proposes fixes, or says the backlog is
+    clean.
 
 ## Per-repo files
 
@@ -173,11 +296,7 @@ Review docs (was `review-docs`):
 Review README.md and CLAUDE.md for paths that don't exist, stale skill names, and tracker references. List the problems; fix only what I confirm.
 ```
 
-Set up a new repo (was `setup-project`):
-
-```text
-Set up this repo for sdlc-llm: create .sdlc/config.toml for Kaneo project <slug> and Outline collection <name>, a .env from .env.example, and docs/guidelines/ with the guideline files from <repo>.
-```
+Set up a new repo (was `setup-project`): follow `Setup`.
 
 Ask what blocks a task:
 
