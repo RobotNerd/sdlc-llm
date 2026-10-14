@@ -111,6 +111,25 @@ None
 A failing test gets a bug task in the epic, which blocks this task.
 ```
 
+**Manual** (label `manual`, plus its type label): work only the developer can do by hand, such as running cable, buying hardware, or installing an OS. It has nothing to implement: `work` refuses a batch that includes it, and the developer moves it to done. It `blocks` each task it gates, so the board shows which manual step unblocks the most work. It has a `## Steps` section with numbered steps only when its steps can be written out, such as installing an OS; purely physical work has none.
+
+```markdown
+## Description
+<what the developer does by hand, and which tasks it unblocks>
+## Steps
+1. <only when the steps can be written out>
+## Acceptance criteria
+- [ ] <an observable end state, such as the machine answering ssh>
+## Testing strategy
+### Automated
+None
+### Manual
+**Why manual:** the developer does this task by hand.
+#### Done by hand → each criterion holds   (criteria: all)
+## Notes
+None
+```
+
 **Follow-up** (label `follow-up`, created during a batch): the normal template. Notes says which task it came from and why it was split off.
 
 **Needs refinement:** a task created with gaps carries a `needs-refinement` comment listing them. It stays in Planned until the gaps are filled.

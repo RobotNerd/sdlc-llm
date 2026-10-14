@@ -63,6 +63,7 @@ The steps are manual.
    * `epic`
    * `feature`
    * `follow-up`
+   * `manual`
    * `needs-refinement`
    * `refactor`
    * `validation`
