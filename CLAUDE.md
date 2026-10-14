@@ -16,9 +16,8 @@ developer. Tasks live in Kaneo. Specs and reports live in Outline, in the
 ## Running the plugin
 
 This repo runs the plugin as released on `main` on GitHub, installed once per machine at user
-scope by the README's Install steps. `.claude/settings.json` also declares the `sdlc-llm`
-marketplace and enables `sdlc-llm@sdlc-llm` here. Start `claude` here with no flags. Don't
-load this repo with `--plugin-dir`: the session would then run the files it edits.
+scope by the README's Install steps. Start `claude` here with no flags. Don't load this repo
+with `--plugin-dir`: the session would then run the files it edits.
 
 The manifest has no `version`, so Claude Code versions the install by commit SHA, and every
 merge to `main` reaches it. Auto-update brings a merge in the background. To bring it in
