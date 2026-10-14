@@ -1,4 +1,4 @@
-"""SessionStart hook: put the in-progress and needs-human tasks in the session's context.
+"""SessionStart hook: put the in-progress and in-review tasks in the session's context.
 
 Claude Code adds this hook's stdout to the context. The plugin's hooks run in every
 project it's enabled in, so a project without .sdlc/config.toml is skipped silently.
@@ -18,7 +18,7 @@ from lib import board
 from lib.config import ConfigError, find_repo_root, load_config
 
 HEADING = "Kaneo tasks in progress or needing review (key, status, title, labels, blockers, id):"
-STATUSES = "in-progress,needs-human"
+STATUSES = "in-progress,in-review"
 
 
 def main(api=None):

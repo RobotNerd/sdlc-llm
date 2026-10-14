@@ -51,7 +51,7 @@ The steps are manual.
 
    * `to-do`
    * `in-progress`
-   * `needs-human`
+   * `in-review`
    * `done`
 
 3. Create these labels in the workspace:
@@ -136,7 +136,7 @@ The steps are manual.
     claude
     ```
 
-    A good result: the SessionStart hook prints either the in-progress and needs-human
+    A good result: the SessionStart hook prints either the in-progress and in-review
     tasks, or `No Kaneo tasks are in progress or needing review.`, and no error. Then send:
 
     ```text
@@ -183,7 +183,7 @@ them out:
 
 | Name | Kind | What it does |
 |------|------|--------------|
-| `hooks/session_start.py` | SessionStart hook | Prints the in-progress and needs-human tasks, so a new session knows where things stand |
+| `hooks/session_start.py` | SessionStart hook | Prints the in-progress and in-review tasks, so a new session knows where things stand |
 | `hooks/stop_notify.py` | Stop and StopFailure hook | Notifies with the session's state, including a usage limit and when it resets |
 | `lib/board.py` | script | Prints one line per open task: key, status, title, labels, open blockers, and id |
 | `lib/notify.py` | script | Sends a notification to Discord, with Telegram as the fallback |
@@ -259,7 +259,7 @@ The hooks do nothing in a repo without `.sdlc/config.toml`.
    claude
    ```
 
-2. Read the in-progress and needs-human tasks the SessionStart hook prints at the top.
+2. Read the in-progress and in-review tasks the SessionStart hook prints at the top.
 3. If the pull request is still open, or the batch stopped partway, run the same `work`
    command again. It resumes from the tasks' Kaneo status:
 

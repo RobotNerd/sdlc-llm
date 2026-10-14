@@ -44,7 +44,7 @@ def parse_arguments(argv):
     parser.add_argument(
         "--status",
         type=lambda text: [status.strip() for status in text.split(",") if status.strip()],
-        help="print only these statuses, comma-separated, such as in-progress,needs-human",
+        help="print only these statuses, comma-separated, such as in-progress,in-review",
     )
     return parser.parse_args(argv)
 

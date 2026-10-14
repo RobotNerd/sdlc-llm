@@ -34,7 +34,7 @@ throwaway_test_dir = ".sdlc/local/throwaway-tests"
 token_budget_per_batch = 5000000
 
 [kaneo]
-columns = { done = "b10naj12e54evkyddorvuy5c", "in-progress" = "pv4c9cppnblarlchi41bhwhu", "needs-human" = "bjya9rknbnubq3ygenl8q4tj", "to-do" = "xngc7jxpyyojj8we0c14rroc" }
+columns = { done = "b10naj12e54evkyddorvuy5c", "in-progress" = "pv4c9cppnblarlchi41bhwhu", "in-review" = "p6zh3etyzpx4y70wwkj5zygf", "to-do" = "xngc7jxpyyojj8we0c14rroc" }
 project_id = "q2yevcyqfsf56w1nvdi47p7t"
 project_slug = "SDLC"
 url = "https://rainbow-flame.taila02055.ts.net:8443"
