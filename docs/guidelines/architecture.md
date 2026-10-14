@@ -14,7 +14,7 @@ A Claude Code plugin for one developer: three skills that plan, groom, and imple
 | Scripts (`lib/`) | Work that must be exact, or would load a large payload into context. Stdlib Python. |
 | Notifiers (`lib/backends/`) | Discord and Telegram senders for `lib/notify.py`, behind the `Notifier` interface. |
 | Kaneo client (`lib/backends/kaneo.py`, `lib/backends/rest.py`) | Kaneo's REST API, for scripts. Skills use the Kaneo MCP tools instead. |
-| Hooks (`hooks/hooks.json`) | `hooks/session_start.py` runs on SessionStart, and puts the in-progress and needs-human tasks in the session's context. `hooks/stop_notify.py` runs on Stop and StopFailure, and notifies with the session's state. |
+| Hooks (`hooks/hooks.json`) | `hooks/session_start.py` runs on SessionStart, and puts the in-progress and in-review tasks in the session's context. `hooks/stop_notify.py` runs on Stop and StopFailure, and notifies with the session's state. |
 | MCP config (`mcp.json`) | Declares the `kaneo` and `outline` MCP servers, with URLs from the plugin's `userConfig`. The manifest names it, because a root `.mcp.json` would also load as the repo's own project MCP config. |
 
 ### Scripts

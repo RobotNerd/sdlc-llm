@@ -25,7 +25,7 @@ url = "http://127.0.0.1:9"
 COLUMNS = [
     {"slug": "to-do", "isFinal": False},
     {"slug": "in-progress", "isFinal": False},
-    {"slug": "needs-human", "isFinal": False},
+    {"slug": "in-review", "isFinal": False},
     {"slug": "done", "isFinal": True},
 ]
 
@@ -103,14 +103,14 @@ def test_only_open_tasks_print_with_their_open_blockers(tmp_path, capsys):
 
 
 def test_status_filters_the_tasks(tmp_path, capsys):
-    exit_code, output = run_board(tmp_path, capsys, "--status", "in-progress,needs-human")
+    exit_code, output = run_board(tmp_path, capsys, "--status", "in-progress,in-review")
 
     assert exit_code == 0
     assert [line.split()[0] for line in output.out.splitlines()] == ["EX-4"]
 
 
 def test_planned_tasks_are_open_and_follow_the_columns(tmp_path, capsys):
-    api = FakeKaneo([task("planned-5", 5, "planned"), task("open-6", 6, "needs-human")], {})
+    api = FakeKaneo([task("planned-5", 5, "planned"), task("open-6", 6, "in-review")], {})
 
     _, output = run_board(tmp_path, capsys, api=api)
 
@@ -154,7 +154,7 @@ def run_hook(repo, monkeypatch, capsys, api):
     return exit_code, capsys.readouterr().out
 
 
-def test_the_hook_prints_the_in_progress_and_needs_human_tasks(tmp_path, monkeypatch, capsys):
+def test_the_hook_prints_the_in_progress_and_in_review_tasks(tmp_path, monkeypatch, capsys):
     exit_code, output = run_hook(make_repo(tmp_path), monkeypatch, capsys, messy_board())
 
     assert exit_code == 0

@@ -34,7 +34,7 @@ Use `ASK` for a question and `STOP` for anything else. Stop when:
 
 ## Batch
 
-1. Before any work, read the board, and find each task in the batch by its key. Skip tasks already in needs-human or done. Stop, listing each problem, if any other task isn't in To Do or In Progress, or is blocked by a task that's outside the batch or later in it. A task missing from the board is done or archived; read it by number to tell which.
+1. Before any work, read the board, and find each task in the batch by its key. Skip tasks already in in-review or done. Stop, listing each problem, if any other task isn't in To Do or In Progress, or is blocked by a task that's outside the batch or later in it. A task missing from the board is done or archived; read it by number to tell which.
 2. Branch: `<branch_prefix><number of the first task>-<short slug>`. If it exists locally or on the remote, check it out. Otherwise fetch, then branch from the up-to-date default branch.
 3. For each remaining task, in the order given, start one subagent. Tell it the task key, and to:
    - set the task to in-progress, and implement it to its acceptance criteria and testing strategy
@@ -43,7 +43,7 @@ Use `ASK` for a question and `STOP` for anything else. Stop when:
    - commit with the task key in the message, and never push
    - never ask the developer; return a blocker instead
    - return at most five lines: what changed, the checks' result, the commit, and any blocker or follow-up
-4. After each subagent, check the commit exists. Then move the task to needs-human with a comment: what changed, and any follow-up. On a blocker, stop.
+4. After each subagent, check the commit exists. Then move the task to in-review with a comment: what changed, and any follow-up. On a blocker, stop.
 5. After the last task, push the branch and open one pull request, unless one is open. Its title says what the batch does; its body lists each task's key and title with a line on what changed. Then stop, with `--link` set to the pull request.
 
 ## Merged
