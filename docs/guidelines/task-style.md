@@ -91,13 +91,13 @@ All four top-level sections are always present. A section with nothing in it say
 <link to the spec or PRD that deferred it>
 ```
 
-**Validation** (label `validation`): the last task of an epic that has deferred manual tests. It runs those tests after the rest of the epic has merged. It's a subtask of the epic, and every task whose tests it lists blocks it. It has nothing to implement: `work` stops on it for the developer, who runs the tests and moves it to done when they pass. When a task with a deferred manual test joins an epic, its tests are added to the validation task, which is created if the epic doesn't have one yet.
+**Validation** (label `validation`): the last task of an epic that has deferred manual tests. It runs those tests after the rest of the epic has merged. It's a subtask of the epic, and every task whose tests it lists blocks it. It has nothing to implement: `work` stops on it for the developer, who runs the tests and moves it to done when they pass. When a task with a deferred manual test joins an epic, its tests are added to the validation task, which is created if the epic doesn't have one yet. Each task key in the validation task is a Markdown link to that task, so the developer can jump to its steps.
 
 ```markdown
 ## Description
 Run the manual tests deferred from this epic's tasks, on the default branch. Each test's steps are on its own task.
 ## Acceptance criteria
-- [ ] KEY-NNN <task title>: <manual test title> passes
+- [ ] [KEY-NNN](<task link>) <task title>: <manual test title> passes
 ## Testing strategy
 ### Automated
 None
