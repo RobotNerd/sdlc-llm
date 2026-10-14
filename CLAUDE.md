@@ -15,24 +15,21 @@ developer. Tasks live in Kaneo. Specs and reports live in Outline, in the
 
 ## Running the plugin
 
-This repo runs the plugin as released on `main` on GitHub. `.claude/settings.json` declares
-the `sdlc-llm` marketplace and enables `sdlc-llm@sdlc-llm` at project scope, but enabling a plugin doesn't install it. Install it
-once from the repo root:
-
-```bash
-claude plugin marketplace add RobotNerd/sdlc-llm && claude plugin install sdlc-llm@sdlc-llm --scope project
-```
-
-Then start `claude` here with no flags. The first session asks for the Kaneo and Outline
-URLs. Don't load this repo with `--plugin-dir`: the session would then run the files it
-edits.
+This repo runs the plugin as released on `main` on GitHub, installed once per machine at user
+scope by the README's Install steps. `.claude/settings.json` also declares the `sdlc-llm`
+marketplace and enables `sdlc-llm@sdlc-llm` here. Start `claude` here with no flags. Don't
+load this repo with `--plugin-dir`: the session would then run the files it edits.
 
 The manifest has no `version`, so Claude Code versions the install by commit SHA, and every
 merge to `main` reaches it. Auto-update brings a merge in the background. To bring it in
-right away, run this from the repo root, then start a new session:
+right away, run these, then start a new session:
 
 ```bash
-claude plugin marketplace update sdlc-llm && claude plugin update sdlc-llm@sdlc-llm
+claude plugin marketplace update sdlc-llm
+```
+
+```bash
+claude plugin update sdlc-llm@sdlc-llm
 ```
 
 A branch is tested in the sandbox, `~/dev/sdlc-sandbox`, from a scratch checkout at
