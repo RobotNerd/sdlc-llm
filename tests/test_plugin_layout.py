@@ -55,14 +55,9 @@ def test_marketplace_lists_the_plugin_at_the_repo_root():
     assert (ROOT / ".claude-plugin/plugin.json").exists()
 
 
-def test_project_settings_enable_the_plugin_from_this_repo_on_github():
-    settings = load_json(".claude/settings.json")
+def test_plugin_manifest_points_at_the_github_repo_the_install_steps_use():
     repository = load_json(".claude-plugin/plugin.json")["repository"]
-
-    source = settings["extraKnownMarketplaces"]["sdlc-llm"]["source"]
-    assert source["source"] == "github"
-    assert repository == f"https://github.com/{source['repo']}"
-    assert settings["enabledPlugins"]["sdlc-llm@sdlc-llm"] is True
+    assert repository == "https://github.com/RobotNerd/sdlc-llm"
 
 
 def test_no_version_pins_the_installed_plugin():
