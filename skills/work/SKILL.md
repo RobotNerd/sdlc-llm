@@ -29,6 +29,7 @@ Use `ASK` for a question and `STOP` for anything else. Stop when:
 - a task is blocked by an open task outside the batch, or later in it: stop before any work, so the developer can revise the batch
 - a task's checks still fail after `quality_gate_attempts` honest fixes
 - a decision is the developer's: an unclear criterion, a design choice, or a task that can't be done as written
+- a task in the batch has the `manual` label: stop before any work, naming each, with no branch created and no task changed
 - a task has a manual test marked `[blocks merge]`: commit it, push, open the pull request, then stop with where its steps are
 - the next step is destructive or outward-facing, other than pushing the batch branch and opening its pull request
 
