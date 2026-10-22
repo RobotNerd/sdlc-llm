@@ -102,11 +102,14 @@ def build_notifier(channel, repo_root):
     if channel_type == "discord":
         return DiscordNotifier(require_secret(secrets, "DISCORD_WEBHOOK_URL", env_path), user_agent)
     if channel_type == "telegram":
-        if "chat_id" not in channel:
-            raise NotifyError("notify.channels for telegram needs chat_id")
+        if "chat_id" in channel:
+            raise NotifyError(
+                "chat_id on the telegram channel in .sdlc/config.toml is no longer read; "
+                f"move it to {env_path} as TELEGRAM_CHAT_ID"
+            )
         return TelegramNotifier(
             require_secret(secrets, "TELEGRAM_BOT_TOKEN", env_path),
-            channel["chat_id"],
+            require_secret(secrets, "TELEGRAM_CHAT_ID", env_path),
             user_agent,
             channel.get("api_url", DEFAULT_API_URL),
         )

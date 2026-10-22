@@ -1,5 +1,6 @@
 """The notify script: one message to the primary channel, or to the failover when it fails."""
 
+import json
 import subprocess
 import sys
 from pathlib import Path
@@ -11,14 +12,14 @@ NOTIFY = ROOT / "lib/notify.py"
 LINK = "https://kaneo.example.com/task?id=12&view=full"
 
 
-def run_notify(repo, discord, *arguments):
+def run_notify(repo, discord, *arguments, chat_id="4242"):
     command = [sys.executable, str(NOTIFY), "--project", "sdlc-llm", "--skill", "implement-task", "--kind", "STOP"]
     return subprocess.run(
         [*command, *arguments],
         capture_output=True,
         check=False,
         cwd=repo,
-        env=fake_environment(discord),
+        env=fake_environment(discord, chat_id),
         text=True,
         timeout=30,
     )
@@ -78,6 +79,42 @@ def test_telegram_gets_the_message_when_discord_fails(tmp_path, servers):
     assert (repo / MARKER).is_file()
     assert "sent to telegram" in result.stderr
     assert "not sent" not in result.stderr
+
+
+def test_telegram_chat_id_is_read_from_the_env_file(tmp_path, servers):
+    discord, telegram = servers([(503, None)]), servers([(200, {"ok": True})])
+    repo = make_repo(tmp_path, telegram.url)
+    (repo / ".env").write_text("TELEGRAM_CHAT_ID=5151\n")
+
+    result = run_notify(repo, discord, "--text", "batch finished", chat_id=None)
+
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout)["sent_to"] == "telegram"
+    assert [request["json"]["chat_id"] for request in telegram.requests] == ["5151"]
+
+
+def test_warning_names_the_key_and_env_path_when_the_chat_id_is_missing(tmp_path, servers):
+    discord, telegram = servers([(503, None)]), servers([(200, {"ok": True})])
+    repo = make_repo(tmp_path, telegram.url)
+
+    result = run_notify(repo, discord, "--text", "batch finished", chat_id=None)
+
+    assert result.returncode == 0
+    assert telegram.requests == []
+    assert "TELEGRAM_CHAT_ID" in result.stderr
+    assert str(repo / ".env") in result.stderr
+
+
+def test_warning_says_to_move_a_chat_id_left_in_the_config(tmp_path, servers):
+    discord, telegram = servers([(503, None)]), servers([(200, {"ok": True})])
+    repo = make_repo(tmp_path, telegram.url, chat_id="4242")
+
+    result = run_notify(repo, discord, "--text", "batch finished")
+
+    assert result.returncode == 0
+    assert telegram.requests == []
+    assert "move it to" in result.stderr
+    assert "TELEGRAM_CHAT_ID" in result.stderr
 
 
 def test_discord_is_retried_once_when_it_answers_429(tmp_path, servers):

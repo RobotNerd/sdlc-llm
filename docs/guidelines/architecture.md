@@ -31,7 +31,7 @@ A Claude Code plugin for one developer: three skills that plan, groom, and imple
 
 A project using the plugin keeps everything unique to it in its own repo. The skills read only these:
 
-* `.env`: the Kaneo API key and notification tokens. Read only by scripts.
+* `.env`: the Kaneo API key, the notification tokens, and the Telegram chat id, which isn't a secret. Read only by scripts.
 * `.sdlc/config.toml`: the Kaneo project, the Outline collection, and repo settings such as the check commands.
 * `CLAUDE.md`: the project's rules and checks.
 * `docs/guidelines/`: the project's guideline docs, with fixed file names.

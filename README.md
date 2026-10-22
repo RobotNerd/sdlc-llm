@@ -83,6 +83,7 @@ The steps are manual.
    * `KANEO_API_KEY`
    * `OUTLINE_API_KEY`
    * `TELEGRAM_BOT_TOKEN`
+   * `TELEGRAM_CHAT_ID`
 
    Leave the notification keys empty if notifications are off.
 
@@ -115,7 +116,7 @@ The steps are manual.
    ```
 
    To turn on notifications, add this to the file. A second channel with `type = "telegram"`,
-   `role = "failover"`, and a `chat_id` is the fallback:
+   `role = "failover"` is the fallback; its chat id is `TELEGRAM_CHAT_ID` in `.env`:
 
    ```toml
    [notify]
