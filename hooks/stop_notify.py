@@ -4,7 +4,9 @@ The plugin's hooks run in every project it's enabled in, so a project without
 .sdlc/config.toml is skipped silently. The hook never blocks the stop: it prints
 nothing on stdout and always exits 0.
 
-A Stop that leaves background subagents still running sends nothing; the stop after they report back does.
+A Stop that leaves background subagents still running sends nothing; the stop after their task notifications
+say they finished does. A subagent that stopped to wait on background work of its own is still running. A
+turn that only a finished subagent's late report started sends nothing either.
 
 The message is the first sentence of the agent's last reply. A turn that ended on a
 usage limit says so instead, with the time the session reruns or the limit resets.
@@ -27,7 +29,12 @@ sys.path.insert(0, str(PLUGIN_ROOT))
 from lib.backends.telegram import MARKDOWN_LINK
 from lib.config import ConfigError, find_repo_root, load_config
 from lib.notify import MARKER_PATH, notify, parse_arguments
-from lib.transcript import running_background_subagents, transcript_entries, usage_limit_note
+from lib.transcript import (
+    running_background_subagents,
+    transcript_entries,
+    turn_started_by_finished_subagents,
+    usage_limit_note,
+)
 
 AFTER_USAGE_LIMIT = "--after-usage-limit"
 CLOCK_TIME = r"\d{1,2}(?::\d{2})?\s?[ap]m"
@@ -83,7 +90,8 @@ def waiting_on_background_subagents(stop_input):
     """A Stop that only started background subagents isn't the end of the work."""
     if stop_input.get("hook_event_name") == "StopFailure":
         return False
-    return bool(running_background_subagents(transcript_entries(stop_input.get("transcript_path"))))
+    entries = transcript_entries(stop_input.get("transcript_path"))
+    return bool(running_background_subagents(entries)) or turn_started_by_finished_subagents(entries)
 
 
 def hand_off(repo_root, stop_input):

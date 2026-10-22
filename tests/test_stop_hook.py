@@ -266,12 +266,48 @@ def test_a_turn_with_no_last_reply_sends_the_generic_text(tmp_path, servers):
     assert sent_text(discord) == "Claude Code is waiting for you"
 
 
-STARTED = {"type": "user", "toolUseResult": {"isAsync": True, "agentId": "a1"}}
-TASK_NOTIFICATION = {
-    "type": "queue-operation",
-    "content": "<task-notification><task-id>a1</task-id></task-notification>",
-}
-HAND_BACK = {"type": "user", "origin": {"from": "a1"}, "message": {"role": "user", "content": "done"}}
+def started(agent):
+    return {"type": "user", "toolUseResult": {"isAsync": True, "agentId": agent, "status": "async_launched"}}
+
+
+def hand_back(agent):
+    return {
+        "type": "user",
+        "isMeta": True,
+        "origin": {"from": agent, "handback": True, "kind": "peer"},
+        "message": {"role": "user", "content": f'<agent-message from="{agent}">\n  done\n</agent-message>'},
+    }
+
+
+def notification_text(agent, status, summary):
+    return (
+        f"<task-notification>\n<task-id>{agent}</task-id>\n<status>{status}</status>\n"
+        f'<summary>Agent "{agent}" {summary}</summary>\n<note>A note.</note>\n</task-notification>'
+    )
+
+
+def queued(agent, status, summary):
+    return {"type": "queue-operation", "operation": "enqueue", "content": notification_text(agent, status, summary)}
+
+
+def delivered(agent, status, summary):
+    return {
+        "type": "user",
+        "message": {"role": "user", "content": notification_text(agent, status, summary)},
+        "origin": {"kind": "task-notification", "producer": "session-task"},
+    }
+
+
+def waiting(agent):
+    return queued(agent, "completed", "is waiting on its own background work")
+
+
+def finished(agent):
+    return queued(agent, "completed", "finished")
+
+
+STOP_SUMMARY = {"type": "system", "subtype": "stop_hook_summary"}
+STARTED = started("a1")
 
 
 def test_nothing_is_sent_while_a_background_subagent_is_running(tmp_path, servers):
@@ -286,15 +322,75 @@ def test_nothing_is_sent_while_a_background_subagent_is_running(tmp_path, server
     assert not (repo / MARKER).exists()
 
 
-@pytest.mark.parametrize("finish", [TASK_NOTIFICATION, HAND_BACK], ids=["task notification", "hand-back"])
-def test_one_message_is_sent_once_every_background_subagent_has_finished(tmp_path, servers, finish):
+@pytest.mark.parametrize(
+    "entries",
+    [
+        [hand_back("a1"), waiting("a1"), delivered("a1", "completed", "is waiting on its own background work")],
+        [hand_back("a1")],
+        [started("a2"), waiting("a1"), waiting("a2"), finished("a1"), hand_back("a1")],
+    ],
+    ids=["waiting on its own work", "hand-back alone", "one of two finished"],
+)
+def test_nothing_is_sent_while_a_subagent_has_not_finished(tmp_path, servers, entries):
     discord, telegram = servers([(204, None)]), servers([(200, {"ok": True})])
     repo = make_repo(tmp_path, telegram.url, stop_hook=True)
-    write_transcript(repo, PROMPT, STARTED, finish)
+    write_transcript(repo, PROMPT, STARTED, *entries)
+
+    result = run_hook(repo, discord)
+
+    assert result.returncode == 0
+    time.sleep(0.5)
+    assert discord.requests == []
+
+
+@pytest.mark.parametrize(
+    "report", [finished, lambda agent: delivered(agent, "completed", "finished")], ids=["queued", "delivered"]
+)
+def test_one_message_is_sent_once_every_background_subagent_has_finished(tmp_path, servers, report):
+    discord, telegram = servers([(204, None)]), servers([(200, {"ok": True})])
+    repo = make_repo(tmp_path, telegram.url, stop_hook=True)
+    write_transcript(
+        repo, PROMPT, STARTED, started("a2"), hand_back("a1"), waiting("a1"), waiting("a2"), report("a1"), report("a2")
+    )
 
     run_hook(repo, discord, last_assistant_message="All done.")
 
     assert sent_text(discord) == "All done."
+
+
+@pytest.mark.parametrize("status", ["failed", "killed"])
+def test_a_message_is_sent_when_a_subagent_ends_with_a_status_other_than_completed(tmp_path, servers, status):
+    discord, telegram = servers([(204, None)]), servers([(200, {"ok": True})])
+    repo = make_repo(tmp_path, telegram.url, stop_hook=True)
+    write_transcript(repo, PROMPT, STARTED, queued("a1", status, "failed"))
+
+    run_hook(repo, discord)
+
+    assert len(discord.requests) == 1
+
+
+def test_nothing_is_sent_when_a_late_hand_back_starts_a_turn_after_every_subagent_finished(tmp_path, servers):
+    discord, telegram = servers([(204, None)]), servers([(200, {"ok": True})])
+    repo = make_repo(tmp_path, telegram.url, stop_hook=True)
+    write_transcript(
+        repo, PROMPT, STARTED, started("a2"), finished("a1"), finished("a2"), STOP_SUMMARY, hand_back("a2")
+    )
+
+    result = run_hook(repo, discord, last_assistant_message="Both are done.")
+
+    assert result.returncode == 0
+    time.sleep(0.5)
+    assert discord.requests == []
+
+
+def test_a_new_prompt_after_every_subagent_finished_is_sent(tmp_path, servers):
+    discord, telegram = servers([(204, None)]), servers([(200, {"ok": True})])
+    repo = make_repo(tmp_path, telegram.url, stop_hook=True)
+    write_transcript(repo, PROMPT, STARTED, finished("a1"), STOP_SUMMARY, hand_back("a1"), PROMPT)
+
+    run_hook(repo, discord, last_assistant_message="Next.")
+
+    assert sent_text(discord) == "Next."
 
 
 def test_a_stop_failure_is_sent_while_a_background_subagent_is_running(tmp_path, servers):
