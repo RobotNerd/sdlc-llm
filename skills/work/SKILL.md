@@ -14,6 +14,7 @@ Implements the given tasks in order, one subagent per task, and stops only on a 
 - Never push to the default branch, and never merge a pull request. The developer merges.
 - Each task is implemented in a fresh subagent with `model: sonnet`. Keep only its summary; don't read its diff into this session.
 - Kaneo is the batch's state. Read it before acting, so a new session resumes where the last one stopped.
+- A flaky test fails and then passes, or the reverse, with no code change between runs. Rewrite one the task wrote or changed to be deterministic before the pull request opens. For one the task didn't touch, or when the right fix is unclear, stop and ask the developer. Never rerun it until green, skip it, or loosen it, and add no extra suite runs to find flaky tests.
 - Read the board only with `python3 ${CLAUDE_PLUGIN_ROOT}/lib/board.py`. It prints one line per open task: key, status, title, labels, open blockers, and id.
 
 ## Stop
