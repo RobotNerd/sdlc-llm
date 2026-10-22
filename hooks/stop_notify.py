@@ -4,6 +4,8 @@ The plugin's hooks run in every project it's enabled in, so a project without
 .sdlc/config.toml is skipped silently. The hook never blocks the stop: it prints
 nothing on stdout and always exits 0.
 
+A Stop that leaves background subagents still running sends nothing; the stop after they report back does.
+
 The message is the first sentence of the agent's last reply. A turn that ended on a
 usage limit says so instead, with the time the session reruns or the limit resets.
 Claude Code writes the rerun time to the transcript only after this hook returns, so a
@@ -25,6 +27,7 @@ sys.path.insert(0, str(PLUGIN_ROOT))
 from lib.backends.telegram import MARKDOWN_LINK
 from lib.config import ConfigError, find_repo_root, load_config
 from lib.notify import MARKER_PATH, notify, parse_arguments
+from lib.transcript import running_background_subagents, transcript_entries, usage_limit_note
 
 AFTER_USAGE_LIMIT = "--after-usage-limit"
 CLOCK_TIME = r"\d{1,2}(?::\d{2})?\s?[ap]m"
@@ -59,6 +62,8 @@ def main(argv):
             marker.unlink(missing_ok=True)
             hand_off(repo_root, stop_input)
             return 0
+        if send and waiting_on_background_subagents(stop_input):
+            send = False
         if send:
             send_text(repo_root, describe(stop_input.get("last_assistant_message")))
         # A send above writes the marker too, and it mustn't suppress the next stop.
@@ -71,43 +76,14 @@ def main(argv):
 def ended_on_usage_limit(stop_input):
     if stop_input.get("hook_event_name") == "StopFailure":
         return stop_input.get("error") == "rate_limit"
-    return usage_limit_note(stop_input.get("transcript_path")) == "wrap_up"
+    return usage_limit_note(transcript_entries(stop_input.get("transcript_path"))) == "wrap_up"
 
 
-def usage_limit_note(transcript_path):
-    """Return the usage-limit note in force for the current turn, or None."""
-    note = None
-    for entry in transcript_entries(transcript_path):
-        if "usageLimitNote" in entry:
-            note = entry["usageLimitNote"]
-        elif is_developer_prompt(entry):
-            note = None
-    return note
-
-
-def is_developer_prompt(entry):
-    if entry.get("type") != "user" or entry.get("isMeta"):
+def waiting_on_background_subagents(stop_input):
+    """A Stop that only started background subagents isn't the end of the work."""
+    if stop_input.get("hook_event_name") == "StopFailure":
         return False
-    content = entry.get("message", {}).get("content")
-    return isinstance(content, str) or any(block.get("type") == "text" for block in content or [])
-
-
-def transcript_entries(transcript_path):
-    if not transcript_path:
-        return []
-    try:
-        lines = Path(transcript_path).expanduser().read_text().splitlines()
-    except OSError:
-        return []
-    entries = []
-    for line in lines:
-        try:
-            entry = json.loads(line)
-        except ValueError:
-            continue
-        if isinstance(entry, dict):
-            entries.append(entry)
-    return entries
+    return bool(running_background_subagents(transcript_entries(stop_input.get("transcript_path"))))
 
 
 def hand_off(repo_root, stop_input):

@@ -8,6 +8,7 @@ from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+import pytest
 from notify_fakes import MARKER, fake_environment, make_repo
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -253,3 +254,64 @@ def test_a_turn_with_no_last_reply_sends_the_generic_text(tmp_path, servers):
     run_hook(repo, discord)
 
     assert sent_text(discord) == "Claude Code is waiting for you"
+
+
+STARTED = {"type": "user", "toolUseResult": {"isAsync": True, "agentId": "a1"}}
+TASK_NOTIFICATION = {
+    "type": "queue-operation",
+    "content": "<task-notification><task-id>a1</task-id></task-notification>",
+}
+HAND_BACK = {"type": "user", "origin": {"from": "a1"}, "message": {"role": "user", "content": "done"}}
+
+
+def test_nothing_is_sent_while_a_background_subagent_is_running(tmp_path, servers):
+    discord, telegram = servers([(204, None)]), servers([(200, {"ok": True})])
+    repo = make_repo(tmp_path, telegram.url, stop_hook=True)
+    write_transcript(repo, PROMPT, STARTED)
+
+    result = run_hook(repo, discord)
+
+    assert result.returncode == 0
+    assert discord.requests == []
+    assert not (repo / MARKER).exists()
+
+
+@pytest.mark.parametrize("finish", [TASK_NOTIFICATION, HAND_BACK], ids=["task notification", "hand-back"])
+def test_one_message_is_sent_once_every_background_subagent_has_finished(tmp_path, servers, finish):
+    discord, telegram = servers([(204, None)]), servers([(200, {"ok": True})])
+    repo = make_repo(tmp_path, telegram.url, stop_hook=True)
+    write_transcript(repo, PROMPT, STARTED, finish)
+
+    run_hook(repo, discord, last_assistant_message="All done.")
+
+    assert sent_text(discord) == "All done."
+
+
+def test_a_stop_failure_is_sent_while_a_background_subagent_is_running(tmp_path, servers):
+    discord, telegram = servers([(204, None)]), servers([(200, {"ok": True})])
+    repo = make_repo(tmp_path, telegram.url, stop_hook=True)
+    write_transcript(repo, PROMPT, STARTED)
+
+    run_hook(repo, discord, hook_event_name="StopFailure", error="server_error")
+
+    assert len(discord.requests) == 1
+
+
+def test_a_usage_limit_stop_is_sent_while_a_background_subagent_is_running(tmp_path, servers):
+    discord, telegram = servers([(204, None)]), servers([(200, {"ok": True})])
+    repo = make_repo(tmp_path, telegram.url, stop_hook=True)
+    write_transcript(repo, PROMPT, STARTED, WRAP_UP)
+
+    run_hook(repo, discord)
+
+    assert sent_text(discord) == "usage limit reached"
+
+
+def test_a_missing_transcript_still_sends_a_message(tmp_path, servers):
+    discord, telegram = servers([(204, None)]), servers([(200, {"ok": True})])
+    repo = make_repo(tmp_path, telegram.url, stop_hook=True)
+
+    result = run_hook(repo, discord, transcript_path=str(repo / "absent.jsonl"))
+
+    assert result.returncode == 0
+    assert len(discord.requests) == 1
