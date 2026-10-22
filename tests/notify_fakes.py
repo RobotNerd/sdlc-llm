@@ -7,7 +7,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 FAKE_TOKEN = "fake-bot-token-123"
 MARKER = ".sdlc/local/notify-sent"
-SECRET_NAMES = ("DISCORD_WEBHOOK_URL", "TELEGRAM_BOT_TOKEN")
+SECRET_NAMES = ("DISCORD_WEBHOOK_URL", "TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID")
 
 
 class FakeServer:
@@ -42,7 +42,9 @@ class FakeServer:
         self.server.server_close()
 
 
-def make_repo(tmp_path, telegram_url, enabled=True, stop_hook=False):
+def make_repo(tmp_path, telegram_url, enabled=True, stop_hook=False, chat_id=None, emoji=None):
+    emoji_line = f'emoji = "{emoji}"\n' if emoji is not None else ""
+    chat_id_line = f'chat_id = "{chat_id}"\n' if chat_id else ""
     (tmp_path / ".git").mkdir()
     (tmp_path / ".sdlc").mkdir()
     (tmp_path / ".sdlc/config.toml").write_text(
@@ -52,23 +54,24 @@ config_version = 1
 [notify]
 enabled = {"true" if enabled else "false"}
 stop_hook = {"true" if stop_hook else "false"}
-
+{emoji_line}
 [[notify.channels]]
 role = "primary"
 type = "discord"
 
 [[notify.channels]]
 api_url = "{telegram_url}"
-chat_id = "4242"
-role = "failover"
+{chat_id_line}role = "failover"
 type = "telegram"
 """
     )
     return tmp_path
 
 
-def fake_environment(discord):
+def fake_environment(discord, chat_id="4242"):
     environment = {name: value for name, value in os.environ.items() if name not in SECRET_NAMES}
     environment["DISCORD_WEBHOOK_URL"] = f"{discord.url}/api/webhooks/1/fake"
     environment["TELEGRAM_BOT_TOKEN"] = FAKE_TOKEN
+    if chat_id:
+        environment["TELEGRAM_CHAT_ID"] = chat_id
     return environment

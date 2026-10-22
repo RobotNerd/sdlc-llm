@@ -22,6 +22,7 @@ from lib.env import EnvError, load_env, require_secret
 KINDS = ("ASK", "STOP")
 # The Stop hook skips its own message while this exists.
 MARKER_PATH = ".sdlc/local/notify-sent"
+DEFAULT_EMOJI = "⚙️"
 ROLES = ("primary", "failover")
 
 
@@ -62,7 +63,7 @@ def notify(arguments, start=None):
     if not settings.get("enabled", False):
         return {"sent_to": None, "reason": "notifications are off"}
 
-    text, link_text = message(arguments, repo_root)
+    text, link_text = message(arguments, repo_root, settings.get("emoji", DEFAULT_EMOJI))
     failures = []
     for channel in channels_in_order(settings):
         name = channel.get("type", "unknown")
@@ -79,11 +80,12 @@ def notify(arguments, start=None):
     raise NotifyError("; ".join(failures) or "no channels in notify.channels")
 
 
-def message(arguments, repo_root):
+def message(arguments, repo_root, emoji=DEFAULT_EMOJI):
     project = arguments.project or repo_root.name
     prefix = " · ".join([project, arguments.skill, arguments.kind, *([arguments.task] if arguments.task else [])])
     link_text = arguments.link_text or " ".join(["Open", *([arguments.task] if arguments.task else [])])
-    return f"{prefix}: {arguments.text}", link_text
+    lead = f"{emoji} " if emoji else ""
+    return f"{lead}{prefix}: {arguments.text}", link_text
 
 
 def channels_in_order(settings):
@@ -102,11 +104,14 @@ def build_notifier(channel, repo_root):
     if channel_type == "discord":
         return DiscordNotifier(require_secret(secrets, "DISCORD_WEBHOOK_URL", env_path), user_agent)
     if channel_type == "telegram":
-        if "chat_id" not in channel:
-            raise NotifyError("notify.channels for telegram needs chat_id")
+        if "chat_id" in channel:
+            raise NotifyError(
+                "chat_id on the telegram channel in .sdlc/config.toml is no longer read; "
+                f"move it to {env_path} as TELEGRAM_CHAT_ID"
+            )
         return TelegramNotifier(
             require_secret(secrets, "TELEGRAM_BOT_TOKEN", env_path),
-            channel["chat_id"],
+            require_secret(secrets, "TELEGRAM_CHAT_ID", env_path),
             user_agent,
             channel.get("api_url", DEFAULT_API_URL),
         )

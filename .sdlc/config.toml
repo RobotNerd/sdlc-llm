@@ -51,7 +51,6 @@ role = "primary"
 type = "discord"
 
 [[notify.channels]]
-chat_id = "8880199077"
 role = "failover"
 type = "telegram"
 
