@@ -11,6 +11,7 @@ How work is tested. The workflow is TDD (tests are written before the implementa
 * Manual tests in a batch
 * Unit tests
 * Protecting failing tests
+* Flaky tests
 * Testing skills
 
 ## Test types
@@ -120,6 +121,14 @@ A batch runs to completion without the developer, unless something goes wrong.
 * During implementation, those tests aren't edited. Fix the code, not the test.
 * If a test is wrong, change it on purpose, and record why in a task comment.
 * Never skip, delete, or weaken a failing test to get a green run.
+
+## Flaky tests
+
+* **Definition.** A test is flaky when it fails and then passes, or the reverse, with no code change between the runs.
+* **Rewrite it.** A flaky test the task wrote or changed is rewritten to be deterministic before the pull request opens.
+* **Stop and ask.** A flaky test the task didn't touch, or one whose right fix is unclear, stops the batch with a question for the developer.
+* **Never retry it.** A flaky test is never rerun until it passes, skipped, or weakened to get a green run.
+* **No hunting.** No extra suite runs are added to find flaky tests.
 
 ## Testing skills
 
