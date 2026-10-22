@@ -22,6 +22,7 @@ from lib.env import EnvError, load_env, require_secret
 KINDS = ("ASK", "STOP")
 # The Stop hook skips its own message while this exists.
 MARKER_PATH = ".sdlc/local/notify-sent"
+DEFAULT_EMOJI = "⚙️"
 ROLES = ("primary", "failover")
 
 
@@ -62,7 +63,7 @@ def notify(arguments, start=None):
     if not settings.get("enabled", False):
         return {"sent_to": None, "reason": "notifications are off"}
 
-    text, link_text = message(arguments, repo_root)
+    text, link_text = message(arguments, repo_root, settings.get("emoji", DEFAULT_EMOJI))
     failures = []
     for channel in channels_in_order(settings):
         name = channel.get("type", "unknown")
@@ -79,11 +80,12 @@ def notify(arguments, start=None):
     raise NotifyError("; ".join(failures) or "no channels in notify.channels")
 
 
-def message(arguments, repo_root):
+def message(arguments, repo_root, emoji=DEFAULT_EMOJI):
     project = arguments.project or repo_root.name
     prefix = " · ".join([project, arguments.skill, arguments.kind, *([arguments.task] if arguments.task else [])])
     link_text = arguments.link_text or " ".join(["Open", *([arguments.task] if arguments.task else [])])
-    return f"{prefix}: {arguments.text}", link_text
+    lead = f"{emoji} " if emoji else ""
+    return f"{lead}{prefix}: {arguments.text}", link_text
 
 
 def channels_in_order(settings):

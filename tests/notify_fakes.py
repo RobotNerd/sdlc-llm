@@ -42,7 +42,8 @@ class FakeServer:
         self.server.server_close()
 
 
-def make_repo(tmp_path, telegram_url, enabled=True, stop_hook=False, chat_id=None):
+def make_repo(tmp_path, telegram_url, enabled=True, stop_hook=False, chat_id=None, emoji=None):
+    emoji_line = f'emoji = "{emoji}"\n' if emoji is not None else ""
     chat_id_line = f'chat_id = "{chat_id}"\n' if chat_id else ""
     (tmp_path / ".git").mkdir()
     (tmp_path / ".sdlc").mkdir()
@@ -53,7 +54,7 @@ config_version = 1
 [notify]
 enabled = {"true" if enabled else "false"}
 stop_hook = {"true" if stop_hook else "false"}
-
+{emoji_line}
 [[notify.channels]]
 role = "primary"
 type = "discord"

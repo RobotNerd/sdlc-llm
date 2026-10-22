@@ -50,7 +50,7 @@ def test_one_discord_message_is_sent_when_discord_is_up(tmp_path, servers):
     request = discord.requests[0]
     assert request["path"] == "/api/webhooks/1/fake"
     assert request["json"]["content"] == (
-        f"sdlc-llm · implement-task · STOP · EX-12: critic rejected 3×, decision needed\n[Open EX-12]({LINK})"
+        f"⚙️ sdlc-llm · implement-task · STOP · EX-12: critic rejected 3×, decision needed\n[Open EX-12]({LINK})"
     )
     assert request["headers"]["User-Agent"].startswith("sdlc-llm-notify/")
     assert telegram.requests == []
@@ -72,7 +72,7 @@ def test_telegram_gets_the_message_when_discord_fails(tmp_path, servers):
     assert request["json"]["parse_mode"] == "HTML"
     assert request["json"]["link_preview_options"] == {"is_disabled": True}
     assert request["json"]["text"] == (
-        "sdlc-llm · implement-task · STOP · EX-12: tests &lt;failed&gt; &amp; stopped\n"
+        "⚙️ sdlc-llm · implement-task · STOP · EX-12: tests &lt;failed&gt; &amp; stopped\n"
         '<a href="https://kaneo.example.com/task?id=12&amp;view=full">Open EX-12</a>'
     )
     assert discord.requests[0]["headers"]["User-Agent"].startswith("sdlc-llm-notify/")
@@ -176,3 +176,31 @@ def test_warning_and_exit_0_when_the_config_is_missing(tmp_path, servers):
     assert result.returncode == 0
     assert ".sdlc/config.toml" in result.stderr
     assert discord.requests == []
+
+
+def test_message_starts_with_the_default_emoji_when_the_config_has_none(tmp_path, servers):
+    discord, telegram = servers([(204, None)]), servers([(200, {"ok": True})])
+    repo = make_repo(tmp_path, telegram.url)
+
+    run_notify(repo, discord, "--text", "batch finished")
+
+    assert discord.requests[0]["json"]["content"].startswith("⚙️ sdlc-llm · ")
+
+
+def test_message_starts_with_the_configured_emoji_on_both_channels(tmp_path, servers):
+    discord, telegram = servers([(503, None)]), servers([(200, {"ok": True})])
+    repo = make_repo(tmp_path, telegram.url, emoji="🌸")
+
+    run_notify(repo, discord, "--text", "batch finished")
+
+    assert discord.requests[0]["json"]["content"].startswith("🌸 sdlc-llm · ")
+    assert telegram.requests[0]["json"]["text"].startswith("🌸 sdlc-llm · ")
+
+
+def test_message_starts_with_the_project_when_the_emoji_is_empty(tmp_path, servers):
+    discord, telegram = servers([(204, None)]), servers([(200, {"ok": True})])
+    repo = make_repo(tmp_path, telegram.url, emoji="")
+
+    run_notify(repo, discord, "--text", "batch finished")
+
+    assert discord.requests[0]["json"]["content"].startswith("sdlc-llm · ")

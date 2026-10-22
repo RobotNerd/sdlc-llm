@@ -94,6 +94,16 @@ def test_one_generic_message_is_sent_when_the_flag_is_on_and_there_is_no_marker(
     assert not (repo / MARKER).exists()
 
 
+def test_the_message_starts_with_the_configured_emoji(tmp_path, servers):
+    discord, telegram = servers([(204, None)]), servers([(200, {"ok": True})])
+    repo = make_repo(tmp_path, telegram.url, stop_hook=True, emoji="🌸")
+
+    run_hook(repo, discord)
+
+    assert len(discord.requests) == 1
+    assert discord.requests[0]["json"]["content"].startswith("🌸 ")
+
+
 def test_nothing_is_sent_and_the_marker_is_cleared_when_a_skill_already_notified(tmp_path, servers):
     discord, telegram = servers([(204, None)]), servers([(200, {"ok": True})])
     repo = make_repo(tmp_path, telegram.url, stop_hook=True)

@@ -122,6 +122,8 @@ The steps are manual.
    [notify]
    enabled = true
    stop_hook = true
+   # Starts every message, so projects sharing a channel are told apart. "" turns it off.
+   emoji = "⚙️"
 
    [[notify.channels]]
    role = "primary"
