@@ -20,7 +20,10 @@ claude plugin marketplace add RobotNerd/sdlc-llm
 claude plugin install sdlc-llm@sdlc-llm --scope user
 ```
 
-The first session asks for the Kaneo and Outline URLs.
+The plugin also needs an Excalidraw canvas and the
+[`yctimlin/mcp_excalidraw`](https://github.com/yctimlin/mcp_excalidraw) MCP server, reachable
+over Streamable HTTP. The first session asks for the Kaneo and Outline URLs, and for the MCP
+server's base URL, without `/mcp`, as `excalidraw_mcp_url`.
 
 ### Upgrade
 

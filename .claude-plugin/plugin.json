@@ -23,6 +23,12 @@
       "title": "Outline URL",
       "description": "Base URL of your Outline instance, with no trailing slash, for example https://outline.example.com",
       "required": true
+    },
+    "excalidraw_mcp_url": {
+      "type": "string",
+      "title": "Excalidraw MCP URL",
+      "description": "Base URL of your Excalidraw MCP server, without /mcp and with no trailing slash, for example https://excalidraw.example.com",
+      "required": true
     }
   },
   "mcpServers": "./mcp.json"

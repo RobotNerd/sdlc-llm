@@ -14,13 +14,16 @@ def load_json(relative_path):
     return json.loads((ROOT / relative_path).read_text())
 
 
-def test_manifest_names_the_plugin_and_asks_for_both_urls():
+def test_manifest_names_the_plugin_and_asks_for_the_server_urls():
     manifest = load_json(".claude-plugin/plugin.json")
 
     assert manifest["name"] == "sdlc-llm"
-    assert {"kaneo_url", "outline_url"} <= set(manifest["userConfig"])
+    assert {"kaneo_url", "outline_url", "excalidraw_mcp_url"} <= set(manifest["userConfig"])
     for option in manifest["userConfig"].values():
         assert {"type", "title", "description"} <= set(option)
+    excalidraw = manifest["userConfig"]["excalidraw_mcp_url"]
+    assert excalidraw["required"] is True
+    assert re.search(r"https?://\S+[^/\s,.]", excalidraw["description"])
 
 
 def test_every_component_path_in_the_manifest_exists_inside_the_plugin():
@@ -39,12 +42,20 @@ def test_mcp_servers_use_only_declared_user_config_values():
     declared = set(load_json(".claude-plugin/plugin.json")["userConfig"])
     servers = load_json("mcp.json")["mcpServers"]
 
-    assert set(servers) == {"kaneo", "outline"}
+    assert set(servers) == {"kaneo", "outline", "excalidraw"}
     for name, server in servers.items():
         assert server["type"] == "http"
         referenced = set(USER_CONFIG_REF.findall(server["url"]))
         assert referenced, f"{name} URL doesn't come from userConfig"
         assert referenced <= declared, f"{name} URL references undeclared {referenced - declared}"
+
+
+def test_excalidraw_server_is_http_at_the_mcp_path_with_no_command():
+    server = load_json("mcp.json")["mcpServers"]["excalidraw"]
+
+    assert server["type"] == "http"
+    assert server["url"] == "${user_config.excalidraw_mcp_url}/mcp"
+    assert "command" not in server
 
 
 def test_marketplace_lists_the_plugin_at_the_repo_root():

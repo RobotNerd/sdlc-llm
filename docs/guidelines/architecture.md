@@ -15,7 +15,7 @@ A Claude Code plugin for one developer: three skills that plan, groom, and imple
 | Notifiers (`lib/backends/`) | Discord and Telegram senders for `lib/notify.py`, behind the `Notifier` interface. |
 | Kaneo client (`lib/backends/kaneo.py`, `lib/backends/rest.py`) | Kaneo's REST API, for scripts. Skills use the Kaneo MCP tools instead. |
 | Hooks (`hooks/hooks.json`) | `hooks/session_start.py` runs on SessionStart, and puts the in-progress and in-review tasks in the session's context. `hooks/stop_notify.py` runs on Stop and StopFailure, and notifies with the session's state. |
-| MCP config (`mcp.json`) | Declares the `kaneo` and `outline` MCP servers, with URLs from the plugin's `userConfig`. The manifest names it, because a root `.mcp.json` would also load as the repo's own project MCP config. |
+| MCP config (`mcp.json`) | Declares the `kaneo`, `outline`, and `excalidraw` MCP servers, each reached over HTTP, with URLs from the plugin's `userConfig`. The manifest names it, because a root `.mcp.json` would also load as the repo's own project MCP config. |
 
 ### Scripts
 
@@ -52,11 +52,12 @@ Kaneo carries a batch's state between sessions: a new session resumes from the t
 
 ```
 .claude-plugin/        plugin and marketplace manifests
+docs/diagrams/         diagrams
 docs/guidelines/       guideline docs
 hooks/                 plugin hooks
 lib/                   scripts and shared code: config, .env loader
 lib/backends/          notifiers and the Kaneo REST client
-mcp.json               Kaneo and Outline MCP servers
+mcp.json               Kaneo, Outline, and Excalidraw MCP servers
 skills/<name>/         SKILL.md
 tests/                 script tests and fakes
 ```
