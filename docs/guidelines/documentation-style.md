@@ -32,49 +32,30 @@ These rules apply to every doc: guidelines, specs, reports, task text, and comme
 
 ## Diagrams
 
-* Every diagram in an Outline doc is a Mermaid code block (```` ```mermaid ````). Outline renders it natively.
-* No ASCII-art diagrams.
-* Keep diagrams small: one idea per diagram, and labels short enough to read on a phone.
+Every diagram is drawn in Excalidraw, with the Excalidraw MCP tools. No ASCII-art diagrams.
 
-### Layout
+### Workflow
 
-Outline uses Mermaid 11 with the ELK layout engine available.
+1. **Draw** the diagram with the Excalidraw MCP tools.
+2. **Look** at a PNG export before you publish. Fix crossings, long arrows, and cramped labels, then export again. Publish only when the PNG reads cleanly.
+3. **Save** the source with `export_scene` and the SVG with `export_to_image`, both under one base name: `<name>.excalidraw` and `<name>.svg`.
+4. **Edit** a diagram by loading its `.excalidraw` source with `import_scene`, changing it, and saving both files again. Keep the shapes that are not part of the change.
 
-| Diagram type | Layout |
-|--------------|--------|
-| `flowchart`, `stateDiagram-v2`, `classDiagram`, `erDiagram` | `layout: elk` |
-| `sequenceDiagram`, `gantt`, `timeline`, `mindmap`, `pie`, `gitGraph`, `journey` | none; these have their own fixed layout |
+### Where the files go
 
-Set the layout in frontmatter, at the top of the block:
+* **Outline doc:** embed the SVG as an image attachment. Attach the `.excalidraw` file, and put a link labeled "Source" under the image that points to it.
+* **Repo doc:** store the files at these paths. Markdown references only the SVG, by a relative path from the doc.
+  * `docs/diagrams/excalidraw/<name>.excalidraw`
+  * `docs/diagrams/svg/<name>.svg`
 
-```
----
-config:
-  layout: elk
----
-flowchart LR
-```
+### Making diagrams readable
 
-### Making graphs readable
+* **One idea per diagram.**
+* **Size:** about 12 shapes at most. Split a bigger diagram into two.
+* **Labels:** short, so they read on a phone. Details go in the text, not the shape.
+* **Direction:** left to right for flows.
+* **Arrows:** draw only the ones that make the point. Avoid arrows that run back against the main direction.
 
-* **Direction:** `LR` for flows and pipelines; `TB` for hierarchies. Inside a subgraph, set `direction TB` to stack its nodes.
-* **Size:** about 12 nodes at most. Split a bigger diagram into two.
-* **Labels:** one short title line, plus at most one detail line (`<br/>`). Details go in the text, not the box.
-* **Edges:** draw only the edges that make the point. Fan out with `&` (`a --> b & c & d`). Avoid edges that run back against the main direction. Label an edge only when the label adds meaning.
-* **Groups:** use subgraphs for real boundaries (a system, a repo), not for decoration.
+### Existing Mermaid diagrams
 
-### Checking the render
-
-Never publish a diagram without looking at it.
-
-1. Write the diagram to a `.mmd` file in a scratch directory.
-2. Render it with the same Mermaid major version Outline uses:
-
-   ```bash
-   npx -y @mermaid-js/mermaid-cli@11 -i diagram.mmd -o diagram.png -b white -s 2
-   ```
-
-3. View the PNG. Fix crossings, long edges, and cramped labels, then render again.
-4. Publish the block only when the PNG reads cleanly.
-
-The local render uses Mermaid's default theme, so colors differ from Outline's. The layout is the same.
+An existing Mermaid diagram is redrawn in Excalidraw only when it is edited.
