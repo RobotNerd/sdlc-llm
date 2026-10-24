@@ -228,8 +228,9 @@ them out:
 
 The `draw` skill needs no canvas. To change a diagram by hand, load its `.excalidraw` source
 onto an Excalidraw canvas, edit it in a browser, and save it back. Both commands need Node 20
-or later. Replace `https://excalidraw.example.com` with your canvas URL, and `<name>` with the
-diagram's name. `EXCALIDRAW_NO_AUTOSTART=1` stops the commands from starting a local canvas
+or later. Replace `https://excalidraw.example.com` with your canvas URL, with no trailing
+slash, and `<name>` with the diagram's name. With a trailing slash, the commands can't reach
+the canvas. `EXCALIDRAW_NO_AUTOSTART=1` stops the commands from starting a local canvas
 when yours is unreachable.
 
 Load the source onto the canvas, replacing what is there:
