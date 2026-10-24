@@ -43,7 +43,13 @@ Every diagram is drawn in Excalidraw, with the Excalidraw MCP tools. No ASCII-ar
 
 ### Where the files go
 
-* **Outline doc:** embed the SVG as an image attachment. Attach the `.excalidraw` file, and put a link labeled "Source" under the image that points to it.
+* **Outline doc:** embed the SVG as an image attachment. Attach the `.excalidraw` file, and put a link to it alone in its own paragraph under the image, written as below. The name and size are the ones given to `create_attachment`.
+
+  ```
+  [<name>.excalidraw <size in bytes>](<attachment url>)
+  ```
+
+  The link text is never a label such as "Source". Outline reads the last word of the text as the file size and the rest as the title.
 * **Repo doc:** store the files at these paths. Markdown references only the SVG, by a relative path from the doc.
   * `docs/diagrams/excalidraw/<name>.excalidraw`
   * `docs/diagrams/svg/<name>.svg`
