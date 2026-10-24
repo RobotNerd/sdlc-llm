@@ -20,14 +20,8 @@ claude plugin marketplace add RobotNerd/sdlc-llm
 claude plugin install sdlc-llm@sdlc-llm --scope user
 ```
 
-The plugin also needs an Excalidraw canvas and the
-[`yctimlin/mcp_excalidraw`](https://github.com/yctimlin/mcp_excalidraw) MCP server, reachable
-over Streamable HTTP.
+The plugin has two options:
 
-The plugin has three options:
-
-* `excalidraw_mcp_url`: the MCP server's base URL, without `/mcp`, such as
-  `https://excalidraw.example.com`
 * `kaneo_url`: the Kaneo URL
 * `outline_url`: the Outline URL
 
@@ -41,8 +35,17 @@ claude plugin configure sdlc-llm@sdlc-llm
 Each option shows `(required, set)` or `(required, not set)`. Inside a session,
 `/plugin configure sdlc-llm@sdlc-llm` does the same.
 
-The plugin brings its own Kaneo, Outline, and Excalidraw MCP servers. A repo needs no
-`mcp.json` or `.mcp.json` for them.
+The plugin brings its own Kaneo and Outline MCP servers. A repo needs no `mcp.json` or
+`.mcp.json` for them.
+
+Diagrams need Node 20 or later, because the `draw` skill runs `npx`. To check the version, run:
+
+```bash
+node --version
+```
+
+An Excalidraw canvas is optional. It is only for editing a diagram by hand, as the
+[Edit a diagram by hand](#edit-a-diagram-by-hand) section describes.
 
 ### Upgrade
 
@@ -73,7 +76,7 @@ strings from stdin and saves it. Options left out keep their values. Replace the
 your own:
 
 ```bash
-echo '{"excalidraw_mcp_url": "https://excalidraw.example.com"}' | claude plugin configure sdlc-llm@sdlc-llm --values-stdin
+echo '{"kaneo_url": "https://kaneo.example.com"}' | claude plugin configure sdlc-llm@sdlc-llm --values-stdin
 ```
 
 ## Setup
@@ -214,11 +217,34 @@ them out:
 
 | Skill | What it does |
 |-------|--------------|
+| `draw` | Draws or edits a diagram as an Excalidraw source and a dark and light mode SVG, rendered on this machine, and places both in an Outline doc or the repo. |
 | `groom` | Reviews the backlog: blocked chains, tasks ranked above their blocker, stale and under-specified tasks, Planned tasks ready for To Do, deferred tasks, and finished epics. It proposes every fix in one numbered list, and makes only the ones you confirm. |
 | `plan` | Turns an idea into tasks. It interviews you in an Outline questions doc, writes a spec when the work is bigger than one task, and creates the epic and its tasks in Kaneo. |
 | `work` | Implements a batch of To Do tasks on one branch, one subagent per task, and opens one pull request. It stops only on a real blocker. |
 
-`work` runs on Sonnet; `plan` and `groom` run on Opus.
+`work` runs on Sonnet; `plan`, `groom`, and `draw` run on Opus.
+
+### Edit a diagram by hand
+
+The `draw` skill needs no canvas. To change a diagram by hand, load its `.excalidraw` source
+onto an Excalidraw canvas, edit it in a browser, and save it back. Both commands need Node 20
+or later. Replace `https://excalidraw.example.com` with your canvas URL, and `<name>` with the
+diagram's name. `EXCALIDRAW_NO_AUTOSTART=1` stops the commands from starting a local canvas
+when yours is unreachable.
+
+Load the source onto the canvas, replacing what is there:
+
+```bash
+EXPRESS_SERVER_URL=https://excalidraw.example.com EXCALIDRAW_NO_AUTOSTART=1 npx -y mcp-excalidraw-server@2.1.2 import docs/diagrams/excalidraw/<name>.excalidraw --replace
+```
+
+Edit the diagram in the browser, then save the canvas back to the same file:
+
+```bash
+EXPRESS_SERVER_URL=https://excalidraw.example.com EXCALIDRAW_NO_AUTOSTART=1 npx -y mcp-excalidraw-server@2.1.2 export --out docs/diagrams/excalidraw/<name>.excalidraw
+```
+
+Then ask the `draw` skill to re-render the diagram from its source.
 
 ## Scripts and hooks
 
@@ -229,6 +255,7 @@ them out:
 | `lib/board.py` | script | Prints one line per open task: key, status, title, labels, open blockers, and id |
 | `lib/notify.py` | script | Sends a notification to Discord, with Telegram as the fallback |
 | `lib/reference_check.py` | script, CI | Fails when a committed file cites a tracker item |
+| `lib/svg_theme.py` | script | Makes an exported diagram SVG follow the viewer's light or dark mode |
 | `lib/validate_draft.py` | script | Checks task drafts against the task format |
 
 The hooks do nothing in a repo without `.sdlc/config.toml`.

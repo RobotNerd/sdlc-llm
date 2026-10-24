@@ -4,18 +4,18 @@ How sdlc-llm is built, where new code goes, and the decisions behind it.
 
 ## What it is
 
-A Claude Code plugin for one developer: three skills that plan, groom, and implement work. Tasks live in Kaneo. Specs and questions docs live in Outline. Each project's repo holds its code, tests, config, and guideline docs.
+A Claude Code plugin for one developer: four skills that plan, groom, implement, and draw. Tasks live in Kaneo. Specs and questions docs live in Outline. Each project's repo holds its code, tests, config, and guideline docs.
 
 ## Components
 
 | Component | Role |
 |-----------|------|
-| Skills (`skills/<name>/SKILL.md`) | Judgment. `plan` turns an idea into tasks, `groom` reviews the backlog, and `work` implements a batch of tasks. Each states its goal, its hard rules, and when to stop. |
+| Skills (`skills/<name>/SKILL.md`) | Judgment. `plan` turns an idea into tasks, `groom` reviews the backlog, `work` implements a batch of tasks, and `draw` makes a diagram. Each states its goal, its hard rules, and when to stop. |
 | Scripts (`lib/`) | Work that must be exact, or would load a large payload into context. Stdlib Python. |
 | Notifiers (`lib/backends/`) | Discord and Telegram senders for `lib/notify.py`, behind the `Notifier` interface. |
 | Kaneo client (`lib/backends/kaneo.py`, `lib/backends/rest.py`) | Kaneo's REST API, for scripts. Skills use the Kaneo MCP tools instead. |
 | Hooks (`hooks/hooks.json`) | `hooks/session_start.py` runs on SessionStart, and puts the in-progress and in-review tasks in the session's context. `hooks/stop_notify.py` runs on Stop and StopFailure, and notifies with the session's state. |
-| MCP config (`mcp.json`) | Declares the `kaneo`, `outline`, and `excalidraw` MCP servers, each reached over HTTP, with URLs from the plugin's `userConfig`. The manifest names it, because a root `.mcp.json` would also load as the repo's own project MCP config. |
+| MCP config (`mcp.json`) | Declares the `kaneo` and `outline` MCP servers, each reached over HTTP, with URLs from the plugin's `userConfig`. The manifest names it, because a root `.mcp.json` would also load as the repo's own project MCP config. |
 
 ### Scripts
 
@@ -24,6 +24,7 @@ A Claude Code plugin for one developer: three skills that plan, groom, and imple
 | `lib/board.py` | Prints one line per open Kaneo task, so a skill reads the board without loading every description |
 | `lib/notify.py` | Sends an ASK or STOP notification to Discord, with Telegram as the fallback |
 | `lib/reference_check.py` | Fails, in CI, when a committed file cites a tracker item |
+| `lib/svg_theme.py` | Makes an exported diagram SVG follow the viewer's light or dark mode |
 | `lib/transcript.py` | Reads a session transcript: its entries, usage-limit notes, and background subagents still running |
 | `lib/validate_draft.py` | Checks task drafts against the task format |
 
@@ -57,7 +58,7 @@ docs/guidelines/       guideline docs
 hooks/                 plugin hooks
 lib/                   scripts and shared code: config, .env loader
 lib/backends/          notifiers and the Kaneo REST client
-mcp.json               Kaneo, Outline, and Excalidraw MCP servers
+mcp.json               Kaneo and Outline MCP servers
 skills/<name>/         SKILL.md
 tests/                 script tests and fakes
 ```
@@ -78,4 +79,5 @@ Shared code lives only in `lib/`. A script finds `lib/` by a path relative to it
 * **Short skills, scripts for exact work.** A skill states the goal, the hard rules, and when to stop, and leaves the tool calls to Claude. A step becomes a script only when it must be exact or cheap.
 * **A pull request per batch, merged by the developer.** `work` commits each task on one branch and opens one pull request. Skills never push to the default branch or merge.
 * **A subagent per task,** so the main session holds only short summaries and stays cheap.
+* **Diagrams render on the dev machine.** The `draw` skill runs a pinned `mcp-excalidraw-server` through `npx`, so concurrent sessions share no scene. This is the plugin's first dependency outside Python, and it needs Node 20 or later.
 * **Guidelines in each repo,** so each project can differ, and reading one is a cheap local read.

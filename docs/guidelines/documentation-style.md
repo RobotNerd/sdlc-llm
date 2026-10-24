@@ -32,14 +32,11 @@ These rules apply to every doc: guidelines, specs, reports, task text, and comme
 
 ## Diagrams
 
-Every diagram is drawn in Excalidraw, with the Excalidraw MCP tools. No ASCII-art diagrams.
+Every diagram is drawn in Excalidraw, with the `draw` skill. No ASCII-art diagrams.
 
 ### Workflow
 
-1. **Draw** the diagram with the Excalidraw MCP tools.
-2. **Look** at a PNG export before you publish. Fix crossings, long arrows, and cramped labels, then export again. Publish only when the PNG reads cleanly.
-3. **Save** the source with `export_scene` and the SVG with `export_to_image`, both under one base name: `<name>.excalidraw` and `<name>.svg`.
-4. **Edit** a diagram by loading its `.excalidraw` source with `import_scene`, changing it, and saving both files again. Keep the shapes that are not part of the change.
+The `draw` skill has the steps. It keeps the source as a local `.excalidraw` file, looks at a PNG before anything is published, and renders the SVG from the source. The files share one base name: `<name>.excalidraw` and `<name>.svg`. To edit a diagram, load its `.excalidraw` source and keep the shapes that are not part of the change.
 
 ### Where the files go
 

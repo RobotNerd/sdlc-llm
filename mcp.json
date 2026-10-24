@@ -7,10 +7,6 @@
     "outline": {
       "type": "http",
       "url": "${user_config.outline_url}/mcp"
-    },
-    "excalidraw": {
-      "type": "http",
-      "url": "${user_config.excalidraw_mcp_url}/mcp"
     }
   }
 }

@@ -18,12 +18,11 @@ def test_manifest_names_the_plugin_and_asks_for_the_server_urls():
     manifest = load_json(".claude-plugin/plugin.json")
 
     assert manifest["name"] == "sdlc-llm"
-    assert {"kaneo_url", "outline_url", "excalidraw_mcp_url"} <= set(manifest["userConfig"])
+    assert set(manifest["userConfig"]) == {"kaneo_url", "outline_url"}
     for option in manifest["userConfig"].values():
         assert {"type", "title", "description"} <= set(option)
-    excalidraw = manifest["userConfig"]["excalidraw_mcp_url"]
-    assert excalidraw["required"] is True
-    assert re.search(r"https?://\S+[^/\s,.]", excalidraw["description"])
+        assert option["required"] is True
+        assert re.search(r"https?://\S+[^/\s,.]", option["description"])
 
 
 def test_every_component_path_in_the_manifest_exists_inside_the_plugin():
@@ -42,20 +41,12 @@ def test_mcp_servers_use_only_declared_user_config_values():
     declared = set(load_json(".claude-plugin/plugin.json")["userConfig"])
     servers = load_json("mcp.json")["mcpServers"]
 
-    assert set(servers) == {"kaneo", "outline", "excalidraw"}
+    assert set(servers) == {"kaneo", "outline"}
     for name, server in servers.items():
         assert server["type"] == "http"
         referenced = set(USER_CONFIG_REF.findall(server["url"]))
         assert referenced, f"{name} URL doesn't come from userConfig"
         assert referenced <= declared, f"{name} URL references undeclared {referenced - declared}"
-
-
-def test_excalidraw_server_is_http_at_the_mcp_path_with_no_command():
-    server = load_json("mcp.json")["mcpServers"]["excalidraw"]
-
-    assert server["type"] == "http"
-    assert server["url"] == "${user_config.excalidraw_mcp_url}/mcp"
-    assert "command" not in server
 
 
 def test_marketplace_lists_the_plugin_at_the_repo_root():
@@ -100,7 +91,7 @@ def test_skills_use_only_declared_user_config_values():
         assert referenced <= declared, f"{skill.parent.name} references undeclared {referenced - declared}"
 
 
-@pytest.mark.parametrize("name", ("groom", "plan", "work"))
+@pytest.mark.parametrize("name", ("draw", "groom", "plan", "work"))
 def test_skill_is_short_with_valid_frontmatter(name):
     text = (ROOT / f"skills/{name}/SKILL.md").read_text()
     match = re.match(r"---\n(.*?)\n---\n", text, re.DOTALL)
@@ -113,4 +104,4 @@ def test_skill_is_short_with_valid_frontmatter(name):
 
 
 def test_only_the_v3_skills_exist():
-    assert sorted(path.name for path in (ROOT / "skills").iterdir()) == ["groom", "plan", "work"]
+    assert sorted(path.name for path in (ROOT / "skills").iterdir()) == ["draw", "groom", "plan", "work"]
