@@ -100,7 +100,7 @@ def test_skills_use_only_declared_user_config_values():
         assert referenced <= declared, f"{skill.parent.name} references undeclared {referenced - declared}"
 
 
-@pytest.mark.parametrize("name", ("groom", "plan", "work"))
+@pytest.mark.parametrize("name", ("draw", "groom", "plan", "work"))
 def test_skill_is_short_with_valid_frontmatter(name):
     text = (ROOT / f"skills/{name}/SKILL.md").read_text()
     match = re.match(r"---\n(.*?)\n---\n", text, re.DOTALL)
@@ -113,4 +113,4 @@ def test_skill_is_short_with_valid_frontmatter(name):
 
 
 def test_only_the_v3_skills_exist():
-    assert sorted(path.name for path in (ROOT / "skills").iterdir()) == ["groom", "plan", "work"]
+    assert sorted(path.name for path in (ROOT / "skills").iterdir()) == ["draw", "groom", "plan", "work"]

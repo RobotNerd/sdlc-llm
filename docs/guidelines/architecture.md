@@ -4,13 +4,13 @@ How sdlc-llm is built, where new code goes, and the decisions behind it.
 
 ## What it is
 
-A Claude Code plugin for one developer: three skills that plan, groom, and implement work. Tasks live in Kaneo. Specs and questions docs live in Outline. Each project's repo holds its code, tests, config, and guideline docs.
+A Claude Code plugin for one developer: four skills that plan, groom, implement, and draw. Tasks live in Kaneo. Specs and questions docs live in Outline. Each project's repo holds its code, tests, config, and guideline docs.
 
 ## Components
 
 | Component | Role |
 |-----------|------|
-| Skills (`skills/<name>/SKILL.md`) | Judgment. `plan` turns an idea into tasks, `groom` reviews the backlog, and `work` implements a batch of tasks. Each states its goal, its hard rules, and when to stop. |
+| Skills (`skills/<name>/SKILL.md`) | Judgment. `plan` turns an idea into tasks, `groom` reviews the backlog, `work` implements a batch of tasks, and `draw` makes a diagram. Each states its goal, its hard rules, and when to stop. |
 | Scripts (`lib/`) | Work that must be exact, or would load a large payload into context. Stdlib Python. |
 | Notifiers (`lib/backends/`) | Discord and Telegram senders for `lib/notify.py`, behind the `Notifier` interface. |
 | Kaneo client (`lib/backends/kaneo.py`, `lib/backends/rest.py`) | Kaneo's REST API, for scripts. Skills use the Kaneo MCP tools instead. |

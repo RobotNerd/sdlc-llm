@@ -214,11 +214,12 @@ them out:
 
 | Skill | What it does |
 |-------|--------------|
+| `draw` | Draws or edits a diagram as an Excalidraw source and a dark and light mode SVG, rendered on this machine, and places both in an Outline doc or the repo. |
 | `groom` | Reviews the backlog: blocked chains, tasks ranked above their blocker, stale and under-specified tasks, Planned tasks ready for To Do, deferred tasks, and finished epics. It proposes every fix in one numbered list, and makes only the ones you confirm. |
 | `plan` | Turns an idea into tasks. It interviews you in an Outline questions doc, writes a spec when the work is bigger than one task, and creates the epic and its tasks in Kaneo. |
 | `work` | Implements a batch of To Do tasks on one branch, one subagent per task, and opens one pull request. It stops only on a real blocker. |
 
-`work` runs on Sonnet; `plan` and `groom` run on Opus.
+`work` runs on Sonnet; `plan`, `groom`, and `draw` run on Opus.
 
 ## Scripts and hooks
 
