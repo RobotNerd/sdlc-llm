@@ -22,8 +22,27 @@ claude plugin install sdlc-llm@sdlc-llm --scope user
 
 The plugin also needs an Excalidraw canvas and the
 [`yctimlin/mcp_excalidraw`](https://github.com/yctimlin/mcp_excalidraw) MCP server, reachable
-over Streamable HTTP. The first session asks for the Kaneo and Outline URLs, and for the MCP
-server's base URL, without `/mcp`, as `excalidraw_mcp_url`.
+over Streamable HTTP.
+
+The plugin has three options:
+
+* `excalidraw_mcp_url`: the MCP server's base URL, without `/mcp`, such as
+  `https://excalidraw.example.com`
+* `kaneo_url`: the Kaneo URL
+* `outline_url`: the Outline URL
+
+Claude Code asks for them when it installs the plugin. To list the options and see which are
+set, run:
+
+```bash
+claude plugin configure sdlc-llm@sdlc-llm
+```
+
+Each option shows `(required, set)` or `(required, not set)`. Inside a session,
+`/plugin configure sdlc-llm@sdlc-llm` does the same.
+
+The plugin brings its own Kaneo, Outline, and Excalidraw MCP servers. A repo needs no
+`mcp.json` or `.mcp.json` for them.
 
 ### Upgrade
 
@@ -41,6 +60,21 @@ claude plugin update sdlc-llm@sdlc-llm --scope user
 ```
 
 Then start a new session. A running session keeps the version it started with.
+
+An update can add an option. Claude Code asks for options only at install, so the new option
+stays unset, and its MCP server fails to connect. After an update, list the options:
+
+```bash
+claude plugin configure sdlc-llm@sdlc-llm
+```
+
+Set each one marked `(required, not set)`. This command reads a JSON object of single-line
+strings from stdin and saves it. Options left out keep their values. Replace the URL with
+your own:
+
+```bash
+echo '{"excalidraw_mcp_url": "https://excalidraw.example.com"}' | claude plugin configure sdlc-llm@sdlc-llm --values-stdin
+```
 
 ## Setup
 
