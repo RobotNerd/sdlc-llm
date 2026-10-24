@@ -229,6 +229,7 @@ them out:
 | `lib/board.py` | script | Prints one line per open task: key, status, title, labels, open blockers, and id |
 | `lib/notify.py` | script | Sends a notification to Discord, with Telegram as the fallback |
 | `lib/reference_check.py` | script, CI | Fails when a committed file cites a tracker item |
+| `lib/svg_theme.py` | script | Makes an exported diagram SVG follow the viewer's light or dark mode |
 | `lib/validate_draft.py` | script | Checks task drafts against the task format |
 
 The hooks do nothing in a repo without `.sdlc/config.toml`.

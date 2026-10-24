@@ -24,6 +24,7 @@ A Claude Code plugin for one developer: three skills that plan, groom, and imple
 | `lib/board.py` | Prints one line per open Kaneo task, so a skill reads the board without loading every description |
 | `lib/notify.py` | Sends an ASK or STOP notification to Discord, with Telegram as the fallback |
 | `lib/reference_check.py` | Fails, in CI, when a committed file cites a tracker item |
+| `lib/svg_theme.py` | Makes an exported diagram SVG follow the viewer's light or dark mode |
 | `lib/transcript.py` | Reads a session transcript: its entries, usage-limit notes, and background subagents still running |
 | `lib/validate_draft.py` | Checks task drafts against the task format |
 
