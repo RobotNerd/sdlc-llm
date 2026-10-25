@@ -18,7 +18,7 @@ def test_manifest_names_the_plugin_and_asks_for_the_server_urls():
     manifest = load_json(".claude-plugin/plugin.json")
 
     assert manifest["name"] == "sdlc-llm"
-    assert set(manifest["userConfig"]) == {"kaneo_url", "outline_url"}
+    assert set(manifest["userConfig"]) == {"kaneo_url", "kimai_mcp_url", "outline_url"}
     for option in manifest["userConfig"].values():
         assert {"type", "title", "description"} <= set(option)
         assert option["required"] is True
@@ -41,7 +41,8 @@ def test_mcp_servers_use_only_declared_user_config_values():
     declared = set(load_json(".claude-plugin/plugin.json")["userConfig"])
     servers = load_json("mcp.json")["mcpServers"]
 
-    assert set(servers) == {"kaneo", "outline"}
+    assert servers["kimai"]["url"] == "${user_config.kimai_mcp_url}"
+    assert set(servers) == {"kaneo", "kimai", "outline"}
     for name, server in servers.items():
         assert server["type"] == "http"
         referenced = set(USER_CONFIG_REF.findall(server["url"]))

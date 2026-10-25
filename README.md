@@ -20,9 +20,11 @@ claude plugin marketplace add RobotNerd/sdlc-llm
 claude plugin install sdlc-llm@sdlc-llm --scope user
 ```
 
-The plugin has two options:
+The plugin has three options:
 
 * `kaneo_url`: the Kaneo URL
+* `kimai_mcp_url`: the full URL of the Kimai MCP server, including its path, for example
+  `https://kimai-mcp.example.com/mcp`
 * `outline_url`: the Outline URL
 
 Claude Code asks for them when it installs the plugin. To list the options and see which are
@@ -35,8 +37,9 @@ claude plugin configure sdlc-llm@sdlc-llm
 Each option shows `(required, set)` or `(required, not set)`. Inside a session,
 `/plugin configure sdlc-llm@sdlc-llm` does the same.
 
-The plugin brings its own Kaneo and Outline MCP servers. A repo needs no `mcp.json` or
-`.mcp.json` for them.
+The plugin brings its own Kaneo, Kimai, and Outline MCP servers. The Kimai server signs in
+with OAuth. After setting `kimai_mcp_url`, run `/mcp` in a session and sign in to `kimai`. A repo
+needs no `mcp.json` or `.mcp.json` for them.
 
 Diagrams need Node 20 or later, because the `draw` skill runs `npx`. To check the version, run:
 
@@ -76,7 +79,7 @@ strings from stdin and saves it. Options left out keep their values. Replace the
 your own:
 
 ```bash
-echo '{"kaneo_url": "https://kaneo.example.com"}' | claude plugin configure sdlc-llm@sdlc-llm --values-stdin
+echo '{"kimai_mcp_url": "https://kimai-mcp.example.com/mcp"}' | claude plugin configure sdlc-llm@sdlc-llm --values-stdin
 ```
 
 ## Setup
