@@ -15,5 +15,9 @@ class KimaiApi:
         body = {"activity": activity_id, "begin": begin.strftime("%Y-%m-%dT%H:%M:%S"), "project": project_id}
         return self.client.request("start entry", "POST", "/api/timesheets", body)
 
-    def stop_entry(self, entry_id):
-        return self.client.request("stop entry", "PATCH", f"/api/timesheets/{entry_id}/stop")
+    def stop_entry(self, entry_id, end=None):
+        """Stop a running entry now, or at `end`, a time Kimai reads as the user's local time."""
+        if end is None:
+            return self.client.request("stop entry", "PATCH", f"/api/timesheets/{entry_id}/stop")
+        body = {"end": end.astimezone().strftime("%Y-%m-%dT%H:%M:%S")}
+        return self.client.request("stop entry", "PATCH", f"/api/timesheets/{entry_id}", body)

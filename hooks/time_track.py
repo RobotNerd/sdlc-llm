@@ -3,7 +3,8 @@
 UserPromptSubmit starts an entry for the repo's project and activity, unless this repo's
 entry is already running. Stop, StopFailure, and SessionEnd stop it, except that a Stop leaves
 the entry running while a background subagent the session started hasn't reported back. The running entry lives
-in .sdlc/local/time-entry.json.
+in .sdlc/local/time-entry.json, with the time the hook last ran. A UserPromptSubmit that finds another
+session's entry still running stops it at that time, then starts one for this session.
 
 Time tracking is on only when .sdlc/config.toml has a [time_tracking] section. A repo
 without one is skipped silently. A failure is a warning on stderr, and the hook always
@@ -48,7 +49,7 @@ def main():
         if event == "UserPromptSubmit":
             start(repo_root, settings, hook_input.get("session_id"))
         elif event == "Stop" and running_background_subagents(transcript_entries(hook_input.get("transcript_path"))):
-            return 0
+            touch(repo_root)
         elif event in STOP_EVENTS:
             stop(repo_root, settings)
     except (ConfigError, EnvError, RestError, OSError) as error:
@@ -60,11 +61,32 @@ def main():
 
 def start(repo_root, settings, session_id):
     state = read_state(repo_root)
+    if state.get("entry_id") is not None and state.get("session_id") != session_id:
+        # A session that died without a Stop left this entry running: end it where that session was last seen.
+        close_abandoned(repo_root, settings, state)
+        state = {}
     if state.get("entry_id") is None:
         entry = client(repo_root, settings).start_entry(settings["project_id"], settings["activity_id"])
         state = {"entry_id": entry["id"], "session_id": session_id}
-    state["last_seen"] = datetime.now().astimezone().isoformat(timespec="seconds")
-    write_state(repo_root, state)
+    touch(repo_root, state)
+
+
+def close_abandoned(repo_root, settings, state):
+    # The state clears even when the stop fails, so one bad entry can't block every later start.
+    (repo_root / STATE_PATH).unlink(missing_ok=True)
+    try:
+        end = datetime.fromisoformat(state["last_seen"])
+    except (KeyError, TypeError, ValueError):
+        end = None
+    client(repo_root, settings).stop_entry(state["entry_id"], end)
+
+
+def touch(repo_root, state=None):
+    """Record now as the running entry's last-seen time, if there is a running entry."""
+    state = read_state(repo_root) if state is None else state
+    if state.get("entry_id") is not None:
+        state["last_seen"] = datetime.now().astimezone().isoformat(timespec="seconds")
+        write_state(repo_root, state)
 
 
 def stop(repo_root, settings):

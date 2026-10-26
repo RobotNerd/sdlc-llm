@@ -5,6 +5,7 @@ import socket
 import subprocess
 import sys
 import threading
+from datetime import datetime, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -182,3 +183,37 @@ def test_failure_or_session_end_stops_despite_a_running_subagent(tmp_path, kimai
     run_hook(repo, "UserPromptSubmit")
     run_hook(repo, event, transcript=make_transcript(tmp_path, finished=False))
     assert [(r["method"], r["path"]) for r in kimai.requests[1:]] == [("PATCH", "/api/timesheets/7/stop")]
+
+
+def write_state(repo, session_id, last_seen):
+    (repo / STATE).parent.mkdir(parents=True, exist_ok=True)
+    (repo / STATE).write_text(json.dumps({"entry_id": 5, "session_id": session_id, "last_seen": last_seen}))
+
+
+def test_hook_run_updates_last_seen(tmp_path, kimai):
+    repo = make_repo(tmp_path, kimai.url)
+    write_state(repo, "s1", "2020-01-01T00:00:00+00:00")
+    run_hook(repo, "UserPromptSubmit", "s1")
+    seen = datetime.fromisoformat(read_state(repo)["last_seen"])
+    assert abs((datetime.now().astimezone() - seen).total_seconds()) < 5
+
+
+def test_other_sessions_entry_is_closed_at_its_last_seen(tmp_path, kimai):
+    repo = make_repo(tmp_path, kimai.url)
+    last_seen = (datetime.now().astimezone() - timedelta(hours=1)).replace(microsecond=0)
+    write_state(repo, "old", last_seen.isoformat())
+    result = run_hook(repo, "UserPromptSubmit", "new")
+    assert result.returncode == 0 and result.stderr == ""
+    stop_request, start_request = kimai.requests
+    assert (stop_request["method"], stop_request["path"]) == ("PATCH", "/api/timesheets/5")
+    assert stop_request["json"] == {"end": last_seen.strftime("%Y-%m-%dT%H:%M:%S")}
+    assert (start_request["method"], start_request["path"]) == ("POST", "/api/timesheets")
+    state = read_state(repo)
+    assert state["session_id"] == "new" and state["entry_id"] == 7
+
+
+def test_same_sessions_entry_makes_no_request(tmp_path, kimai):
+    repo = make_repo(tmp_path, kimai.url)
+    write_state(repo, "s1", "2020-01-01T00:00:00+00:00")
+    run_hook(repo, "UserPromptSubmit", "s1")
+    assert kimai.requests == []
