@@ -281,7 +281,29 @@ section, so the hook does nothing, and prints nothing, without one.
 4. Create a customer, a project for the repo, and an activity such as `Development`. Give the
    team access to the project. Note the project's id and the activity's id.
 5. In the system settings, allow more than one active timesheet entry per user.
-6. Log in as `agent`, create an API token, and add it to the repo's `.env`:
+6. Turn off rounding. Without this step, Kimai rounds entries to whole minutes, which overcounts
+   short agent turns. In the Kimai container, put this in `config/packages/local.yaml`, merged
+   with any existing `kimai:` key:
+
+   ```yaml
+   kimai:
+       timesheet:
+           rounding:
+               default:
+                   weekdays: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
+                   begin: 0
+                   end: 0
+                   duration: 0
+                   mode: default
+   ```
+
+   Then reload the cache, in the Kimai container:
+
+   ```bash
+   bin/console kimai:reload --env=prod
+   ```
+
+7. Log in as `agent`, create an API token, and add it to the repo's `.env`:
 
    ```text
    KIMAI_API_TOKEN=<the token>
