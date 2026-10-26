@@ -2,9 +2,9 @@
 
 UserPromptSubmit starts an entry for the repo's project and activity, unless this repo's
 entry is already running. Stop, StopFailure, and SessionEnd stop it, except that a Stop leaves
-the entry running while a background subagent the session started hasn't reported back. The running entry lives
-in .sdlc/local/time-entry.json, with the time the hook last ran. A UserPromptSubmit that finds another
-session's entry still running stops it at that time, then starts one for this session.
+the entry running while a background subagent or shell command the session started hasn't reported back. The
+running entry lives in .sdlc/local/time-entry.json, with the time the hook last ran. A UserPromptSubmit that
+finds another session's entry still running stops it at that time, then starts one for this session.
 
 Time tracking is on only when .sdlc/config.toml has a [time_tracking] section. A repo
 without one is skipped silently. A failure is a warning on stderr, and the hook always
@@ -23,7 +23,7 @@ from lib.backends.kimai import KimaiApi
 from lib.backends.rest import RestError
 from lib.config import ConfigError, find_repo_root, load_config
 from lib.env import EnvError, load_env, require_secret
-from lib.transcript import running_background_subagents, transcript_entries
+from lib.transcript import running_background_work, transcript_entries
 
 REQUIRED_KEYS = ("url", "project_id", "activity_id", "agent_user")
 STATE_PATH = ".sdlc/local/time-entry.json"
@@ -48,7 +48,7 @@ def main():
         event = hook_input.get("hook_event_name")
         if event == "UserPromptSubmit":
             start(repo_root, settings, hook_input.get("session_id"))
-        elif event == "Stop" and running_background_subagents(transcript_entries(hook_input.get("transcript_path"))):
+        elif event == "Stop" and running_background_work(transcript_entries(hook_input.get("transcript_path"))):
             touch(repo_root)
         elif event in STOP_EVENTS:
             stop(repo_root, settings)

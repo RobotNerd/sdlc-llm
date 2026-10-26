@@ -185,6 +185,47 @@ def test_failure_or_session_end_stops_despite_a_running_subagent(tmp_path, kimai
     assert [(r["method"], r["path"]) for r in kimai.requests[1:]] == [("PATCH", "/api/timesheets/7/stop")]
 
 
+def make_shell_transcript(tmp_path, status=None):
+    result = {"stdout": "", "stderr": "", "interrupted": False, "backgroundTaskId": "b1"}
+    lines = [{"type": "user", "toolUseResult": result}]
+    if status:
+        note = (
+            "<task-notification> <task-id>b1</task-id> <tool-use-id>t1</tool-use-id> "
+            f"<output-file>/tmp/b1.output</output-file> <status>{status}</status> "
+            f'<summary>Background command "Wait" {status} (exit code 0)</summary> </task-notification>'
+        )
+        lines.append({"type": "queue-operation", "content": note})
+    path = tmp_path / "transcript.jsonl"
+    path.write_text("".join(json.dumps(line) + "\n" for line in lines))
+    return path
+
+
+def test_stop_with_a_running_shell_command_keeps_the_entry(tmp_path, kimai):
+    repo = make_repo(tmp_path, kimai.url)
+    run_hook(repo, "UserPromptSubmit")
+    result = run_hook(repo, "Stop", transcript=make_shell_transcript(tmp_path))
+    assert result.returncode == 0 and result.stderr == ""
+    assert len(kimai.requests) == 1
+    assert read_state(repo)["entry_id"] == 7
+
+
+@pytest.mark.parametrize("status", ["completed", "failed", "killed"])
+def test_stop_after_the_shell_command_is_notified_stops_the_entry(tmp_path, kimai, status):
+    repo = make_repo(tmp_path, kimai.url)
+    run_hook(repo, "UserPromptSubmit")
+    run_hook(repo, "Stop", transcript=make_shell_transcript(tmp_path, status))
+    assert [(r["method"], r["path"]) for r in kimai.requests[1:]] == [("PATCH", "/api/timesheets/7/stop")]
+    assert not (repo / STATE).exists()
+
+
+@pytest.mark.parametrize("event", ["StopFailure", "SessionEnd"])
+def test_failure_or_session_end_stops_despite_a_running_shell_command(tmp_path, kimai, event):
+    repo = make_repo(tmp_path, kimai.url)
+    run_hook(repo, "UserPromptSubmit")
+    run_hook(repo, event, transcript=make_shell_transcript(tmp_path))
+    assert [(r["method"], r["path"]) for r in kimai.requests[1:]] == [("PATCH", "/api/timesheets/7/stop")]
+
+
 def write_state(repo, session_id, last_seen):
     (repo / STATE).parent.mkdir(parents=True, exist_ok=True)
     (repo / STATE).write_text(json.dumps({"entry_id": 5, "session_id": session_id, "last_seen": last_seen}))

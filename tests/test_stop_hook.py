@@ -369,6 +369,52 @@ def test_a_message_is_sent_when_a_subagent_ends_with_a_status_other_than_complet
     assert len(discord.requests) == 1
 
 
+def shell_started(command):
+    return {"type": "user", "toolUseResult": {"stdout": "", "stderr": "", "backgroundTaskId": command}}
+
+
+def shell_ended(command, status="completed"):
+    text = (
+        f"<task-notification> <task-id>{command}</task-id> <tool-use-id>t1</tool-use-id> "
+        f"<output-file>/tmp/{command}.output</output-file> <status>{status}</status> "
+        f'<summary>Background command "Wait" {status} (exit code 0)</summary> </task-notification>'
+    )
+    return {"type": "queue-operation", "operation": "enqueue", "content": text}
+
+
+def test_nothing_is_sent_while_a_background_shell_command_is_running(tmp_path, servers):
+    discord, telegram = servers([(204, None)]), servers([(200, {"ok": True})])
+    repo = make_repo(tmp_path, telegram.url, stop_hook=True)
+    write_transcript(repo, PROMPT, shell_started("b1"))
+
+    result = run_hook(repo, discord)
+
+    assert result.returncode == 0
+    time.sleep(0.5)
+    assert discord.requests == []
+
+
+@pytest.mark.parametrize("status", ["completed", "failed", "killed"])
+def test_a_message_is_sent_once_the_background_shell_command_is_notified(tmp_path, servers, status):
+    discord, telegram = servers([(204, None)]), servers([(200, {"ok": True})])
+    repo = make_repo(tmp_path, telegram.url, stop_hook=True)
+    write_transcript(repo, PROMPT, shell_started("b1"), shell_ended("b1", status))
+
+    run_hook(repo, discord, last_assistant_message="All done.")
+
+    assert sent_text(discord) == "All done."
+
+
+def test_a_message_is_sent_for_a_turn_a_shell_command_notification_started(tmp_path, servers):
+    discord, telegram = servers([(204, None)]), servers([(200, {"ok": True})])
+    repo = make_repo(tmp_path, telegram.url, stop_hook=True)
+    write_transcript(repo, PROMPT, shell_started("b1"), STOP_SUMMARY, delivered("b1", "completed", "done"))
+
+    run_hook(repo, discord, last_assistant_message="All done.")
+
+    assert sent_text(discord) == "All done."
+
+
 def test_nothing_is_sent_when_a_late_hand_back_starts_a_turn_after_every_subagent_finished(tmp_path, servers):
     discord, telegram = servers([(204, None)]), servers([(200, {"ok": True})])
     repo = make_repo(tmp_path, telegram.url, stop_hook=True)
