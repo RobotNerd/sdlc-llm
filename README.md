@@ -281,7 +281,46 @@ section, so the hook does nothing, and prints nothing, without one.
 4. Create a customer, a project for the repo, and an activity such as `Development`. Give the
    team access to the project. Note the project's id and the activity's id.
 5. In the system settings, allow more than one active timesheet entry per user.
-6. Log in as `agent`, create an API token, and add it to the repo's `.env`:
+6. Turn off rounding. Without this step, Kimai rounds entries to whole minutes, which overcounts
+   short agent turns. Kimai's config folder isn't in a volume, so a file written inside the
+   container is lost when the container is recreated. Keep the file on the host, beside
+   `docker-compose.yml`, and mount it. Create this file:
+
+   ```text
+   local.yaml
+   ```
+
+   ```yaml
+   kimai:
+       timesheet:
+           rounding:
+               default:
+                   days: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
+                   begin: 0
+                   end: 0
+                   duration: 0
+                   mode: default
+   ```
+
+   Add this line to the Kimai service's `volumes` in `docker-compose.yml`:
+
+   ```yaml
+   - ./local.yaml:/opt/kimai/config/packages/local.yaml:ro
+   ```
+
+   Then recreate the container, beside `docker-compose.yml`:
+
+   ```bash
+   docker compose up -d
+   ```
+
+   Then reload the cache, in the Kimai container:
+
+   ```bash
+   bin/console kimai:reload --env=prod
+   ```
+
+7. Log in as `agent`, create an API token, and add it to the repo's `.env`:
 
    ```text
    KIMAI_API_TOKEN=<the token>

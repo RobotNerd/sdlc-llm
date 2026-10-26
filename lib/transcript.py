@@ -58,13 +58,29 @@ def running_background_subagents(entries):
     return running
 
 
+def running_background_commands(entries):
+    """Return the ids of background shell commands that have started and no task notification has named."""
+    running = set()
+    for entry in entries:
+        running -= {command for command, _, _ in task_notifications(entry)}
+        result = entry.get("toolUseResult")
+        if entry.get("type") == "user" and isinstance(result, dict) and result.get("backgroundTaskId"):
+            running.add(result["backgroundTaskId"])
+    return running
+
+
+def running_background_work(entries):
+    """Return the ids of background subagents and shell commands still running."""
+    return running_background_subagents(entries) | running_background_commands(entries)
+
+
 def has_finished(status, summary):
     """A completed notification can mean the subagent only stopped to wait on background work of its own."""
     return status != "completed" or summary.endswith("finished")
 
 
 def task_notifications(entry):
-    """Return (agent id, status, summary) for each task notification an entry carries."""
+    """Return (task id, status, summary) for each task notification an entry carries."""
     if entry.get("type") not in ("queue-operation", "user"):
         return []
     content = (
@@ -72,7 +88,7 @@ def task_notifications(entry):
     )
     if not isinstance(content, str):
         return []
-    return [(agent, status, summary) for agent, status, summary in TASK_NOTIFICATION.findall(content)]
+    return [(task, status, summary) for task, status, summary in TASK_NOTIFICATION.findall(content)]
 
 
 def turn_started_by_finished_subagents(entries):

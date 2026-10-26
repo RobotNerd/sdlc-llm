@@ -27,7 +27,7 @@ A Claude Code plugin for one developer: four skills that plan, groom, implement,
 | `lib/reference_check.py` | Fails, in CI, when a committed file cites a tracker item |
 | `lib/svg_theme.py` | Makes an exported diagram SVG follow the viewer's light or dark mode |
 | `lib/time_report.py` | Prints a project's time report from Kimai and Kaneo: agent hours and human hours per task |
-| `lib/transcript.py` | Reads a session transcript: its entries, usage-limit notes, and background subagents still running. Shared by the hooks. |
+| `lib/transcript.py` | Reads a session transcript: its entries, usage-limit notes, and background subagents and shell commands still running. Shared by the hooks. |
 | `lib/validate_draft.py` | Checks task drafts against the task format |
 
 ## Per-repo files
