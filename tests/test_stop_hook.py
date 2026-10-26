@@ -154,7 +154,7 @@ def test_hooks_file_runs_the_hook_on_stop_and_stop_failure_from_the_plugin_root(
     for event in ("Stop", "StopFailure"):
         commands = [hook["command"] for entry in hooks[event] for hook in entry["hooks"]]
 
-        assert commands == ['python3 "${CLAUDE_PLUGIN_ROOT}/hooks/stop_notify.py"']
+        assert 'python3 "${CLAUDE_PLUGIN_ROOT}/hooks/stop_notify.py"' in commands
 
 
 def test_a_usage_limit_stop_failure_gives_the_reset_time(tmp_path, servers):

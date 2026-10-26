@@ -14,8 +14,9 @@ A Claude Code plugin for one developer: four skills that plan, groom, implement,
 | Scripts (`lib/`) | Work that must be exact, or would load a large payload into context. Stdlib Python. |
 | Notifiers (`lib/backends/`) | Discord and Telegram senders for `lib/notify.py`, behind the `Notifier` interface. |
 | Kaneo client (`lib/backends/kaneo.py`, `lib/backends/rest.py`) | Kaneo's REST API, for scripts. Skills use the Kaneo MCP tools instead. |
-| Hooks (`hooks/hooks.json`) | `hooks/session_start.py` runs on SessionStart, and puts the in-progress and in-review tasks in the session's context. `hooks/stop_notify.py` runs on Stop and StopFailure, and notifies with the session's state. |
-| MCP config (`mcp.json`) | Declares the `kaneo` and `outline` MCP servers, each reached over HTTP, with URLs from the plugin's `userConfig`. The manifest names it, because a root `.mcp.json` would also load as the repo's own project MCP config. |
+| Kimai client (`lib/backends/kimai.py`) | Kimai's REST API, for the time-tracking hook and `lib/time_report.py`, over the shared `lib/backends/rest.py`. |
+| Hooks (`hooks/hooks.json`) | `hooks/session_start.py` runs on SessionStart, and puts the in-progress and in-review tasks in the session's context. `hooks/stop_notify.py` runs on Stop and StopFailure, and notifies with the session's state. `hooks/time_track.py` runs on UserPromptSubmit, Stop, StopFailure, and SessionEnd, and records each turn's wall-clock time as a Kimai entry, in repos with a `[time_tracking]` section. |
+| MCP config (`mcp.json`) | Declares the `kaneo`, `kimai`, and `outline` MCP servers, each reached over HTTP, with URLs from the plugin's `userConfig`. The manifest names it, because a root `.mcp.json` would also load as the repo's own project MCP config. |
 
 ### Scripts
 
@@ -25,15 +26,16 @@ A Claude Code plugin for one developer: four skills that plan, groom, implement,
 | `lib/notify.py` | Sends an ASK or STOP notification to Discord, with Telegram as the fallback |
 | `lib/reference_check.py` | Fails, in CI, when a committed file cites a tracker item |
 | `lib/svg_theme.py` | Makes an exported diagram SVG follow the viewer's light or dark mode |
-| `lib/transcript.py` | Reads a session transcript: its entries, usage-limit notes, and background subagents still running |
+| `lib/time_report.py` | Prints a project's time report from Kimai and Kaneo: agent hours and human hours per task |
+| `lib/transcript.py` | Reads a session transcript: its entries, usage-limit notes, and background subagents still running. Shared by the hooks. |
 | `lib/validate_draft.py` | Checks task drafts against the task format |
 
 ## Per-repo files
 
 A project using the plugin keeps everything unique to it in its own repo. The skills read only these:
 
-* `.env`: the Kaneo API key, the notification tokens, and the Telegram chat id, which isn't a secret. Read only by scripts.
-* `.sdlc/config.toml`: the Kaneo project, the Outline collection, and repo settings such as the check commands.
+* `.env`: the Kaneo API key, `KIMAI_API_TOKEN`, the notification tokens, and the Telegram chat id, which isn't a secret. Read only by scripts.
+* `.sdlc/config.toml`: the Kaneo project, the Outline collection, the `[time_tracking]` section that turns on time tracking, and repo settings such as the check commands.
 * `CLAUDE.md`: the project's rules and checks.
 * `docs/guidelines/`: the project's guideline docs, with fixed file names.
 
@@ -43,8 +45,9 @@ A project using the plugin keeps everything unique to it in its own repo. The sk
 |-------|-------|
 | Tasks, epics, deferred work, status, order, dependencies, task comments | Kaneo |
 | Specs and questions docs | Outline |
+| Time entries | Kimai |
 | Code, tests, config, guideline docs | The repo |
-| Drafts and other scratch state | `.sdlc/local/` (gitignored) |
+| Drafts, the running time entry, and other scratch state | `.sdlc/local/` (gitignored) |
 | Secrets | `.env` (gitignored), read only by scripts |
 
 Kaneo carries a batch's state between sessions: a new session resumes from the tasks' statuses. The only links between Kaneo and the repo are task keys in commit messages. Committed files never cite tracker items.
@@ -57,8 +60,8 @@ docs/diagrams/         diagrams
 docs/guidelines/       guideline docs
 hooks/                 plugin hooks
 lib/                   scripts and shared code: config, .env loader
-lib/backends/          notifiers and the Kaneo REST client
-mcp.json               Kaneo and Outline MCP servers
+lib/backends/          notifiers and the Kaneo and Kimai REST clients
+mcp.json               Kaneo, Kimai, and Outline MCP servers
 skills/<name>/         SKILL.md
 tests/                 script tests and fakes
 ```
@@ -74,7 +77,7 @@ Shared code lives only in `lib/`. A script finds `lib/` by a path relative to it
 
 ## Key decisions
 
-* **Built for one developer.** No backend abstraction and no install path for other people. Kaneo and Outline are the only backends, and skills call their MCP tools by name.
+* **Built for one developer.** No backend abstraction and no install path for other people. Kimai, Kaneo, and Outline are the only backends, and skills call their MCP tools by name.
 * **A real tracker, not files in the repo.** A markdown tracker needed a generator and hooks just to stay consistent, and its archives went stale.
 * **Short skills, scripts for exact work.** A skill states the goal, the hard rules, and when to stop, and leaves the tool calls to Claude. A step becomes a script only when it must be exact or cheap.
 * **A pull request per batch, merged by the developer.** `work` commits each task on one branch and opens one pull request. Skills never push to the default branch or merge.

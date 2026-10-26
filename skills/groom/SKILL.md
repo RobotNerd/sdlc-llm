@@ -1,7 +1,7 @@
 ---
 name: groom
 description: Reviews the project's Kaneo backlog and proposes fixes. Use when the developer asks to groom, refine, tidy, triage, or review the backlog, to find blocked, stale, or under-specified tasks, or to check what's ready to work on.
-allowed-tools: Bash(python3 ${CLAUDE_PLUGIN_ROOT}/lib/board.py*), Bash(python3 ${CLAUDE_PLUGIN_ROOT}/lib/notify.py *), Bash(python3 ${CLAUDE_PLUGIN_ROOT}/lib/validate_draft.py *)
+allowed-tools: Bash(python3 ${CLAUDE_PLUGIN_ROOT}/lib/board.py*), Bash(python3 ${CLAUDE_PLUGIN_ROOT}/lib/notify.py *), Bash(python3 ${CLAUDE_PLUGIN_ROOT}/lib/time_report.py*), Bash(python3 ${CLAUDE_PLUGIN_ROOT}/lib/validate_draft.py *)
 model: opus
 ---
 
@@ -44,7 +44,7 @@ Then read each to-do and Planned task, and its comments, by id. Then find:
 
 6. **Ready tasks:** a Planned task that isn't under-specified, deferred, or an epic. Propose moving it to the end of To Do.
 7. **Deferred tasks:** each `deferred` task. Choices: promote it to a full task in Planned, keep it, or archive it as `wont-do`.
-8. **Finished epics:** an epic whose subtasks are all done or archived. Propose moving it to done.
+8. **Finished epics:** an epic whose subtasks are all done or archived. Propose moving it to done. When confirmed, move it, then run `python3 ${CLAUDE_PLUGIN_ROOT}/lib/time_report.py --markdown`. Create a doc titled with the epic's title in the collection's `reports/epics` folder, creating the folder if missing, or update that doc if it exists. Without a `[time_tracking]` section, publish nothing and report that time tracking isn't set up.
 
 ## Propose and apply
 
