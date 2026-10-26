@@ -65,8 +65,10 @@ def make_repo(tmp_path, url=None):
     return tmp_path
 
 
-def run_hook(repo, event, session_id="s1"):
+def run_hook(repo, event, session_id="s1", transcript=None):
     hook_input = {"cwd": str(repo), "hook_event_name": event, "session_id": session_id}
+    if transcript:
+        hook_input["transcript_path"] = str(transcript)
     return subprocess.run(
         [sys.executable, str(HOOK)],
         capture_output=True,
@@ -145,3 +147,38 @@ def test_unreachable_kimai_warns_and_exits_zero(tmp_path):
     result = run_hook(make_repo(tmp_path, f"http://127.0.0.1:{port}"), "UserPromptSubmit")
     assert result.returncode == 0
     assert "warning" in result.stderr and "can't connect" in result.stderr
+
+
+def make_transcript(tmp_path, finished):
+    launch = {"type": "user", "toolUseResult": {"isAsync": True, "agentId": "a1"}}
+    lines = [launch]
+    if finished:
+        note = "<task-id>a1</task-id><status>completed</status><summary>Agent finished</summary>"
+        lines.append({"type": "queue-operation", "content": note})
+    path = tmp_path / "transcript.jsonl"
+    path.write_text("".join(json.dumps(line) + "\n" for line in lines))
+    return path
+
+
+def test_stop_with_a_running_subagent_keeps_the_entry(tmp_path, kimai):
+    repo = make_repo(tmp_path, kimai.url)
+    run_hook(repo, "UserPromptSubmit")
+    result = run_hook(repo, "Stop", transcript=make_transcript(tmp_path, finished=False))
+    assert result.returncode == 0 and result.stderr == ""
+    assert len(kimai.requests) == 1
+    assert read_state(repo)["entry_id"] == 7
+
+
+def test_stop_with_every_subagent_finished_stops_the_entry(tmp_path, kimai):
+    repo = make_repo(tmp_path, kimai.url)
+    run_hook(repo, "UserPromptSubmit")
+    run_hook(repo, "Stop", transcript=make_transcript(tmp_path, finished=True))
+    assert [(r["method"], r["path"]) for r in kimai.requests[1:]] == [("PATCH", "/api/timesheets/7/stop")]
+
+
+@pytest.mark.parametrize("event", ["StopFailure", "SessionEnd"])
+def test_failure_or_session_end_stops_despite_a_running_subagent(tmp_path, kimai, event):
+    repo = make_repo(tmp_path, kimai.url)
+    run_hook(repo, "UserPromptSubmit")
+    run_hook(repo, event, transcript=make_transcript(tmp_path, finished=False))
+    assert [(r["method"], r["path"]) for r in kimai.requests[1:]] == [("PATCH", "/api/timesheets/7/stop")]

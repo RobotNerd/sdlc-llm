@@ -1,7 +1,8 @@
 """Time-tracking hook: record each turn's wall-clock time as a Kimai entry.
 
 UserPromptSubmit starts an entry for the repo's project and activity, unless this repo's
-entry is already running. Stop, StopFailure, and SessionEnd stop it. The running entry lives
+entry is already running. Stop, StopFailure, and SessionEnd stop it, except that a Stop leaves
+the entry running while a background subagent the session started hasn't reported back. The running entry lives
 in .sdlc/local/time-entry.json.
 
 Time tracking is on only when .sdlc/config.toml has a [time_tracking] section. A repo
@@ -21,6 +22,7 @@ from lib.backends.kimai import KimaiApi
 from lib.backends.rest import RestError
 from lib.config import ConfigError, find_repo_root, load_config
 from lib.env import EnvError, load_env, require_secret
+from lib.transcript import running_background_subagents, transcript_entries
 
 REQUIRED_KEYS = ("url", "project_id", "activity_id", "agent_user")
 STATE_PATH = ".sdlc/local/time-entry.json"
@@ -45,6 +47,8 @@ def main():
         event = hook_input.get("hook_event_name")
         if event == "UserPromptSubmit":
             start(repo_root, settings, hook_input.get("session_id"))
+        elif event == "Stop" and running_background_subagents(transcript_entries(hook_input.get("transcript_path"))):
+            return 0
         elif event in STOP_EVENTS:
             stop(repo_root, settings)
     except (ConfigError, EnvError, RestError, OSError) as error:
