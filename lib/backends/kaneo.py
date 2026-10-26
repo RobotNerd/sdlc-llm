@@ -47,3 +47,6 @@ class KaneoApi:
 
     def task_relations(self, task_id):
         return self.client.request("get task relations", "GET", f"/task-relation/{task_id}")
+
+    def task_activity(self, task_id):
+        return self.client.request("get task activity", "GET", f"/activity/{task_id}")

@@ -4,6 +4,9 @@ from datetime import datetime
 
 from lib.backends.rest import RestClient
 
+# The most entries one request returns that this client asks for.
+ENTRY_PAGE_SIZE = 200
+
 
 class KimaiApi:
     def __init__(self, url, api_token):
@@ -21,3 +24,11 @@ class KimaiApi:
             return self.client.request("stop entry", "PATCH", f"/api/timesheets/{entry_id}/stop")
         body = {"end": end.astimezone().strftime("%Y-%m-%dT%H:%M:%S")}
         return self.client.request("stop entry", "PATCH", f"/api/timesheets/{entry_id}", body)
+
+    def list_entries(self, project_id, page):
+        """One page of every user's entries on the project, as the token's user is allowed to see them."""
+        query = {"page": page, "project": project_id, "size": ENTRY_PAGE_SIZE, "user": "all"}
+        return self.client.request("list entries", "GET", "/api/timesheets", query=query)
+
+    def list_users(self):
+        return self.client.request("list users", "GET", "/api/users", query={"visible": 3})
