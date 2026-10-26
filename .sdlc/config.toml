@@ -58,6 +58,12 @@ type = "telegram"
 collection_id = "4be4e4cd-f49e-4788-ad60-c927cb2c5c83"
 url = "https://rainbow-flame.taila02055.ts.net:8445"
 
+[time_tracking]
+activity_id = 1
+agent_user = "agent"
+project_id = 1
+url = "https://rainbow-flame.taila02055.ts.net:8448"
+
 [reference_check]
 # Placeholder keys that docs may use in examples.
 allow = ["KEY-NNN"]

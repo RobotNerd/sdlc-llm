@@ -124,6 +124,7 @@ The steps are manual.
 
    * `DISCORD_WEBHOOK_URL`
    * `KANEO_API_KEY`
+   * `KIMAI_API_TOKEN`
    * `OUTLINE_API_KEY`
    * `TELEGRAM_BOT_TOKEN`
    * `TELEGRAM_CHAT_ID`
@@ -197,7 +198,7 @@ The steps are manual.
 
 Everything unique to a project lives in its own repo. The skills read only these:
 
-* `.env`: the Kaneo API key and the notification tokens. Gitignored, and read only by
+* `.env`: the Kaneo API key, the Kimai API token, and the notification tokens. Gitignored, and read only by
   scripts. `.env.example` lists the keys.
 * `.sdlc/config.toml`: the Kaneo project, the Outline collection, and repo settings such as
   the branch prefix and the test, lint, and format commands.
@@ -255,6 +256,7 @@ Then ask the `draw` skill to re-render the diagram from its source.
 | Name | Kind | What it does |
 |------|------|--------------|
 | `hooks/session_start.py` | SessionStart hook | Prints the in-progress and in-review tasks, so a new session knows where things stand |
+| `hooks/time_track.py` | UserPromptSubmit, Stop, StopFailure, and SessionEnd hook | Records each turn's wall-clock time as a Kimai entry, when the repo has `[time_tracking]` |
 | `hooks/stop_notify.py` | Stop and StopFailure hook | Notifies with the session's state, including a usage limit and when it resets |
 | `lib/board.py` | script | Prints one line per open task: key, status, title, labels, open blockers, and id |
 | `lib/notify.py` | script | Sends a notification to Discord, with Telegram as the fallback |
@@ -263,6 +265,53 @@ Then ask the `draw` skill to re-render the diagram from its source.
 | `lib/validate_draft.py` | script | Checks task drafts against the task format |
 
 The hooks do nothing in a repo without `.sdlc/config.toml`.
+
+## Time tracking
+
+The `hooks/time_track.py` hook records how long the agent works as Kimai time entries. A prompt
+starts an entry, and the end of the turn stops it. A repo opts in with a `[time_tracking]`
+section, so the hook does nothing, and prints nothing, without one.
+
+### Set up Kimai
+
+1. Run [Kimai](https://www.kimai.org) on a server, following its Docker docs, and serve it only
+   on your private network.
+2. Create two users: yourself, and `agent`.
+3. Create a team led by `agent`, with you as a member.
+4. Create a customer, a project for the repo, and an activity such as `Development`. Give the
+   team access to the project. Note the project's id and the activity's id.
+5. In the system settings, allow more than one active timesheet entry per user.
+6. Log in as `agent`, create an API token, and add it to the repo's `.env`:
+
+   ```text
+   KIMAI_API_TOKEN=<the token>
+   ```
+
+### The `[time_tracking]` section
+
+Add this to `.sdlc/config.toml`. All four keys are required. Replace the values:
+
+```toml
+[time_tracking]
+url = "https://kimai.example.com"
+project_id = 1
+activity_id = 1
+agent_user = "agent"
+```
+
+* `url`: the Kimai URL, with no trailing slash
+* `project_id`: the id of the repo's Kimai project
+* `activity_id`: the id of the activity entries are recorded on
+* `agent_user`: the Kimai user the token belongs to
+
+The running entry is kept in `.sdlc/local/time-entry.json`. When Kimai is unreachable or
+refuses the token, the hook prints a warning on stderr and the session goes on.
+
+### Record your own time from an iPhone
+
+Install an iPhone app such as Kimai Mobile or Timai from the App Store. Log in with the Kimai
+URL and your own API token, not the agent's. Entries you start there show beside the agent's,
+under your user.
 
 ## Workflows
 
