@@ -18,6 +18,12 @@
       "description": "Base URL of your Kaneo instance, with no trailing slash, for example https://kaneo.example.com",
       "required": true
     },
+    "kimai_mcp_url": {
+      "type": "string",
+      "title": "Kimai MCP URL",
+      "description": "Full URL of your Kimai MCP server, including its path, for example https://kimai-mcp.example.com/mcp",
+      "required": true
+    },
     "outline_url": {
       "type": "string",
       "title": "Outline URL",
